@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, Children } from 'react'
-import { EmotionFilter } from '../components/EmotionFilter'
+import { CategoryFilmStrip } from '../components/CategoryFilmStrip'
 import { MomentCard } from '../components/MomentCard'
 import { MomentCardSkeleton } from '../components/Skeleton'
 import { getRandomMoments, getMomentsByEmotion, getFeedReactions } from '../lib/db'
@@ -53,22 +53,23 @@ export function ExplorePage() {
         className="sticky z-40"
         style={{
           top: 'var(--tg-top, 0px)',
-          background: 'rgba(20,14,10,0.95)',
+          background: 'rgba(20,14,10,0.97)',
           backdropFilter: 'blur(12px)',
+          borderBottom: '1px solid var(--border)',
         }}
       >
-        <div className="px-4 pt-3 pb-0">
-          <h1 className="text-lg font-bold" style={{ color: 'var(--amber)' }}>Подборки</h1>
+        <div style={{ padding: '12px 14px 10px' }}>
+          <h1 style={{ color: 'var(--brown)', fontSize: 18, fontWeight: 800, letterSpacing: 0.3, margin: 0, fontFamily: 'Georgia, serif' }}>
+            Подборки
+          </h1>
         </div>
-        <EmotionFilter active={filter} onChange={setFilter} />
+        <CategoryFilmStrip active={filter} onChange={setFilter} />
       </div>
 
       <div style={{ flex: 1, padding: '8px 12px 96px' }}>
         {loading ? (
           <PhotoGrid>
-            {Array.from({ length: 8 }).map((_, i) => (
-              <MomentCardSkeleton key={i} />
-            ))}
+            {Array.from({ length: 8 }).map((_, i) => <MomentCardSkeleton key={i} />)}
           </PhotoGrid>
         ) : moments.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3 text-center">

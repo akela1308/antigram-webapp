@@ -5,11 +5,22 @@
 :root {
   --bg: #140E0A;
   --bg-warm: #1E1510;
-  --amber: #C9843E;
-  --brown: #A0622A;
+  --amber: #C9922A;
+  --amber-light: #E8B84B;
+  --brown: #8B5B29;
+  --brown-dark: #5C2D0A;
   --text: #E8D5C0;
+  --text-sec: #B89A7A;
   --text-muted: #8A6A50;
-  --border: rgba(201, 132, 62, 0.15);
+  --border: rgba(201, 146, 42, 0.15);
+  --divider: rgba(201, 146, 42, 0.08);
+
+  /* Film strip */
+  --film-track: #0E0804;
+  --film-amber: #A05C18;
+  --film-amber-dark: #6B2E0C;
+  --film-hole: #3A1406;
+  --film-frame-border: #6B3A12;
 }
 
 * {
@@ -34,43 +45,25 @@ html, body {
   flex-direction: column;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-}
+::-webkit-scrollbar { width: 0; height: 0; }
 
-/* Safe area support — --tg-top is set by main.tsx from Telegram WebApp API */
-.safe-bottom {
-  padding-bottom: var(--tg-bottom, env(safe-area-inset-bottom, 0px));
-}
+.safe-bottom { padding-bottom: var(--tg-bottom, env(safe-area-inset-bottom, 0px)); }
+.safe-top    { padding-top:    var(--tg-top,    env(safe-area-inset-top,    0px)); }
 
-.safe-top {
-  padding-top: var(--tg-top, env(safe-area-inset-top, 0px));
-}
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
 
-/* Smooth transitions */
-.page-enter {
-  animation: fadeIn 0.2s ease-out;
-}
+.page-enter { animation: fadeIn 0.2s ease-out; }
 
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Image loading */
-img {
-  display: block;
-}
+img { display: block; }
 
-/* Active states */
-button:active, a:active {
-  opacity: 0.7;
-  transition: opacity 0.1s;
-}
+button:active, a:active { opacity: 0.7; transition: opacity 0.1s; }
 
-/* Skeleton animation */
 @keyframes shimmer {
   0%   { background-position: -200% 0; }
   100% { background-position:  200% 0; }
@@ -80,7 +73,7 @@ button:active, a:active {
   background: linear-gradient(
     90deg,
     var(--bg-warm) 25%,
-    rgba(201, 132, 62, 0.08) 50%,
+    rgba(201, 146, 42, 0.08) 50%,
     var(--bg-warm) 75%
   );
   background-size: 200% 100%;

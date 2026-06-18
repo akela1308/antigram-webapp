@@ -46,7 +46,7 @@ export function MyProfilePage() {
     return (
       <div className="flex flex-col" style={{ minHeight: '100dvh', paddingTop: 'var(--tg-top, 0px)' }}>
         <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--border)' }}>
-          <h2 className="text-base font-bold" style={{ color: 'var(--amber)' }}>Мой профиль</h2>
+          <h2 style={{ color: 'var(--brown)', fontSize: 17, fontWeight: 700, margin: 0, fontFamily: 'Georgia, serif' }}>Мой профиль</h2>
         </div>
         <ProfileSkeleton />
         <div style={{ padding: '0 12px' }} className="grid grid-cols-2 gap-2">
@@ -117,11 +117,11 @@ export function MyProfilePage() {
           borderBottom: '1px solid var(--border)',
         }}
       >
-        <h2 className="text-base font-bold" style={{ color: 'var(--amber)' }}>Мой профиль</h2>
+        <h2 style={{ color: 'var(--brown)', fontSize: 17, fontWeight: 700, margin: 0, fontFamily: 'Georgia, serif' }}>Мой профиль</h2>
         <button
           onClick={handleSignOut}
           className="text-sm px-3 py-1.5 rounded-lg"
-          style={{ color: 'var(--text-muted)', background: 'rgba(255,255,255,0.05)' }}
+          style={{ color: 'var(--text-muted)', background: 'rgba(255,255,255,0.05)', border: 'none', cursor: 'pointer' }}
         >
           Выйти
         </button>
@@ -162,10 +162,20 @@ export function MyProfilePage() {
         )}
 
         {/* Stats */}
-        <div className="flex gap-8 mt-1">
-          <Stat label="постов" value={moments.length} />
-          <Stat label="подписчиков" value={followersCount} />
-          <Stat label="подписок" value={followingCount} />
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: '14px 24px',
+            width: '100%',
+          }}
+        >
+          <Stat label="кадры" value={moments.length} />
+          <div style={{ width: 1, height: 28, background: 'var(--divider)', margin: '0 20px' }} />
+          <Stat label="подписчики" value={followersCount} />
+          <div style={{ width: 1, height: 28, background: 'var(--divider)', margin: '0 20px' }} />
+          <Stat label="подписки" value={followingCount} />
         </div>
       </div>
 
@@ -200,11 +210,16 @@ export function MyProfilePage() {
   )
 }
 
+function fmt(n: number): string {
+  if (n >= 1000) return (n / 1000).toFixed(n >= 10000 ? 0 : 1) + 'K'
+  return String(n)
+}
+
 function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="flex flex-col items-center gap-0.5">
-      <span className="text-lg font-bold" style={{ color: 'var(--text)' }}>{value}</span>
-      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{label}</span>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+      <span style={{ color: 'var(--text)', fontSize: 20, fontWeight: 700 }}>{fmt(value)}</span>
+      <span style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 1 }}>{label}</span>
     </div>
   )
 }

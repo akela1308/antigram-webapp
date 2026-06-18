@@ -179,12 +179,27 @@ export function MomentPage() {
               userReaction={userReaction}
               onReact={handleReact}
               size="md"
+              customMood={
+                moment.custom_mood_emoji && moment.custom_mood_label
+                  ? { emoji: moment.custom_mood_emoji, label: moment.custom_mood_label }
+                  : null
+              }
             />
           </div>
         ) : (
           <div>
             <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>Реакции</p>
-            <ReactionBar reactions={reactions} userReaction={null} onReact={() => {}} size="md" />
+            <ReactionBar
+              reactions={reactions}
+              userReaction={null}
+              onReact={() => {}}
+              size="md"
+              customMood={
+                moment.custom_mood_emoji && moment.custom_mood_label
+                  ? { emoji: moment.custom_mood_emoji, label: moment.custom_mood_label }
+                  : null
+              }
+            />
           </div>
         )}
 
