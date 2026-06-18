@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { EmotionFilter } from '../components/EmotionFilter'
 import { MomentCard } from '../components/MomentCard'
 import { MomentCardSkeleton } from '../components/Skeleton'
@@ -74,17 +74,17 @@ export function FeedPage() {
       </div>
 
       {/* Feed grid */}
-      <div className="flex-1 pb-24 pt-2" style={{ padding: '8px 12px 96px' }}>
+      <div style={{ flex: 1, padding: '8px 12px 96px' }}>
         {loading ? (
-          <div className="grid grid-cols-2 gap-2">
+          <PhotoGrid>
             {Array.from({ length: 8 }).map((_, i) => (
               <MomentCardSkeleton key={i} />
             ))}
-          </div>
+          </PhotoGrid>
         ) : moments.length === 0 ? (
           <EmptyState filter={filter} />
         ) : (
-          <div className="grid grid-cols-2 gap-2">
+          <PhotoGrid>
             {moments.map(moment => (
               <MomentCard
                 key={moment.id}
@@ -92,9 +92,22 @@ export function FeedPage() {
                 reactions={reactionsMap[moment.id] ?? []}
               />
             ))}
-          </div>
+          </PhotoGrid>
         )}
       </div>
+    </div>
+  )
+}
+
+// Two-column grid with explicit flex sizing (avoids CSS grid overflow bugs)
+function PhotoGrid({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+      {React.Children.map(children, child => (
+        <div style={{ width: 'calc(50% - 4px)', minWidth: 0 }}>
+          {child}
+        </div>
+      ))}
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { EmotionFilter } from '../components/EmotionFilter'
 import { MomentCard } from '../components/MomentCard'
 import { MomentCardSkeleton } from '../components/Skeleton'
@@ -63,20 +63,20 @@ export function ExplorePage() {
         <EmotionFilter active={filter} onChange={setFilter} />
       </div>
 
-      <div className="flex-1 pt-2" style={{ padding: '8px 12px 96px' }}>
+      <div style={{ flex: 1, padding: '8px 12px 96px' }}>
         {loading ? (
-          <div className="grid grid-cols-2 gap-2">
+          <PhotoGrid>
             {Array.from({ length: 8 }).map((_, i) => (
               <MomentCardSkeleton key={i} />
             ))}
-          </div>
+          </PhotoGrid>
         ) : moments.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3 text-center">
             <span style={{ fontSize: 48 }}>🔍</span>
             <p style={{ color: 'var(--text-muted)' }}>Нет постов с такой эмоцией.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-2">
+          <PhotoGrid>
             {moments.map(moment => (
               <MomentCard
                 key={moment.id}
@@ -84,9 +84,21 @@ export function ExplorePage() {
                 reactions={reactionsMap[moment.id] ?? []}
               />
             ))}
-          </div>
+          </PhotoGrid>
         )}
       </div>
+    </div>
+  )
+}
+
+function PhotoGrid({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+      {React.Children.map(children, child => (
+        <div style={{ width: 'calc(50% - 4px)', minWidth: 0 }}>
+          {child}
+        </div>
+      ))}
     </div>
   )
 }

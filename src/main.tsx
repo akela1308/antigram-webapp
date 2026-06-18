@@ -24,20 +24,41 @@ function getTgWebApp(): TgWebApp | undefined {
 }
 
 function applyTelegramSafeArea(tg: TgWebApp) {
-  // contentSafeAreaInset.top = height of Telegram's own UI overlay at top
   const contentTop = tg.contentSafeAreaInset?.top ?? 0
-  // safeAreaInset.top = device safe area (notch). Use whichever is larger.
   const deviceTop = tg.safeAreaInset?.top ?? 0
-  const top = Math.max(contentTop, deviceTop)
-  document.documentElement.style.setProperty('--tg-top', `${top}px`)
 
-  const bottom = Math.max(tg.contentSafeAreaInset?.bottom ?? 0, tg.safeAreaInset?.bottom ?? 0)
-  document.documentElement.style.setProperty('--tg-bottom', `${bottom}px`)
+  let topValue: string
+  if (contentTop > 0) {
+    // Telegram API gives exact value (Bot API 8.0+)
+    topValue = `${contentTop}px`
+  } else if (deviceTop > 0) {
+    // Have device safe area, add ~50px for Telegram header
+    topValue = `${deviceTop + 50}px`
+  } else {
+    // Fallback: CSS env() for device notch + ~50px for Telegram header
+    // Works even without JS API — env(safe-area-inset-top) reads from native iOS
+    topValue = 'calc(env(safe-area-inset-top, 44px) + 50px)'
+  }
+
+  document.documentElement.style.setProperty('--tg-top', topValue)
+
+  const contentBottom = tg.contentSafeAreaInset?.bottom ?? 0
+  const deviceBottom = tg.safeAreaInset?.bottom ?? 0
+  const bottomValue = Math.max(contentBottom, deviceBottom)
+  document.documentElement.style.setProperty(
+    '--tg-bottom',
+    bottomValue > 0 ? `${bottomValue}px` : 'env(safe-area-inset-bottom, 0px)',
+  )
 }
 
 function initTelegram() {
   const tg = getTgWebApp()
-  if (!tg) return
+  if (!tg) {
+    // Not in Telegram — no offset needed
+    document.documentElement.style.setProperty('--tg-top', '0px')
+    document.documentElement.style.setProperty('--tg-bottom', '0px')
+    return
+  }
 
   tg.setHeaderColor?.('#140E0A')
   tg.setBackgroundColor?.('#140E0A')
@@ -45,7 +66,6 @@ function initTelegram() {
 
   applyTelegramSafeArea(tg)
 
-  // Re-apply when Telegram notifies of changes (e.g. rotation)
   tg.onEvent?.('contentSafeAreaChanged', () => applyTelegramSafeArea(tg))
   tg.onEvent?.('safeAreaChanged', () => applyTelegramSafeArea(tg))
 
