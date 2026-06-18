@@ -11,7 +11,7 @@ import {
 import type { Moment } from '../lib/types'
 
 export function MyProfilePage() {
-  const { user, profile, loading: authLoading, signOut, isTelegram, telegramUser } = useAuth()
+  const { user, profile, loading: authLoading, signOut, isTelegram, telegramUser, loginWithTelegram, telegramAuthLoading } = useAuth()
   const navigate = useNavigate()
 
   const [moments, setMoments] = useState<Moment[]>([])
@@ -57,19 +57,48 @@ export function MyProfilePage() {
   }
 
   if (!user || !profile) {
+    const tgName = telegramUser
+      ? [telegramUser.first_name, telegramUser.last_name].filter(Boolean).join(' ')
+      : null
+    const tgUsername = telegramUser?.username ? `@${telegramUser.username}` : null
+
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-4 px-6">
         <span style={{ fontSize: 48 }}>👤</span>
         <p className="text-center" style={{ color: 'var(--text-muted)' }}>
           Войдите, чтобы увидеть свой профиль
         </p>
-        <Link
-          to="/auth"
-          className="px-8 py-3 rounded-xl font-semibold text-sm"
-          style={{ background: 'var(--amber)', color: '#140E0A' }}
-        >
-          Войти
-        </Link>
+        {isTelegram && telegramUser ? (
+          <button
+            onClick={loginWithTelegram}
+            disabled={telegramAuthLoading}
+            className="px-8 py-3.5 rounded-xl font-semibold text-sm flex items-center gap-2 transition-opacity"
+            style={{
+              background: 'var(--amber)',
+              color: '#140E0A',
+              opacity: telegramAuthLoading ? 0.7 : 1,
+            }}
+          >
+            {telegramAuthLoading ? (
+              'Входим...'
+            ) : (
+              <>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="#140E0A">
+                  <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.941z"/>
+                </svg>
+                Войти как {tgName ?? tgUsername ?? 'Telegram'}
+              </>
+            )}
+          </button>
+        ) : (
+          <Link
+            to="/auth"
+            className="px-8 py-3 rounded-xl font-semibold text-sm"
+            style={{ background: 'var(--amber)', color: '#140E0A' }}
+          >
+            Войти
+          </Link>
+        )}
       </div>
     )
   }

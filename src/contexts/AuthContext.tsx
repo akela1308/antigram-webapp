@@ -11,10 +11,12 @@ interface AuthContextValue {
   loading: boolean
   isTelegram: boolean
   telegramUser: TelegramUser | null
+  telegramAuthLoading: boolean
   signIn: (email: string, password: string) => Promise<{ error: unknown }>
   signUp: (email: string, password: string, displayName: string) => Promise<{ error: unknown }>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
+  loginWithTelegram: () => Promise<void>
 }
 
 interface TelegramUser {
@@ -58,6 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [telegramUser] = useState<TelegramUser | null>(getTelegramUser)
   const [isTelegram] = useState(isTelegramContext)
+  const [telegramAuthLoading, setTelegramAuthLoading] = useState(false)
 
   const loadProfile = useCallback(async (userId: string) => {
     const p = await getProfile(userId)
@@ -73,6 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const initData = getInitDataRaw()
     if (!initData) return
 
+    setTelegramAuthLoading(true)
     try {
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/telegram-auth`,
@@ -85,7 +89,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           body: JSON.stringify({ initData, telegramUser }),
         },
       )
-      if (!res.ok) return
+      if (!res.ok) {
+        setTelegramAuthLoading(false)
+        return
+      }
 
       const { access_token, refresh_token } = (await res.json()) as {
         access_token: string
@@ -96,7 +103,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         access_token,
         refresh_token,
       })
-      if (error || !data.session) return
+      if (error || !data.session) {
+        setTelegramAuthLoading(false)
+        return
+      }
 
       setSession(data.session)
       setUser(data.session.user)
@@ -104,6 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // Edge Function not available — fall through to email auth
     }
+    setTelegramAuthLoading(false)
   }, [telegramUser, loadProfile])
 
   useEffect(() => {
@@ -177,10 +188,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         isTelegram,
         telegramUser,
+        telegramAuthLoading,
         signIn,
         signUp,
         signOut,
         refreshProfile,
+        loginWithTelegram: authenticateTelegram,
       }}
     >
       {children}
