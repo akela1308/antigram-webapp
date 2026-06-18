@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, Children } from 'react'
 import { EmotionFilter } from '../components/EmotionFilter'
 import { MomentCard } from '../components/MomentCard'
 import { MomentCardSkeleton } from '../components/Skeleton'
@@ -100,9 +100,17 @@ export function FeedPage() {
 }
 
 function PhotoGrid({ children }: { children: React.ReactNode }) {
+  const items = Children.toArray(children)
+  const left = items.filter((_, i) => i % 2 === 0)
+  const right = items.filter((_, i) => i % 2 === 1)
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 8 }}>
-      {children}
+    <div style={{ display: 'flex', gap: 8 }}>
+      <div style={{ flex: '1 1 0%', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {left}
+      </div>
+      <div style={{ flex: '1 1 0%', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {right}
+      </div>
     </div>
   )
 }

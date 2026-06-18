@@ -54,10 +54,9 @@ function applyTelegramSafeArea(tg: TgWebApp) {
 
 function initTelegram() {
   const tg = getTgWebApp()
-  // Detect Telegram by presence of the WebApp expand() method.
-  // initData can be empty in Desktop Telegram, test launches, or direct links,
-  // but expand() is always present in any real Mini App context.
-  if (!tg || typeof tg.expand !== 'function') {
+  // initData is non-empty only when truly running inside Telegram Mini App.
+  // In browsers, telegram-web-app.js sets initData = '' even though expand() exists.
+  if (!tg || !tg.initData) {
     document.documentElement.style.setProperty('--tg-top', '0px')
     document.documentElement.style.setProperty('--tg-bottom', '0px')
     return
@@ -65,7 +64,7 @@ function initTelegram() {
 
   tg.setHeaderColor?.('#140E0A')
   tg.setBackgroundColor?.('#140E0A')
-  tg.expand()
+  tg.expand?.()
 
   applyTelegramSafeArea(tg)
 
