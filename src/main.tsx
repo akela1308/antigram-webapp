@@ -36,9 +36,10 @@ function applyTelegramSafeArea(tg: TgWebApp) {
     // Bot API 7.10+: device notch height + ~50px for Telegram bar
     topValue = `${deviceTop + 50}px`
   } else {
-    // Fallback: CSS env() reads the real OS notch height (0px on flat-screen devices)
-    // + 50px for the Telegram header bar that overlays our content
-    topValue = 'calc(env(safe-area-inset-top, 0px) + 50px)'
+    // Fallback: use env() for OS notch + 54px for Telegram bar.
+    // Minimum 94px ensures content clears Telegram's bar on iPhones where
+    // env(safe-area-inset-top) may report 0 inside the WebView.
+    topValue = 'max(calc(env(safe-area-inset-top, 44px) + 54px), 94px)'
   }
 
   document.documentElement.style.setProperty('--tg-top', topValue)
