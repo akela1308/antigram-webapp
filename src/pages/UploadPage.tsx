@@ -73,13 +73,16 @@ export function UploadPage() {
   }
 
   return (
-    <div className="flex flex-col" style={{ minHeight: '100dvh', background: 'var(--bg)' }}>
+    <div className="flex flex-col" style={{ minHeight: '100dvh', background: 'var(--bg)', paddingTop: 'var(--tg-top, 0px)' }}>
       {/* Header */}
       <div
-        className="flex items-center justify-between px-4 safe-top"
+        className="sticky z-40 flex items-center justify-between px-4"
         style={{
-          paddingTop: `max(16px, env(safe-area-inset-top, 16px))`,
+          top: 'var(--tg-top, 0px)',
+          paddingTop: 16,
           paddingBottom: 12,
+          background: 'rgba(20,14,10,0.95)',
+          backdropFilter: 'blur(12px)',
           borderBottom: '1px solid var(--border)',
         }}
       >

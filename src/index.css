@@ -40,13 +40,13 @@ html, body {
   height: 0;
 }
 
-/* Safe area support */
+/* Safe area support — --tg-top is set by main.tsx from Telegram WebApp API */
 .safe-bottom {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: var(--tg-bottom, env(safe-area-inset-bottom, 0px));
 }
 
 .safe-top {
-  padding-top: env(safe-area-inset-top, 0px);
+  padding-top: var(--tg-top, env(safe-area-inset-top, 0px));
 }
 
 /* Smooth transitions */

@@ -86,15 +86,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           },
-          body: JSON.stringify({ initData, telegramUser }),
+          body: JSON.stringify({ initData }),
         },
       )
+
+      const body = await res.json()
+
       if (!res.ok) {
+        console.error('[TG Auth] Edge Function error:', res.status, body)
         setTelegramAuthLoading(false)
         return
       }
 
-      const { access_token, refresh_token } = (await res.json()) as {
+      const { access_token, refresh_token } = body as {
         access_token: string
         refresh_token: string
       }
@@ -104,6 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         refresh_token,
       })
       if (error || !data.session) {
+        console.error('[TG Auth] setSession error:', error)
         setTelegramAuthLoading(false)
         return
       }
@@ -111,11 +116,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(data.session)
       setUser(data.session.user)
       await loadProfile(data.session.user.id)
-    } catch {
-      // Edge Function not available — fall through to email auth
+    } catch (err) {
+      console.error('[TG Auth] fetch exception:', err)
     }
     setTelegramAuthLoading(false)
-  }, [telegramUser, loadProfile])
+  }, [loadProfile])
 
   useEffect(() => {
     let mounted = true

@@ -44,12 +44,12 @@ export function MyProfilePage() {
 
   if (authLoading || loading) {
     return (
-      <div className="flex flex-col" style={{ minHeight: '100dvh' }}>
-        <div className="px-4 py-3 safe-top" style={{ borderBottom: '1px solid var(--border)' }}>
+      <div className="flex flex-col" style={{ minHeight: '100dvh', paddingTop: 'var(--tg-top, 0px)' }}>
+        <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--border)' }}>
           <h2 className="text-base font-bold" style={{ color: 'var(--amber)' }}>Мой профиль</h2>
         </div>
         <ProfileSkeleton />
-        <div className="grid grid-cols-2 gap-2 px-3">
+        <div style={{ padding: '0 12px' }} className="grid grid-cols-2 gap-2">
           {Array.from({ length: 4 }).map((_, i) => <MomentCardSkeleton key={i} />)}
         </div>
       </div>
@@ -106,11 +106,16 @@ export function MyProfilePage() {
   const displayName = profile.display_name ?? profile.username ?? telegramUser?.first_name ?? 'Аноним'
 
   return (
-    <div className="flex flex-col" style={{ minHeight: '100dvh', background: 'var(--bg)' }}>
+    <div className="flex flex-col" style={{ minHeight: '100dvh', background: 'var(--bg)', paddingTop: 'var(--tg-top, 0px)' }}>
       {/* Header */}
       <div
-        className="sticky top-0 z-40 flex items-center justify-between px-4 py-3 safe-top"
-        style={{ background: 'rgba(20,14,10,0.95)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border)' }}
+        className="sticky z-40 flex items-center justify-between px-4 py-3"
+        style={{
+          top: 'var(--tg-top, 0px)',
+          background: 'rgba(20,14,10,0.95)',
+          backdropFilter: 'blur(12px)',
+          borderBottom: '1px solid var(--border)',
+        }}
       >
         <h2 className="text-base font-bold" style={{ color: 'var(--amber)' }}>Мой профиль</h2>
         <button
@@ -168,7 +173,7 @@ export function MyProfilePage() {
       <div style={{ height: 1, background: 'var(--border)', margin: '0 16px 12px' }} />
 
       {/* Moments grid */}
-      <div className="grid grid-cols-2 gap-2 px-3 pb-28">
+      <div className="grid grid-cols-2 gap-2 pb-28" style={{ padding: '0 12px 112px' }}>
         {moments.length === 0 ? (
           <div className="col-span-2 flex flex-col items-center py-16 gap-2">
             <span style={{ fontSize: 40 }}>📷</span>

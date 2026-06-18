@@ -57,11 +57,15 @@ export function FeedPage() {
   }, [loadFeed])
 
   return (
-    <div className="flex flex-col" style={{ minHeight: '100dvh' }}>
-      {/* Header */}
+    <div className="flex flex-col" style={{ minHeight: '100dvh', paddingTop: 'var(--tg-top, 0px)' }}>
+      {/* Header — sticks below Telegram's own header */}
       <div
-        className="sticky top-0 z-40 safe-top"
-        style={{ background: 'rgba(20,14,10,0.95)', backdropFilter: 'blur(12px)' }}
+        className="sticky z-40"
+        style={{
+          top: 'var(--tg-top, 0px)',
+          background: 'rgba(20,14,10,0.95)',
+          backdropFilter: 'blur(12px)',
+        }}
       >
         <div className="px-4 pt-3 pb-0">
           <h1 className="text-lg font-bold" style={{ color: 'var(--amber)' }}>ANTIGRAM</h1>
@@ -70,7 +74,7 @@ export function FeedPage() {
       </div>
 
       {/* Feed grid */}
-      <div className="flex-1 px-3 pb-24 pt-2">
+      <div className="flex-1 pb-24 pt-2" style={{ padding: '8px 12px 96px' }}>
         {loading ? (
           <div className="grid grid-cols-2 gap-2">
             {Array.from({ length: 8 }).map((_, i) => (
