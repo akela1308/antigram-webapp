@@ -30,15 +30,15 @@ function applyTelegramSafeArea(tg: TgWebApp) {
 
   let topValue: string
   if (contentTop > 0) {
-    // Telegram API gives exact value (Bot API 8.0+)
+    // Bot API 8.0+: exact value, accounts for everything (notch + Telegram bar)
     topValue = `${contentTop}px`
   } else if (deviceTop > 0) {
-    // Have device safe area, add ~50px for Telegram header
+    // Bot API 7.10+: device notch height + ~50px for Telegram bar
     topValue = `${deviceTop + 50}px`
   } else {
-    // Fallback: CSS env() for device notch + ~50px for Telegram header
-    // Works even without JS API — env(safe-area-inset-top) reads from native iOS
-    topValue = 'calc(env(safe-area-inset-top, 44px) + 50px)'
+    // Fallback: CSS env() reads the real OS notch height (0px on flat-screen devices)
+    // + 50px for the Telegram header bar that overlays our content
+    topValue = 'calc(env(safe-area-inset-top, 0px) + 50px)'
   }
 
   document.documentElement.style.setProperty('--tg-top', topValue)
@@ -54,8 +54,10 @@ function applyTelegramSafeArea(tg: TgWebApp) {
 
 function initTelegram() {
   const tg = getTgWebApp()
-  if (!tg || !tg.initData) {
-    // Not in Telegram (browser/Safari) — no offset needed
+  // Detect Telegram by presence of the WebApp expand() method.
+  // initData can be empty in Desktop Telegram, test launches, or direct links,
+  // but expand() is always present in any real Mini App context.
+  if (!tg || typeof tg.expand !== 'function') {
     document.documentElement.style.setProperty('--tg-top', '0px')
     document.documentElement.style.setProperty('--tg-bottom', '0px')
     return
@@ -63,7 +65,7 @@ function initTelegram() {
 
   tg.setHeaderColor?.('#140E0A')
   tg.setBackgroundColor?.('#140E0A')
-  tg.expand?.()
+  tg.expand()
 
   applyTelegramSafeArea(tg)
 
