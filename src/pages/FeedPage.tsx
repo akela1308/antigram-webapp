@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { EmotionFilter } from '../components/EmotionFilter'
 import { MomentCard } from '../components/MomentCard'
 import { MomentCardSkeleton } from '../components/Skeleton'
@@ -99,15 +99,10 @@ export function FeedPage() {
   )
 }
 
-// Two-column grid with explicit flex sizing (avoids CSS grid overflow bugs)
 function PhotoGrid({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-      {React.Children.map(children, child => (
-        <div style={{ width: 'calc(50% - 4px)', minWidth: 0 }}>
-          {child}
-        </div>
-      ))}
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+      {children}
     </div>
   )
 }

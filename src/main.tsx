@@ -6,6 +6,7 @@ import { AuthProvider } from './contexts/AuthContext'
 import './index.css'
 
 type TgWebApp = {
+  initData?: string
   setHeaderColor?: (color: string) => void
   setBackgroundColor?: (color: string) => void
   expand?: () => void
@@ -53,8 +54,8 @@ function applyTelegramSafeArea(tg: TgWebApp) {
 
 function initTelegram() {
   const tg = getTgWebApp()
-  if (!tg) {
-    // Not in Telegram — no offset needed
+  if (!tg || !tg.initData) {
+    // Not in Telegram (browser/Safari) — no offset needed
     document.documentElement.style.setProperty('--tg-top', '0px')
     document.documentElement.style.setProperty('--tg-bottom', '0px')
     return
