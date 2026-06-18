@@ -32,7 +32,7 @@ export function App() {
   return (
     <div
       className="mx-auto relative"
-      style={{ maxWidth: 480, minHeight: '100dvh', background: 'var(--bg)' }}
+      style={{ maxWidth: 480, minHeight: '100dvh', background: 'var(--bg)', width: '100%', overflowX: 'clip' }}
     >
       <Routes>
         <Route path="/" element={<FeedPage />} />
