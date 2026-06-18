@@ -1,6 +1,8 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 import { FeedPage } from './pages/FeedPage'
+import { ExplorePage } from './pages/ExplorePage'
+import { UploadPage } from './pages/UploadPage'
 import { MomentPage } from './pages/MomentPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { MyProfilePage } from './pages/MyProfilePage'
@@ -34,6 +36,8 @@ export function App() {
     >
       <Routes>
         <Route path="/" element={<FeedPage />} />
+        <Route path="/explore" element={<ExplorePage />} />
+        <Route path="/upload" element={<UploadPage />} />
         <Route path="/moment/:id" element={<MomentPage />} />
         <Route path="/profile/:userId" element={<ProfilePage />} />
         <Route path="/me" element={<MyProfilePage />} />

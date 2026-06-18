@@ -17,7 +17,7 @@ export function MomentCard({ moment, reactions }: MomentCardProps) {
     <Link to={`/moment/${moment.id}`} className="flex flex-col gap-1.5 group">
       <div
         className="relative w-full overflow-hidden rounded-xl"
-        style={{ paddingBottom: '133%' }}
+        style={{ paddingBottom: '125%' }}
       >
         <img
           src={moment.photo_url}
