@@ -10,6 +10,7 @@ import { AuthPage } from './pages/AuthPage'
 import { NotificationsPage } from './pages/NotificationsPage'
 import { SearchPage } from './pages/SearchPage'
 import { MomentFeedPage } from './pages/MomentFeedPage'
+import { AlbumDetailPage } from './pages/AlbumDetailPage'
 import { BottomNav } from './components/BottomNav'
 
 export function App() {
@@ -33,7 +34,9 @@ export function App() {
     )
   }
 
-  const hideNav = location.pathname === '/upload' || location.pathname === '/moment-feed'
+  const hideNav = location.pathname === '/upload'
+    || location.pathname === '/moment-feed'
+    || location.pathname.startsWith('/album/')
 
   return (
     <div
@@ -50,6 +53,7 @@ export function App() {
         <Route path="/profile/:userId" element={<ProfilePage />} />
         <Route path="/me" element={<MyProfilePage />} />
         <Route path="/moment-feed" element={<MomentFeedPage />} />
+        <Route path="/album/:albumId" element={<AlbumDetailPage />} />
         <Route path="/auth" element={<AuthPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

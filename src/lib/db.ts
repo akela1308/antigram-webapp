@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import type { Profile, Moment, MomentWithProfile, ReactionType, CommentWithProfile } from './types'
+import type { Profile, Moment, MomentWithProfile, ReactionType, CommentWithProfile, Album, AlbumWithMoments, HighlightWithMoment } from './types'
 
 // ─── PROFILES ────────────────────────────────────────────────────────────────
 
@@ -273,6 +273,126 @@ export async function getComments(momentId: string): Promise<CommentWithProfile[
     ...c,
     profiles: profileMap[c.user_id] ?? null,
   }))
+}
+
+// ── Highlights ────────────────────────────────────────────────────────────────
+
+export async function getHighlights(userId: string): Promise<HighlightWithMoment[]> {
+  const { data } = await supabase
+    .from('highlights')
+    .select('*, moments(id, photo_url)')
+    .eq('user_id', userId)
+    .order('position')
+  return (data as HighlightWithMoment[]) ?? []
+}
+
+export async function setHighlightAtPosition(
+  userId: string, momentId: string, position: number
+): Promise<{ error: unknown }> {
+  const { error } = await supabase
+    .from('highlights')
+    .upsert({ user_id: userId, moment_id: momentId, position }, { onConflict: 'user_id,position' })
+  return { error }
+}
+
+export async function removeHighlightAtPosition(
+  userId: string, position: number
+): Promise<{ error: unknown }> {
+  const { error } = await supabase
+    .from('highlights')
+    .delete()
+    .eq('user_id', userId)
+    .eq('position', position)
+  return { error }
+}
+
+// ── Albums ────────────────────────────────────────────────────────────────────
+
+export async function getUserAlbums(userId: string): Promise<AlbumWithMoments[]> {
+  const { data: albums } = await supabase
+    .from('albums')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+  if (!albums || albums.length === 0) return []
+
+  const result: AlbumWithMoments[] = await Promise.all(
+    (albums as Album[]).map(async (album) => {
+      const { count } = await supabase
+        .from('album_moments')
+        .select('*', { count: 'exact', head: true })
+        .eq('album_id', album.id)
+      const { data: first } = await supabase
+        .from('album_moments')
+        .select('moments(photo_url)')
+        .eq('album_id', album.id)
+        .order('added_at', { ascending: false })
+        .limit(1)
+        .single()
+      const firstUrl = (first as any)?.moments?.photo_url ?? null
+      return { ...album, moments_count: count ?? 0, first_moment_url: firstUrl }
+    })
+  )
+  return result
+}
+
+export async function createAlbum(
+  userId: string, title: string
+): Promise<{ data: Album | null; error: unknown }> {
+  const { data, error } = await supabase
+    .from('albums')
+    .insert({ user_id: userId, title })
+    .select()
+    .single()
+  return { data: data as Album | null, error }
+}
+
+export async function deleteAlbum(albumId: string): Promise<{ error: unknown }> {
+  const { error } = await supabase.from('albums').delete().eq('id', albumId)
+  return { error }
+}
+
+export async function updateAlbumTitle(
+  albumId: string, title: string
+): Promise<{ error: unknown }> {
+  const { error } = await supabase.from('albums').update({ title }).eq('id', albumId)
+  return { error }
+}
+
+export async function getAlbumMoments(albumId: string): Promise<Moment[]> {
+  const { data } = await supabase
+    .from('album_moments')
+    .select('moments(*)')
+    .eq('album_id', albumId)
+    .order('added_at', { ascending: false })
+  return ((data ?? []).map((d: any) => d.moments).filter(Boolean)) as Moment[]
+}
+
+export async function addMomentToAlbum(
+  albumId: string, momentId: string
+): Promise<{ error: unknown }> {
+  const { error } = await supabase
+    .from('album_moments')
+    .insert({ album_id: albumId, moment_id: momentId })
+  return { error }
+}
+
+export async function removeMomentFromAlbum(
+  albumId: string, momentId: string
+): Promise<{ error: unknown }> {
+  const { error } = await supabase
+    .from('album_moments')
+    .delete()
+    .eq('album_id', albumId)
+    .eq('moment_id', momentId)
+  return { error }
+}
+
+// ── Moment delete ─────────────────────────────────────────────────────────────
+
+export async function deleteMoment(momentId: string): Promise<{ error: unknown }> {
+  const { error } = await supabase.from('moments').delete().eq('id', momentId)
+  return { error }
 }
 
 export async function addComment(

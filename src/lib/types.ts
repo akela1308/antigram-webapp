@@ -16,6 +16,7 @@ export interface Moment {
   mood: string | null
   custom_mood_emoji: string | null
   custom_mood_label: string | null
+  film_preset_id: string | null
   is_public: boolean
   created_at: string
 }
@@ -67,6 +68,31 @@ export interface NotificationItem {
   created_at: string
   profiles: Profile | null
   moments: { photo_url: string } | null
+}
+
+export interface Highlight {
+  id: string
+  user_id: string
+  moment_id: string
+  position: number
+  created_at: string
+}
+
+export interface HighlightWithMoment extends Highlight {
+  moments: { photo_url: string; id: string } | null
+}
+
+export interface Album {
+  id: string
+  user_id: string
+  title: string
+  is_public: boolean
+  created_at: string
+}
+
+export interface AlbumWithMoments extends Album {
+  moments_count: number
+  first_moment_url: string | null
 }
 
 export const EMOTIONS = [

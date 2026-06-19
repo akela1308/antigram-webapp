@@ -12,6 +12,7 @@ import {
   isMomentSaved,
   saveMoment,
   unsaveMoment,
+  deleteMoment,
 } from '../lib/db'
 import type { MomentWithProfile, ReactionType } from '../lib/types'
 
@@ -26,6 +27,7 @@ export function MomentPage() {
   const [saved, setSaved] = useState(false)
   const [loading, setLoading] = useState(true)
   const [imgLoaded, setImgLoaded] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   const load = useCallback(async () => {
     if (!id) return
@@ -115,11 +117,22 @@ export function MomentPage() {
         <button onClick={() => navigate(-1)} className="p-1">
           <BackIcon />
         </button>
-        {user && (
-          <button onClick={handleSave} className="p-1">
-            <BookmarkIcon filled={saved} />
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: 4 }}>
+          {user && moment && user.id === moment.user_id && (
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="p-1"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 20 }}
+            >
+              ⋯
+            </button>
+          )}
+          {user && (
+            <button onClick={handleSave} className="p-1">
+              <BookmarkIcon filled={saved} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Photo */}
@@ -206,6 +219,42 @@ export function MomentPage() {
         {/* Date */}
         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{dateStr}</p>
       </div>
+
+      {/* Delete confirm overlay */}
+      {showDeleteConfirm && (
+        <>
+          <div
+            onClick={() => setShowDeleteConfirm(false)}
+            style={{ position: 'fixed', inset: 0, zIndex: 99, background: 'rgba(0,0,0,0.7)' }}
+          />
+          <div style={{
+            position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100,
+            background: '#110C08', borderRadius: '24px 24px 0 0',
+            borderTop: '1px solid #2E2218',
+            padding: '24px 20px',
+            paddingBottom: 'max(32px, env(safe-area-inset-bottom, 20px))',
+          }}>
+            <p style={{ color: '#fff', fontSize: 17, fontWeight: 600, margin: '0 0 6px', textAlign: 'center' }}>Удалить кадр?</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: '0 0 20px', textAlign: 'center' }}>Это действие нельзя отменить</p>
+            <button
+              onClick={async () => {
+                if (!id) return
+                await deleteMoment(id)
+                navigate(-1)
+              }}
+              style={{ width: '100%', padding: '14px 0', borderRadius: 30, background: '#e05a5a', color: '#fff', fontSize: 15, fontWeight: 700, border: 'none', cursor: 'pointer', marginBottom: 10 }}
+            >
+              Удалить
+            </button>
+            <button
+              onClick={() => setShowDeleteConfirm(false)}
+              style={{ width: '100%', padding: '12px 0', background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 14, cursor: 'pointer' }}
+            >
+              Отмена
+            </button>
+          </div>
+        </>
+      )}
     </div>
   )
 }
