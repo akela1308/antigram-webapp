@@ -5,26 +5,244 @@ import { useAuth } from '../contexts/AuthContext'
 import { EMOTIONS } from '../lib/types'
 import type { ReactionType } from '../lib/types'
 
-// ── Film presets (CSS filter–based LUT simulation) ──────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 
-interface FilmPreset {
-  id: string
-  name: string
-  filter: string
+type GrainConfig = {
+  intensity: number
+  size:      number
+  shape:     'round' | 'tgrain'
+  r: number
+  g: number
+  b: number
 }
 
+type AlgoType = 'orthochrom' | 'ultramax' | 'vision_t'
+type FlareType = 'none' | 'leak_warm' | 'leak_cool' | 'edge_burn' | 'streak'
+
+interface FilmPreset {
+  id:        string
+  name:      string
+  filter:    string
+  grain:     GrainConfig
+  algoType?: AlgoType
+}
+
+// ── Film presets ──────────────────────────────────────────────────────────────
+
 const FILM_PRESETS: FilmPreset[] = [
-  { id: 'none',        name: '∅',          filter: 'none' },
-  { id: 'kodak',       name: 'Kodak',      filter: 'contrast(1.06) saturate(1.2) brightness(1.02) sepia(0.08) hue-rotate(-2deg)' },
-  { id: 'fuji',        name: 'Fuji',       filter: 'contrast(1.1) saturate(0.88) hue-rotate(-8deg) brightness(0.97)' },
-  { id: 'agfa',        name: 'Agfa',       filter: 'contrast(1.1) saturate(1.28) sepia(0.14) hue-rotate(6deg)' },
-  { id: 'warm',        name: 'Warm',       filter: 'contrast(1.04) saturate(1.15) sepia(0.3) brightness(1.04)' },
-  { id: 'cold',        name: 'Cold',       filter: 'contrast(1.12) saturate(0.72) hue-rotate(14deg) brightness(0.96)' },
-  { id: 'bleach',      name: 'Bleach',     filter: 'contrast(1.38) saturate(0.62) brightness(0.92)' },
-  { id: 'slide',       name: 'Slide',      filter: 'contrast(1.22) saturate(1.38) brightness(0.95) hue-rotate(-4deg)' },
-  { id: 'technicolor', name: 'Technicolor',filter: 'contrast(1.16) saturate(1.48) hue-rotate(-9deg) brightness(0.96)' },
-  { id: 'bw',          name: 'B&W',        filter: 'grayscale(1) contrast(1.18) brightness(0.93)' },
+  {
+    id: 'none', name: '∅', filter: 'none',
+    grain: { intensity: 0.004, size: 0.8, shape: 'round', r: 1.0, g: 1.0, b: 1.0 },
+  },
+  {
+    id: 'kodak', name: 'Kodak Portra', filter: 'contrast(1.06) saturate(1.2) brightness(1.02) sepia(0.08) hue-rotate(-2deg)',
+    grain: { intensity: 0.010, size: 1.2, shape: 'tgrain', r: 1.0, g: 0.90, b: 0.65 },
+  },
+  {
+    id: 'fuji', name: 'Fuji Superia', filter: 'contrast(1.1) saturate(0.88) hue-rotate(-8deg) brightness(0.97)',
+    grain: { intensity: 0.007, size: 1.0, shape: 'round', r: 0.70, g: 1.0, b: 0.85 },
+  },
+  {
+    id: 'agfa', name: 'Agfa Vista', filter: 'contrast(1.1) saturate(1.28) sepia(0.14) hue-rotate(6deg)',
+    grain: { intensity: 0.012, size: 1.3, shape: 'round', r: 1.0, g: 0.85, b: 0.65 },
+  },
+  {
+    id: 'warm', name: 'Warm', filter: 'contrast(1.04) saturate(1.15) sepia(0.3) brightness(1.04)',
+    grain: { intensity: 0.009, size: 1.0, shape: 'round', r: 1.0, g: 0.80, b: 0.50 },
+  },
+  {
+    id: 'cold', name: 'Cold', filter: 'contrast(1.12) saturate(0.72) hue-rotate(14deg) brightness(0.96)',
+    grain: { intensity: 0.008, size: 1.0, shape: 'round', r: 0.55, g: 0.80, b: 1.0 },
+  },
+  {
+    id: 'bleach', name: 'Bleach Bypass', filter: 'contrast(1.38) saturate(0.62) brightness(0.92)',
+    grain: { intensity: 0.011, size: 1.3, shape: 'round', r: 1.0, g: 1.0, b: 1.0 },
+  },
+  {
+    id: 'slide', name: 'Slide', filter: 'contrast(1.22) saturate(1.38) brightness(0.95) hue-rotate(-4deg)',
+    grain: { intensity: 0.005, size: 0.8, shape: 'round', r: 1.0, g: 0.90, b: 0.80 },
+  },
+  {
+    id: 'technicolor', name: 'Technicolor', filter: 'contrast(1.16) saturate(1.48) hue-rotate(-9deg) brightness(0.96)',
+    grain: { intensity: 0.014, size: 1.7, shape: 'round', r: 1.0, g: 0.95, b: 0.45 },
+  },
+  {
+    id: 'hc_bw', name: 'HC B&W', filter: 'grayscale(1) contrast(1.18) brightness(0.93)',
+    grain: { intensity: 0.018, size: 2.0, shape: 'round', r: 1.0, g: 1.0, b: 1.0 },
+  },
+  {
+    id: 'orthochrom', name: 'Orthochrom', filter: 'none',
+    grain: { intensity: 0.022, size: 1.8, shape: 'round', r: 1.0, g: 1.0, b: 1.0 },
+    algoType: 'orthochrom',
+  },
+  {
+    id: 'ultramax', name: 'Ultramax', filter: 'none',
+    grain: { intensity: 0.010, size: 1.3, shape: 'round', r: 1.0, g: 0.85, b: 0.60 },
+    algoType: 'ultramax',
+  },
+  {
+    id: 'vision_t', name: 'Vision T', filter: 'none',
+    grain: { intensity: 0.009, size: 1.5, shape: 'tgrain', r: 0.65, g: 0.80, b: 1.0 },
+    algoType: 'vision_t',
+  },
 ]
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function clamp(v: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, v))
+}
+
+function triangleRandom(): number {
+  return (Math.random() + Math.random()) / 2
+}
+
+// ── Grain ─────────────────────────────────────────────────────────────────────
+
+function applyGrain(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, grain: GrainConfig): void {
+  const W = canvas.width
+  const H = canvas.height
+
+  if (grain.size > 1.0) {
+    // Generate noise on a smaller canvas, then upscale to create visible clusters
+    const sw = Math.max(1, Math.floor(W / grain.size))
+    const sh = Math.max(1, Math.floor(H / grain.size))
+    const small = new OffscreenCanvas(sw, sh)
+    const smallCtx = small.getContext('2d', { willReadFrequently: true })!
+
+    // Draw current image content scaled down
+    smallCtx.drawImage(canvas, 0, 0, sw, sh)
+    const smallData = smallCtx.getImageData(0, 0, sw, sh)
+    const sd = smallData.data
+
+    for (let i = 0; i < sd.length; i += 4) {
+      const noise = grain.shape === 'tgrain' ? triangleRandom() : Math.random()
+      const noiseVal = noise * grain.intensity * 220
+      sd[i]     = clamp(sd[i]     + noiseVal * grain.r, 0, 255)
+      sd[i + 1] = clamp(sd[i + 1] + noiseVal * grain.g, 0, 255)
+      sd[i + 2] = clamp(sd[i + 2] + noiseVal * grain.b, 0, 255)
+    }
+
+    smallCtx.putImageData(smallData, 0, 0)
+    // Upscale back — nearest-neighbour gives visible clustering
+    ctx.imageSmoothingEnabled = false
+    ctx.drawImage(small, 0, 0, W, H)
+    ctx.imageSmoothingEnabled = true
+  } else {
+    const imageData = ctx.getImageData(0, 0, W, H)
+    const d = imageData.data
+
+    for (let i = 0; i < d.length; i += 4) {
+      const noise = grain.shape === 'tgrain' ? triangleRandom() : Math.random()
+      const noiseVal = noise * grain.intensity * 220
+      d[i]     = clamp(d[i]     + noiseVal * grain.r, 0, 255)
+      d[i + 1] = clamp(d[i + 1] + noiseVal * grain.g, 0, 255)
+      d[i + 2] = clamp(d[i + 2] + noiseVal * grain.b, 0, 255)
+    }
+
+    ctx.putImageData(imageData, 0, 0)
+  }
+}
+
+// ── Algorithmic presets ───────────────────────────────────────────────────────
+
+function applyAlgo(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, algoType: AlgoType): void {
+  const W = canvas.width
+  const H = canvas.height
+  const imageData = ctx.getImageData(0, 0, W, H)
+  const d = imageData.data
+
+  if (algoType === 'orthochrom') {
+    for (let i = 0; i < d.length; i += 4) {
+      let lum = d[i] * 0.90 + d[i + 1] * 0.06 + d[i + 2] * 0.04
+      lum = clamp((lum - 128) * 1.55 + 128, 0, 255)
+      d[i] = d[i + 1] = d[i + 2] = lum
+    }
+  } else if (algoType === 'ultramax') {
+    for (let i = 0; i < d.length; i += 4) {
+      let r = clamp(d[i]     * 1.08 + 12, 0, 255)
+      let g = clamp(d[i + 1] * 1.02,      0, 255)
+      let b = clamp(d[i + 2] * 0.85 - 6,  0, 255)
+      r = clamp((r - 128) * 1.10 + 128, 0, 255)
+      g = clamp((g - 128) * 1.08 + 128, 0, 255)
+      b = clamp((b - 128) * 1.10 + 128, 0, 255)
+      d[i] = r; d[i + 1] = g; d[i + 2] = b
+    }
+  } else if (algoType === 'vision_t') {
+    for (let i = 0; i < d.length; i += 4) {
+      let r = clamp(d[i]     * 0.88 - 8,  0, 255)
+      let g = clamp(d[i + 1] * 0.97,       0, 255)
+      let b = clamp(d[i + 2] * 1.14 + 10, 0, 255)
+      r = clamp((r - 128) * 0.95 + 128, 0, 255)
+      g = clamp((g - 128) * 0.95 + 128, 0, 255)
+      b = clamp((b - 128) * 0.95 + 128, 0, 255)
+      d[i] = r; d[i + 1] = g; d[i + 2] = b
+    }
+  }
+
+  ctx.putImageData(imageData, 0, 0)
+}
+
+// ── Light leaks / flare ───────────────────────────────────────────────────────
+
+function applyFlare(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, flareType: FlareType): void {
+  if (flareType === 'none') return
+
+  const W = canvas.width
+  const H = canvas.height
+  const off = new OffscreenCanvas(W, H)
+  const oc = off.getContext('2d')!
+
+  if (flareType === 'leak_warm') {
+    const g1 = oc.createRadialGradient(0, 0, 0, 0, 0, W * 0.65)
+    g1.addColorStop(0.0, 'rgba(200,140,60,0.55)')
+    g1.addColorStop(0.5, 'rgba(180,100,30,0.20)')
+    g1.addColorStop(1.0, 'rgba(0,0,0,0)')
+    oc.fillStyle = g1
+    oc.fillRect(0, 0, W, H)
+
+    const g2 = oc.createRadialGradient(W * 0.1, 0, 0, W * 0.1, 0, W * 0.45)
+    g2.addColorStop(0.0, 'rgba(255,200,100,0.20)')
+    g2.addColorStop(1.0, 'rgba(0,0,0,0)')
+    oc.fillStyle = g2
+    oc.fillRect(0, 0, W, H)
+  } else if (flareType === 'leak_cool') {
+    const g = oc.createRadialGradient(W, H, 0, W, H, W * 0.7)
+    g.addColorStop(0.0, 'rgba(60,100,200,0.45)')
+    g.addColorStop(0.4, 'rgba(40,80,180,0.15)')
+    g.addColorStop(1.0, 'rgba(0,0,0,0)')
+    oc.fillStyle = g
+    oc.fillRect(0, 0, W, H)
+  } else if (flareType === 'edge_burn') {
+    const g = oc.createRadialGradient(W / 2, H / 2, W * 0.3, W / 2, H / 2, W * 0.72)
+    g.addColorStop(0.0, 'rgba(255,255,255,0)')
+    g.addColorStop(1.0, 'rgba(30,20,15,0.75)')
+    oc.fillStyle = g
+    oc.fillRect(0, 0, W, H)
+    // edge_burn uses multiply — draw directly with multiply blend
+    ctx.globalCompositeOperation = 'multiply'
+    ctx.drawImage(off, 0, 0)
+    ctx.globalCompositeOperation = 'source-over'
+    return
+  } else if (flareType === 'streak') {
+    const g1 = oc.createLinearGradient(0, H * 0.45, 0, H * 0.55)
+    g1.addColorStop(0.0, 'rgba(0,0,0,0)')
+    g1.addColorStop(0.5, 'rgba(210,180,130,0.18)')
+    g1.addColorStop(1.0, 'rgba(0,0,0,0)')
+    oc.fillStyle = g1
+    oc.fillRect(0, 0, W, H)
+
+    const g2 = oc.createLinearGradient(W * 0.2, 0, W * 0.3, 0)
+    g2.addColorStop(0.0, 'rgba(255,230,180,0.08)')
+    g2.addColorStop(1.0, 'rgba(0,0,0,0)')
+    oc.fillStyle = g2
+    oc.fillRect(0, 0, W, H)
+  }
+
+  ctx.globalCompositeOperation = 'screen'
+  ctx.drawImage(off, 0, 0)
+  ctx.globalCompositeOperation = 'source-over'
+}
 
 // ── Main component ────────────────────────────────────────────────────────────
 
@@ -42,6 +260,7 @@ export function UploadPage() {
   const [facing, setFacing]             = useState<'user' | 'environment'>('environment')
   const [flash, setFlash]               = useState(false)
   const [preset, setPreset]             = useState<FilmPreset>(FILM_PRESETS[0])
+  const [selectedFlare, setSelectedFlare] = useState<FlareType>('none')
   const [previewUrl, setPreviewUrl]     = useState<string | null>(null)
   const [photoBlob, setPhotoBlob]       = useState<Blob | null>(null)
   const [caption, setCaption]           = useState('')
@@ -80,7 +299,7 @@ export function UploadPage() {
 
   // ── Capture ─────────────────────────────────────────────────────────────────
 
-  function capture() {
+  async function capture() {
     const video  = videoRef.current
     const canvas = canvasRef.current
     if (!video || !canvas) return
@@ -90,16 +309,29 @@ export function UploadPage() {
 
     canvas.width  = size
     canvas.height = size
-    const ctx = canvas.getContext('2d')!
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })!
 
-    // Apply CSS filter to canvas if preset selected
+    // 1. Bake CSS filter (LUT simulation)
     if (preset.filter !== 'none') ctx.filter = preset.filter
-
-    // Square crop from center
     const ox = (video.videoWidth  - size) / 2
     const oy = (video.videoHeight - size) / 2
     ctx.drawImage(video, ox, oy, size, size, 0, 0, size, size)
+    ctx.filter = 'none'
 
+    // 2. Algorithmic preset (if set)
+    if (preset.algoType) {
+      applyAlgo(ctx, canvas, preset.algoType)
+    }
+
+    // 3. Film grain
+    applyGrain(ctx, canvas, preset.grain)
+
+    // 4. Light leak / flare (last)
+    if (selectedFlare !== 'none') {
+      applyFlare(ctx, canvas, selectedFlare)
+    }
+
+    // 5. Export
     canvas.toBlob(blob => {
       if (!blob) return
       setPhotoBlob(blob)
@@ -124,10 +356,10 @@ export function UploadPage() {
 
       const { data: { publicUrl } } = supabase.storage.from('moments').getPublicUrl(fileName)
       const { error: insErr } = await supabase.from('moments').insert({
-        user_id:  user.id,
+        user_id:   user.id,
         photo_url: publicUrl,
         caption:   caption.trim() || null,
-        mood:       mood ?? null,
+        mood:      mood ?? null,
         visibility: 'public',
       })
       if (insErr) throw new Error(insErr.message)
@@ -188,16 +420,24 @@ export function UploadPage() {
           style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', display: 'block' }}
         />
 
-        {/* Preset badge */}
-        {preset.id !== 'none' && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px' }}>
-            <div style={{
-              width: 24, height: 24, borderRadius: 5,
-              background: '#2E2218', border: '1px solid var(--amber)',
-            }} />
-            <span style={{ color: 'var(--amber)', fontSize: 13 }}>{preset.name}</span>
-          </div>
-        )}
+        {/* Preset badge + processing info */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '8px 16px 4px', alignItems: 'center' }}>
+          {preset.id !== 'none' && (
+            <>
+              <div style={{
+                width: 24, height: 24, borderRadius: 5,
+                background: '#2E2218', border: '1px solid var(--amber)',
+              }} />
+              <span style={{ color: 'var(--amber)', fontSize: 13 }}>{preset.name}</span>
+              <span style={{ color: '#555', fontSize: 11 }}>
+                · grain {Math.round(preset.grain.intensity * 1000)}
+              </span>
+            </>
+          )}
+          {selectedFlare !== 'none' && (
+            <span style={{ color: '#555', fontSize: 11 }}>· {selectedFlare}</span>
+          )}
+        </div>
 
         {/* Атмосфера */}
         <div style={{ padding: '12px 16px 4px' }}>
@@ -276,6 +516,10 @@ export function UploadPage() {
 
   // ── VIEWFINDER phase ──────────────────────────────────────────────────────
 
+  const flareLabels: Record<FlareType, string> = {
+    none: '∅', leak_warm: '🔥', leak_cool: '❄️', edge_burn: '◎', streak: '—',
+  }
+
   return (
     <div style={S.root}>
       {/* Hidden canvas for capture */}
@@ -330,7 +574,6 @@ export function UploadPage() {
                 transform: facing === 'user' ? 'scaleX(-1)' : 'none',
               }}
             />
-            {/* Corner overlay */}
             <div style={{
               position: 'absolute', inset: 0, borderRadius: 20,
               border: '1px solid rgba(255,255,255,0.07)',
@@ -340,8 +583,33 @@ export function UploadPage() {
         )}
       </div>
 
-      {/* Bottom panel: film strip + shutter */}
+      {/* Bottom panel */}
       <div style={S.bottomPanel}>
+
+        {/* Light leak selector */}
+        <div style={{ display: 'flex', gap: 8, padding: '0 16px', alignItems: 'center' }}>
+          <span style={{ color: '#555', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, flexShrink: 0 }}>СВЕТ</span>
+          {(['none', 'leak_warm', 'leak_cool', 'edge_burn', 'streak'] as FlareType[]).map(f => {
+            const active = selectedFlare === f
+            return (
+              <button
+                key={f}
+                onClick={() => setSelectedFlare(f)}
+                style={{
+                  width: 36, height: 36, borderRadius: 18,
+                  border: `${active ? 2 : 1}px solid ${active ? 'var(--amber)' : '#333'}`,
+                  background: active ? 'rgba(196,168,130,0.15)' : 'transparent',
+                  color: active ? 'var(--amber)' : '#555',
+                  fontSize: 16, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                {flareLabels[f]}
+              </button>
+            )
+          })}
+        </div>
+
         {/* Film presets */}
         <div
           className="no-scrollbar"
@@ -457,7 +725,7 @@ const S: Record<string, React.CSSProperties> = {
   bottomPanel: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 20,
+    gap: 16,
     paddingTop: 12,
   },
   topBtn: {
