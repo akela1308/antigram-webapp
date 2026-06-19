@@ -44,7 +44,7 @@ export function MyProfilePage() {
 
   if (authLoading || loading) {
     return (
-      <div className="flex flex-col" style={{ minHeight: '100dvh', paddingTop: 'var(--tg-top, 0px)' }}>
+      <div className="flex flex-col" style={{ minHeight: '100dvh', paddingTop: 'var(--tg-top, 56px)' }}>
         <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--border)' }}>
           <h2 style={{ color: 'var(--brown)', fontSize: 17, fontWeight: 700, margin: 0, fontFamily: 'Georgia, serif' }}>Мой профиль</h2>
         </div>
@@ -106,12 +106,12 @@ export function MyProfilePage() {
   const displayName = profile.display_name ?? profile.username ?? telegramUser?.first_name ?? 'Аноним'
 
   return (
-    <div className="flex flex-col" style={{ minHeight: '100dvh', background: 'var(--bg)', paddingTop: 'var(--tg-top, 0px)' }}>
+    <div className="flex flex-col" style={{ minHeight: '100dvh', background: 'var(--bg)', paddingTop: 'var(--tg-top, 56px)' }}>
       {/* Header */}
       <div
         className="sticky z-40 flex items-center justify-between px-4 py-3"
         style={{
-          top: 'var(--tg-top, 0px)',
+          top: 'var(--tg-top, 56px)',
           background: 'rgba(20,14,10,0.95)',
           backdropFilter: 'blur(12px)',
           borderBottom: '1px solid var(--border)',

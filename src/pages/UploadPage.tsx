@@ -1,91 +1,11 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { EMOTIONS } from '../lib/types'
+import { FILM_PRESETS } from '../lib/filmPresets'
+import type { FilmPreset, AlgoType, GrainConfig, FlareType } from '../lib/filmPresets'
 import type { ReactionType } from '../lib/types'
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-type GrainConfig = {
-  intensity: number
-  size:      number
-  shape:     'round' | 'tgrain'
-  r: number
-  g: number
-  b: number
-}
-
-type AlgoType = 'orthochrom' | 'ultramax' | 'vision_t'
-type FlareType = 'none' | 'leak_warm' | 'leak_cool' | 'edge_burn' | 'streak'
-
-interface FilmPreset {
-  id:        string
-  name:      string
-  filter:    string
-  grain:     GrainConfig
-  algoType?: AlgoType
-}
-
-// ── Film presets ──────────────────────────────────────────────────────────────
-
-const FILM_PRESETS: FilmPreset[] = [
-  {
-    id: 'none', name: '∅', filter: 'none',
-    grain: { intensity: 0.004, size: 0.8, shape: 'round', r: 1.0, g: 1.0, b: 1.0 },
-  },
-  {
-    id: 'kodak', name: 'Kodak Portra', filter: 'contrast(1.06) saturate(1.2) brightness(1.02) sepia(0.08) hue-rotate(-2deg)',
-    grain: { intensity: 0.010, size: 1.2, shape: 'tgrain', r: 1.0, g: 0.90, b: 0.65 },
-  },
-  {
-    id: 'fuji', name: 'Fuji Superia', filter: 'contrast(1.1) saturate(0.88) hue-rotate(-8deg) brightness(0.97)',
-    grain: { intensity: 0.007, size: 1.0, shape: 'round', r: 0.70, g: 1.0, b: 0.85 },
-  },
-  {
-    id: 'agfa', name: 'Agfa Vista', filter: 'contrast(1.1) saturate(1.28) sepia(0.14) hue-rotate(6deg)',
-    grain: { intensity: 0.012, size: 1.3, shape: 'round', r: 1.0, g: 0.85, b: 0.65 },
-  },
-  {
-    id: 'warm', name: 'Warm', filter: 'contrast(1.04) saturate(1.15) sepia(0.3) brightness(1.04)',
-    grain: { intensity: 0.009, size: 1.0, shape: 'round', r: 1.0, g: 0.80, b: 0.50 },
-  },
-  {
-    id: 'cold', name: 'Cold', filter: 'contrast(1.12) saturate(0.72) hue-rotate(14deg) brightness(0.96)',
-    grain: { intensity: 0.008, size: 1.0, shape: 'round', r: 0.55, g: 0.80, b: 1.0 },
-  },
-  {
-    id: 'bleach', name: 'Bleach Bypass', filter: 'contrast(1.38) saturate(0.62) brightness(0.92)',
-    grain: { intensity: 0.011, size: 1.3, shape: 'round', r: 1.0, g: 1.0, b: 1.0 },
-  },
-  {
-    id: 'slide', name: 'Slide', filter: 'contrast(1.22) saturate(1.38) brightness(0.95) hue-rotate(-4deg)',
-    grain: { intensity: 0.005, size: 0.8, shape: 'round', r: 1.0, g: 0.90, b: 0.80 },
-  },
-  {
-    id: 'technicolor', name: 'Technicolor', filter: 'contrast(1.16) saturate(1.48) hue-rotate(-9deg) brightness(0.96)',
-    grain: { intensity: 0.014, size: 1.7, shape: 'round', r: 1.0, g: 0.95, b: 0.45 },
-  },
-  {
-    id: 'hc_bw', name: 'HC B&W', filter: 'grayscale(1) contrast(1.18) brightness(0.93)',
-    grain: { intensity: 0.018, size: 2.0, shape: 'round', r: 1.0, g: 1.0, b: 1.0 },
-  },
-  {
-    id: 'orthochrom', name: 'Orthochrom', filter: 'none',
-    grain: { intensity: 0.022, size: 1.8, shape: 'round', r: 1.0, g: 1.0, b: 1.0 },
-    algoType: 'orthochrom',
-  },
-  {
-    id: 'ultramax', name: 'Ultramax', filter: 'none',
-    grain: { intensity: 0.010, size: 1.3, shape: 'round', r: 1.0, g: 0.85, b: 0.60 },
-    algoType: 'ultramax',
-  },
-  {
-    id: 'vision_t', name: 'Vision T', filter: 'none',
-    grain: { intensity: 0.009, size: 1.5, shape: 'tgrain', r: 0.65, g: 0.80, b: 1.0 },
-    algoType: 'vision_t',
-  },
-]
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -104,13 +24,11 @@ function applyGrain(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, gr
   const H = canvas.height
 
   if (grain.size > 1.0) {
-    // Generate noise on a smaller canvas, then upscale to create visible clusters
     const sw = Math.max(1, Math.floor(W / grain.size))
     const sh = Math.max(1, Math.floor(H / grain.size))
     const small = new OffscreenCanvas(sw, sh)
     const smallCtx = small.getContext('2d', { willReadFrequently: true })!
 
-    // Draw current image content scaled down
     smallCtx.drawImage(canvas, 0, 0, sw, sh)
     const smallData = smallCtx.getImageData(0, 0, sw, sh)
     const sd = smallData.data
@@ -124,7 +42,6 @@ function applyGrain(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, gr
     }
 
     smallCtx.putImageData(smallData, 0, 0)
-    // Upscale back — nearest-neighbour gives visible clustering
     ctx.imageSmoothingEnabled = false
     ctx.drawImage(small, 0, 0, W, H)
     ctx.imageSmoothingEnabled = true
@@ -219,7 +136,6 @@ function applyFlare(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, fl
     g.addColorStop(1.0, 'rgba(30,20,15,0.75)')
     oc.fillStyle = g
     oc.fillRect(0, 0, W, H)
-    // edge_burn uses multiply — draw directly with multiply blend
     ctx.globalCompositeOperation = 'multiply'
     ctx.drawImage(off, 0, 0)
     ctx.globalCompositeOperation = 'source-over'
@@ -251,15 +167,22 @@ type Phase = 'viewfinder' | 'preview' | 'uploading' | 'success'
 export function UploadPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
 
   const videoRef   = useRef<HTMLVideoElement>(null)
   const canvasRef  = useRef<HTMLCanvasElement>(null)
   const streamRef  = useRef<MediaStream | null>(null)
 
+  // Read film preset from router state (set by FilmPicker sheet in BottomNav)
+  const initialPreset = (() => {
+    const filmId = (location.state as { filmId?: string } | null)?.filmId
+    return FILM_PRESETS.find(p => p.id === filmId) ?? FILM_PRESETS[1]
+  })()
+
   const [phase, setPhase]               = useState<Phase>('viewfinder')
   const [facing, setFacing]             = useState<'user' | 'environment'>('environment')
   const [flash, setFlash]               = useState(false)
-  const [preset, setPreset]             = useState<FilmPreset>(FILM_PRESETS[0])
+  const [preset, setPreset]             = useState<FilmPreset>(initialPreset)
   const [selectedFlare, setSelectedFlare] = useState<FlareType>('none')
   const [previewUrl, setPreviewUrl]     = useState<string | null>(null)
   const [photoBlob, setPhotoBlob]       = useState<Blob | null>(null)
@@ -311,27 +234,22 @@ export function UploadPage() {
     canvas.height = size
     const ctx = canvas.getContext('2d', { willReadFrequently: true })!
 
-    // 1. Bake CSS filter (LUT simulation)
     if (preset.filter !== 'none') ctx.filter = preset.filter
     const ox = (video.videoWidth  - size) / 2
     const oy = (video.videoHeight - size) / 2
     ctx.drawImage(video, ox, oy, size, size, 0, 0, size, size)
     ctx.filter = 'none'
 
-    // 2. Algorithmic preset (if set)
     if (preset.algoType) {
       applyAlgo(ctx, canvas, preset.algoType)
     }
 
-    // 3. Film grain
     applyGrain(ctx, canvas, preset.grain)
 
-    // 4. Light leak / flare (last)
     if (selectedFlare !== 'none') {
       applyFlare(ctx, canvas, selectedFlare)
     }
 
-    // 5. Export
     canvas.toBlob(blob => {
       if (!blob) return
       setPhotoBlob(blob)
@@ -409,24 +327,21 @@ export function UploadPage() {
 
   if (phase === 'preview' || phase === 'uploading') {
     return (
-      <div style={{ ...S.root, overflowY: 'auto', paddingTop: 'var(--tg-top, 0px)' }}>
-        {/* Film strip top */}
+      <div style={{ ...S.root, overflowY: 'auto', paddingTop: 'var(--tg-top, 56px)' }}>
         <FilmStripBar />
 
-        {/* Preview image */}
         <img
           src={previewUrl ?? ''}
           alt=""
           style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', display: 'block' }}
         />
 
-        {/* Preset badge + processing info */}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '8px 16px 4px', alignItems: 'center' }}>
           {preset.id !== 'none' && (
             <>
               <div style={{
-                width: 24, height: 24, borderRadius: 5,
-                background: '#2E2218', border: '1px solid var(--amber)',
+                width: 18, height: 18, borderRadius: '50%',
+                background: preset.color,
               }} />
               <span style={{ color: 'var(--amber)', fontSize: 13 }}>{preset.name}</span>
               <span style={{ color: '#555', fontSize: 11 }}>
@@ -465,7 +380,6 @@ export function UploadPage() {
           </div>
         </div>
 
-        {/* Caption */}
         <textarea
           value={caption}
           onChange={e => setCaption(e.target.value)}
@@ -484,7 +398,6 @@ export function UploadPage() {
 
         {error && <p style={{ color: '#e05a5a', padding: '0 16px', textAlign: 'center' }}>{error}</p>}
 
-        {/* Actions */}
         <div style={{ display: 'flex', gap: 12, padding: '16px', paddingBottom: 'max(32px, calc(var(--tg-bottom,0px) + 16px))' }}>
           <button
             onClick={retake}
@@ -522,18 +435,29 @@ export function UploadPage() {
 
   return (
     <div style={S.root}>
-      {/* Hidden canvas for capture */}
       <canvas ref={canvasRef} style={{ display: 'none' }} />
 
       {/* Top bar */}
       <div
         style={{
           position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
-          paddingTop: 'var(--tg-top, 0px)',
+          paddingTop: 'var(--tg-top, 56px)',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px' }}>
           <button onClick={() => navigate(-1)} style={S.topBtn}>✕</button>
+
+          {/* Active film indicator */}
+          {preset.id !== 'none' && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: 'rgba(0,0,0,0.5)', borderRadius: 20, padding: '5px 12px',
+            }}>
+              <div style={{ width: 10, height: 10, borderRadius: 5, background: preset.color }} />
+              <span style={{ color: '#fff', fontSize: 12, fontWeight: 600 }}>{preset.name}</span>
+            </div>
+          )}
+
           <div style={{ display: 'flex', gap: 8 }}>
             <button
               onClick={() => setFlash(f => !f)}
@@ -585,7 +509,6 @@ export function UploadPage() {
 
       {/* Bottom panel */}
       <div style={S.bottomPanel}>
-
         {/* Light leak selector */}
         <div style={{ display: 'flex', gap: 8, padding: '0 16px', alignItems: 'center' }}>
           <span style={{ color: '#555', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, flexShrink: 0 }}>СВЕТ</span>
@@ -610,7 +533,7 @@ export function UploadPage() {
           })}
         </div>
 
-        {/* Film presets */}
+        {/* Film presets strip */}
         <div
           className="no-scrollbar"
           style={{
@@ -634,21 +557,28 @@ export function UploadPage() {
               >
                 <div
                   style={{
-                    width: 52, height: 52, borderRadius: 8,
-                    background: '#1A1208',
-                    overflow: 'hidden', position: 'relative',
+                    width: 48, height: 48, borderRadius: 24,
+                    background: p.id === 'none' ? '#1A1A1A' : p.color,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    position: 'relative', overflow: 'hidden',
+                    border: active ? '2px solid var(--amber)' : '1px solid rgba(255,255,255,0.1)',
                   }}
                 >
-                  {p.id === 'none' ? (
-                    <span style={{ color: active ? 'var(--amber)' : '#555', fontSize: 22 }}>∅</span>
-                  ) : (
-                    <span style={{ color: active ? 'var(--amber)' : '#555', fontSize: 9, fontWeight: 700, letterSpacing: 0.5, textAlign: 'center', padding: '0 4px', lineHeight: 1.3 }}>
-                      {p.name}
-                    </span>
+                  <div
+                    style={{
+                      width: 16, height: 16, borderRadius: 8,
+                      background: 'rgba(0,0,0,0.35)',
+                      border: '1px solid rgba(255,255,255,0.15)',
+                    }}
+                  />
+                  {p.id === 'none' && (
+                    <span style={{
+                      position: 'absolute',
+                      color: active ? 'var(--amber)' : '#555', fontSize: 16,
+                    }}>∅</span>
                   )}
                 </div>
-                <span style={{ color: active ? 'var(--amber)' : '#555', fontSize: 10 }}>
+                <span style={{ color: active ? 'var(--amber)' : '#555', fontSize: 9, maxWidth: 52, textAlign: 'center', lineHeight: 1.2 }}>
                   {p.name.split(' ')[0]}
                 </span>
               </button>

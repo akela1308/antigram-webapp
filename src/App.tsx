@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 import { FeedPage } from './pages/FeedPage'
 import { ExplorePage } from './pages/ExplorePage'
@@ -13,6 +13,7 @@ import { BottomNav } from './components/BottomNav'
 
 export function App() {
   const { loading } = useAuth()
+  const location = useLocation()
 
   if (loading) {
     return (
@@ -31,6 +32,8 @@ export function App() {
     )
   }
 
+  const hideNav = location.pathname === '/upload'
+
   return (
     <div
       className="mx-auto relative"
@@ -48,7 +51,7 @@ export function App() {
         <Route path="/auth" element={<AuthPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-      <BottomNav />
+      {!hideNav && <BottomNav />}
     </div>
   )
 }

@@ -70,7 +70,7 @@ export function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col" style={{ minHeight: '100dvh', paddingTop: 'var(--tg-top, 0px)' }}>
+      <div className="flex flex-col" style={{ minHeight: '100dvh', paddingTop: 'var(--tg-top, 56px)' }}>
         <div className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: '1px solid var(--border)' }}>
           <button onClick={() => navigate(-1)}><BackIcon /></button>
         </div>
@@ -94,11 +94,11 @@ export function ProfilePage() {
   const displayName = profile.display_name ?? profile.username ?? 'Аноним'
 
   return (
-    <div className="flex flex-col" style={{ minHeight: '100dvh', background: 'var(--bg)', paddingTop: 'var(--tg-top, 0px)' }}>
+    <div className="flex flex-col" style={{ minHeight: '100dvh', background: 'var(--bg)', paddingTop: 'var(--tg-top, 56px)' }}>
       {/* Header */}
       <div
         className="sticky z-40 flex items-center gap-3 px-4 py-3"
-        style={{ top: 'var(--tg-top, 0px)', background: 'rgba(20,14,10,0.95)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border)' }}
+        style={{ top: 'var(--tg-top, 56px)', background: 'rgba(20,14,10,0.95)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border)' }}
       >
         <button onClick={() => navigate(-1)} className="p-1"><BackIcon /></button>
         <span className="font-semibold text-sm" style={{ color: 'var(--text)' }}>
