@@ -127,7 +127,7 @@ export function MyProfilePage() {
         </button>
       </div>
 
-      {/* Profile header */}
+      {/* Avatar + name */}
       <div className="flex flex-col items-center gap-3 pt-6 pb-4 px-6">
         {isTelegram && telegramUser?.photo_url ? (
           <img
@@ -162,15 +162,7 @@ export function MyProfilePage() {
         )}
 
         {/* Stats */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            padding: '14px 24px',
-            width: '100%',
-          }}
-        >
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '14px 24px', width: '100%' }}>
           <Stat label="кадры" value={moments.length} />
           <div style={{ width: 1, height: 28, background: 'var(--divider)', margin: '0 20px' }} />
           <Stat label="подписчики" value={followersCount} />
@@ -179,10 +171,29 @@ export function MyProfilePage() {
         </div>
       </div>
 
+      {/* Film strip */}
+      <ProfileFilmStrip moments={moments} />
+
+      {/* Albums section */}
+      <div style={{ padding: '0 16px 16px' }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', margin: '0 0 10px' }}>
+          Альбомы
+        </p>
+        <div style={{
+          padding: '20px 16px',
+          borderRadius: 12,
+          border: '1px solid var(--border)',
+          background: 'rgba(255,255,255,0.02)',
+          textAlign: 'center',
+        }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: 0 }}>Альбомы появятся здесь</p>
+        </div>
+      </div>
+
       {/* Divider */}
       <div style={{ height: 1, background: 'var(--border)', margin: '0 16px 12px' }} />
 
-      {/* Moments grid */}
+      {/* Photos grid */}
       <div className="grid grid-cols-2 gap-2 pb-28" style={{ padding: '0 12px 112px' }}>
         {moments.length === 0 ? (
           <div className="col-span-2 flex flex-col items-center py-16 gap-2">
@@ -192,8 +203,12 @@ export function MyProfilePage() {
             </p>
           </div>
         ) : (
-          moments.map(m => (
-            <Link key={m.id} to={`/moment/${m.id}`}>
+          moments.map((m, index) => (
+            <div
+              key={m.id}
+              onClick={() => navigate('/moment-feed', { state: { moments, startIndex: index } })}
+              style={{ cursor: 'pointer' }}
+            >
               <div className="relative w-full overflow-hidden rounded-xl" style={{ paddingBottom: '100%' }}>
                 <img
                   src={m.photo_url}
@@ -202,9 +217,51 @@ export function MyProfilePage() {
                   loading="lazy"
                 />
               </div>
-            </Link>
+            </div>
           ))
         )}
+      </div>
+    </div>
+  )
+}
+
+function ProfileFilmStrip({ moments }: { moments: Moment[] }) {
+  if (moments.length === 0) return null
+  return (
+    <div style={{
+      background: '#0A0806',
+      borderTop: '2px solid #2A1A0A',
+      borderBottom: '2px solid #2A1A0A',
+      padding: '8px 0',
+      margin: '0 0 16px',
+    }}>
+      <div
+        className="no-scrollbar"
+        style={{
+          display: 'flex', gap: 4, overflowX: 'auto',
+          padding: '0 12px',
+          alignItems: 'center',
+        }}
+      >
+        {moments.map(m => (
+          <div
+            key={m.id}
+            style={{
+              flexShrink: 0,
+              width: 72, height: 72,
+              borderRadius: 6,
+              overflow: 'hidden',
+              border: '1px solid #2E1A0A',
+            }}
+          >
+            <img
+              src={m.photo_url}
+              alt=""
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              loading="lazy"
+            />
+          </div>
+        ))}
       </div>
     </div>
   )

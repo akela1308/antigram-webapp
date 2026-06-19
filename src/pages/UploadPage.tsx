@@ -35,7 +35,7 @@ function applyGrain(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, gr
 
     for (let i = 0; i < sd.length; i += 4) {
       const noise = grain.shape === 'tgrain' ? triangleRandom() : Math.random()
-      const noiseVal = noise * grain.intensity * 220
+      const noiseVal = noise * grain.intensity * 1000
       sd[i]     = clamp(sd[i]     + noiseVal * grain.r, 0, 255)
       sd[i + 1] = clamp(sd[i + 1] + noiseVal * grain.g, 0, 255)
       sd[i + 2] = clamp(sd[i + 2] + noiseVal * grain.b, 0, 255)
@@ -51,7 +51,7 @@ function applyGrain(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, gr
 
     for (let i = 0; i < d.length; i += 4) {
       const noise = grain.shape === 'tgrain' ? triangleRandom() : Math.random()
-      const noiseVal = noise * grain.intensity * 220
+      const noiseVal = noise * grain.intensity * 1000
       d[i]     = clamp(d[i]     + noiseVal * grain.r, 0, 255)
       d[i + 1] = clamp(d[i + 1] + noiseVal * grain.g, 0, 255)
       d[i + 2] = clamp(d[i + 2] + noiseVal * grain.b, 0, 255)
@@ -143,28 +143,28 @@ function applyAlgo(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, alg
 
   if (algoType === 'orthochrom') {
     for (let i = 0; i < d.length; i += 4) {
-      let lum = d[i] * 0.90 + d[i + 1] * 0.06 + d[i + 2] * 0.04
-      lum = clamp((lum - 128) * 1.55 + 128, 0, 255)
+      let lum = d[i] * 0.92 + d[i + 1] * 0.07 + d[i + 2] * 0.01
+      lum = clamp((lum - 128) * 1.75 + 128, 0, 255)
       d[i] = d[i + 1] = d[i + 2] = lum
     }
   } else if (algoType === 'ultramax') {
     for (let i = 0; i < d.length; i += 4) {
-      let r = clamp(d[i]     * 1.08 + 12, 0, 255)
-      let g = clamp(d[i + 1] * 1.02,      0, 255)
-      let b = clamp(d[i + 2] * 0.85 - 6,  0, 255)
-      r = clamp((r - 128) * 1.10 + 128, 0, 255)
-      g = clamp((g - 128) * 1.08 + 128, 0, 255)
-      b = clamp((b - 128) * 1.10 + 128, 0, 255)
+      let r = clamp(d[i]     * 1.18 + 20, 0, 255)
+      let g = clamp(d[i + 1] * 1.04,      0, 255)
+      let b = clamp(d[i + 2] * 0.72 - 12, 0, 255)
+      r = clamp((r - 128) * 1.18 + 128, 0, 255)
+      g = clamp((g - 128) * 1.12 + 128, 0, 255)
+      b = clamp((b - 128) * 1.15 + 128, 0, 255)
       d[i] = r; d[i + 1] = g; d[i + 2] = b
     }
   } else if (algoType === 'vision_t') {
     for (let i = 0; i < d.length; i += 4) {
-      let r = clamp(d[i]     * 0.88 - 8,  0, 255)
-      let g = clamp(d[i + 1] * 0.97,       0, 255)
-      let b = clamp(d[i + 2] * 1.14 + 10, 0, 255)
-      r = clamp((r - 128) * 0.95 + 128, 0, 255)
-      g = clamp((g - 128) * 0.95 + 128, 0, 255)
-      b = clamp((b - 128) * 0.95 + 128, 0, 255)
+      let r = clamp(d[i]     * 0.76 - 16, 0, 255)
+      let g = clamp(d[i + 1] * 0.96,      0, 255)
+      let b = clamp(d[i + 2] * 1.28 + 18, 0, 255)
+      r = clamp((r - 128) * 0.90 + 128, 0, 255)
+      g = clamp((g - 128) * 0.90 + 128, 0, 255)
+      b = clamp((b - 128) * 0.92 + 128, 0, 255)
       d[i] = r; d[i + 1] = g; d[i + 2] = b
     }
   }
@@ -320,8 +320,17 @@ export function UploadPage() {
 
     applyGrain(ctx, canvas, preset.grain)
 
-    if (selectedFlare !== 'none') {
-      applyFlare(ctx, canvas, selectedFlare)
+    // Auto-flare: 30% chance when using a film preset
+    const AUTO_FLARES: FlareType[] = ['leak_warm', 'streak', 'leak_warm', 'leak_cool']
+    const autoFlare: FlareType =
+      preset.id !== 'none' && Math.random() < 0.30
+        ? AUTO_FLARES[Math.floor(Math.random() * AUTO_FLARES.length)]
+        : 'none'
+
+    const effectiveFlare = selectedFlare !== 'none' ? selectedFlare : autoFlare
+
+    if (effectiveFlare !== 'none') {
+      applyFlare(ctx, canvas, effectiveFlare)
     }
 
     canvas.toBlob(blob => {
@@ -350,9 +359,10 @@ export function UploadPage() {
       const { error: insErr } = await supabase.from('moments').insert({
         user_id:   user.id,
         photo_url: publicUrl,
-        caption:   caption.trim() || null,
-        mood:      mood ?? null,
-        visibility: 'public',
+        caption:        caption.trim() || null,
+        mood:           mood ?? null,
+        film_preset_id: preset.id !== 'none' ? preset.id : null,
+        visibility:     'public',
       })
       if (insErr) throw new Error(insErr.message)
 
