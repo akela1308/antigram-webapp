@@ -61,6 +61,78 @@ function applyGrain(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, gr
   }
 }
 
+// ── CSS filter simulation (ctx.filter is unreliable in Telegram WebView) ─────
+//
+// Implements: brightness, contrast, saturate, grayscale, sepia, hue-rotate
+// as pixel-level math identical to the CSS spec.
+
+function applyFilter(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, filterStr: string): void {
+  if (!filterStr || filterStr === 'none') return
+
+  // Parse filter string once; precompute hue-rotate matrix
+  type Op = { t: string; v: number; mx?: number[] }
+  const ops: Op[] = []
+  const re = /([\w-]+)\(\s*([^)]+?)\s*\)/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(filterStr)) !== null) {
+    const t = m[1], v = parseFloat(m[2])
+    if (t === 'hue-rotate') {
+      const rad = v * Math.PI / 180
+      const c = Math.cos(rad), s = Math.sin(rad)
+      ops.push({ t, v, mx: [
+        0.213 + c*0.787 - s*0.213, 0.715 - c*0.715 - s*0.715, 0.072 - c*0.072 + s*0.928,
+        0.213 - c*0.213 + s*0.143, 0.715 + c*0.285 + s*0.140, 0.072 - c*0.072 - s*0.283,
+        0.213 - c*0.213 - s*0.787, 0.715 - c*0.715 + s*0.715, 0.072 + c*0.928 + s*0.072,
+      ]})
+    } else {
+      ops.push({ t, v })
+    }
+  }
+  if (ops.length === 0) return
+
+  const { width: W, height: H } = canvas
+  const imageData = ctx.getImageData(0, 0, W, H)
+  const d = imageData.data
+
+  for (let i = 0; i < d.length; i += 4) {
+    let r = d[i] / 255, g = d[i + 1] / 255, b = d[i + 2] / 255
+
+    for (const op of ops) {
+      const v = op.v
+      if (op.t === 'brightness') {
+        r *= v; g *= v; b *= v
+      } else if (op.t === 'contrast') {
+        r = (r - 0.5) * v + 0.5
+        g = (g - 0.5) * v + 0.5
+        b = (b - 0.5) * v + 0.5
+      } else if (op.t === 'saturate') {
+        const lum = 0.2126*r + 0.7152*g + 0.0722*b
+        r = lum + (r - lum) * v; g = lum + (g - lum) * v; b = lum + (b - lum) * v
+      } else if (op.t === 'grayscale') {
+        const lum = 0.2126*r + 0.7152*g + 0.0722*b
+        r += (lum - r) * v; g += (lum - g) * v; b += (lum - b) * v
+      } else if (op.t === 'sepia') {
+        const nr = r*0.393 + g*0.769 + b*0.189
+        const ng = r*0.349 + g*0.686 + b*0.168
+        const nb = r*0.272 + g*0.534 + b*0.131
+        r += (nr - r) * v; g += (ng - g) * v; b += (nb - b) * v
+      } else if (op.t === 'hue-rotate') {
+        const e = op.mx!
+        const nr = e[0]*r + e[1]*g + e[2]*b
+        const ng = e[3]*r + e[4]*g + e[5]*b
+        const nb = e[6]*r + e[7]*g + e[8]*b
+        r = nr; g = ng; b = nb
+      }
+    }
+
+    d[i]     = clamp(r * 255, 0, 255)
+    d[i + 1] = clamp(g * 255, 0, 255)
+    d[i + 2] = clamp(b * 255, 0, 255)
+  }
+
+  ctx.putImageData(imageData, 0, 0)
+}
+
 // ── Algorithmic presets ───────────────────────────────────────────────────────
 
 function applyAlgo(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, algoType: AlgoType): void {
@@ -234,15 +306,17 @@ export function UploadPage() {
     canvas.height = size
     const ctx = canvas.getContext('2d', { willReadFrequently: true })!
 
-    if (preset.filter !== 'none') ctx.filter = preset.filter
+    // Draw raw frame — no ctx.filter (unreliable in Telegram WebView)
     const ox = (video.videoWidth  - size) / 2
     const oy = (video.videoHeight - size) / 2
     ctx.drawImage(video, ox, oy, size, size, 0, 0, size, size)
-    ctx.filter = 'none'
 
+    // Pixel-level processing (order: algo → filter → grain → flare)
     if (preset.algoType) {
       applyAlgo(ctx, canvas, preset.algoType)
     }
+
+    applyFilter(ctx, canvas, preset.filter)
 
     applyGrain(ctx, canvas, preset.grain)
 
