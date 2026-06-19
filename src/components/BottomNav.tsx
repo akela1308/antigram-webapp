@@ -1,6 +1,9 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
+const ACTIVE = '#C9843E'
+const INACTIVE = '#8A6A50'
+
 export function BottomNav() {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -12,100 +15,103 @@ export function BottomNav() {
         background: 'rgba(20,14,10,0.95)',
         backdropFilter: 'blur(12px)',
         borderTop: '1px solid var(--border)',
-        paddingTop: 10,
-        paddingBottom: `max(10px, env(safe-area-inset-bottom, 10px))`,
+        height: 85,
+        paddingBottom: 'max(20px, env(safe-area-inset-bottom, 20px))',
+        paddingTop: 8,
       }}
     >
-      <NavLink
-        to="/"
-        end
-        className={({ isActive }) =>
-          `flex flex-col items-center gap-1 px-4 py-1 transition-all ${isActive ? 'opacity-100' : 'opacity-40'}`
-        }
-      >
-        {({ isActive }) => (
-          <>
-            <HomeIcon active={isActive} />
-            <span style={{ color: isActive ? 'var(--amber)' : 'var(--text-muted)', fontSize: 10 }}>Лента</span>
-          </>
-        )}
+      <NavLink to="/" end className="flex flex-col items-center justify-end pb-1 px-4 transition-all">
+        {({ isActive }) => <HomeIcon active={isActive} />}
       </NavLink>
 
-      <NavLink
-        to="/explore"
-        className={({ isActive }) =>
-          `flex flex-col items-center gap-1 px-4 py-1 transition-all ${isActive ? 'opacity-100' : 'opacity-40'}`
-        }
-      >
-        {({ isActive }) => (
-          <>
-            <ExploreIcon active={isActive} />
-            <span style={{ color: isActive ? 'var(--amber)' : 'var(--text-muted)', fontSize: 10 }}>Подборки</span>
-          </>
-        )}
+      <NavLink to="/search" className="flex flex-col items-center justify-end pb-1 px-4 transition-all">
+        {({ isActive }) => <SearchIcon active={isActive} />}
       </NavLink>
 
-      {/* Center camera FAB */}
+      {/* Center [A] FAB */}
       <button
         onClick={() => navigate(user ? '/upload' : '/auth')}
-        className="flex flex-col items-center transition-transform active:scale-90"
-        style={{ marginBottom: 2 }}
+        className="flex flex-col items-center justify-end pb-1 transition-transform active:scale-90"
+        style={{ marginBottom: 4 }}
       >
         <div
-          className="w-14 h-14 rounded-full flex items-center justify-center shadow-lg"
-          style={{ background: 'var(--amber)', marginTop: -22 }}
+          className="flex items-center justify-center rounded-full shadow-lg"
+          style={{
+            width: 56,
+            height: 56,
+            background: '#2E1A0A',
+            marginTop: -20,
+          }}
         >
-          <CameraIcon />
+          <div
+            className="flex items-center justify-center rounded-full"
+            style={{
+              width: 44,
+              height: 44,
+              background: '#C4A882',
+            }}
+          >
+            <span
+              style={{
+                fontFamily: "'JetBrains Mono', 'Courier New', monospace",
+                fontSize: 15,
+                fontWeight: 700,
+                color: '#1A0F05',
+                letterSpacing: -0.5,
+                lineHeight: 1,
+              }}
+            >
+              [A]
+            </span>
+          </div>
         </div>
       </button>
 
-      <NavLink
-        to="/me"
-        className={({ isActive }) =>
-          `flex flex-col items-center gap-1 px-4 py-1 transition-all ${isActive ? 'opacity-100' : 'opacity-40'}`
-        }
-      >
-        {({ isActive }) => (
-          <>
-            <MeIcon active={isActive} />
-            <span style={{ color: isActive ? 'var(--amber)' : 'var(--text-muted)', fontSize: 10 }}>Я</span>
-          </>
-        )}
+      <NavLink to="/notifications" className="flex flex-col items-center justify-end pb-1 px-4 transition-all">
+        {({ isActive }) => <BellIcon active={isActive} />}
+      </NavLink>
+
+      <NavLink to="/me" className="flex flex-col items-center justify-end pb-1 px-4 transition-all">
+        {({ isActive }) => <PersonIcon active={isActive} />}
       </NavLink>
     </nav>
   )
 }
 
 function HomeIcon({ active }: { active: boolean }) {
+  const c = active ? ACTIVE : INACTIVE
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active ? 'var(--amber)' : 'var(--text-muted)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: active ? 1 : 0.5 }}>
       <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
       <polyline points="9 22 9 12 15 12 15 22" />
     </svg>
   )
 }
 
-function ExploreIcon({ active }: { active: boolean }) {
+function SearchIcon({ active }: { active: boolean }) {
+  const c = active ? ACTIVE : INACTIVE
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active ? 'var(--amber)' : 'var(--text-muted)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" />
-      <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: active ? 1 : 0.5 }}>
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.35-4.35" />
     </svg>
   )
 }
 
-function CameraIcon() {
+function BellIcon({ active }: { active: boolean }) {
+  const c = active ? ACTIVE : INACTIVE
   return (
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#140E0A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-      <circle cx="12" cy="13" r="4" />
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: active ? 1 : 0.5 }}>
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
     </svg>
   )
 }
 
-function MeIcon({ active }: { active: boolean }) {
+function PersonIcon({ active }: { active: boolean }) {
+  const c = active ? ACTIVE : INACTIVE
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active ? 'var(--amber)' : 'var(--text-muted)'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: active ? 1 : 0.5 }}>
       <circle cx="12" cy="8" r="4" />
       <path d="M6 20v-2a6 6 0 0 1 12 0v2" />
     </svg>

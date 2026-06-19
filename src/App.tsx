@@ -7,6 +7,8 @@ import { MomentPage } from './pages/MomentPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { MyProfilePage } from './pages/MyProfilePage'
 import { AuthPage } from './pages/AuthPage'
+import { NotificationsPage } from './pages/NotificationsPage'
+import { SearchPage } from './pages/SearchPage'
 import { BottomNav } from './components/BottomNav'
 
 export function App() {
@@ -37,6 +39,8 @@ export function App() {
       <Routes>
         <Route path="/" element={<FeedPage />} />
         <Route path="/explore" element={<ExplorePage />} />
+        <Route path="/search" element={<SearchPage />} />
+        <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/upload" element={<UploadPage />} />
         <Route path="/moment/:id" element={<MomentPage />} />
         <Route path="/profile/:userId" element={<ProfilePage />} />

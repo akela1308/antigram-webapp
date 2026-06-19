@@ -75,8 +75,8 @@ export function MomentPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col" style={{ minHeight: '100dvh' }}>
-        <div className="flex items-center gap-3 px-4 py-3 safe-top" style={{ borderBottom: '1px solid var(--border)' }}>
+      <div className="flex flex-col" style={{ minHeight: '100dvh', paddingTop: 'var(--tg-top, 0px)' }}>
+        <div className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: '1px solid var(--border)' }}>
           <button onClick={() => navigate(-1)}>
             <BackIcon />
           </button>
@@ -106,11 +106,11 @@ export function MomentPage() {
   })
 
   return (
-    <div className="flex flex-col" style={{ minHeight: '100dvh', background: 'var(--bg)' }}>
+    <div className="flex flex-col" style={{ minHeight: '100dvh', background: 'var(--bg)', paddingTop: 'var(--tg-top, 0px)' }}>
       {/* Header */}
       <div
-        className="sticky top-0 z-40 flex items-center justify-between px-4 py-3 safe-top"
-        style={{ background: 'rgba(20,14,10,0.95)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border)' }}
+        className="sticky z-40 flex items-center justify-between px-4 py-3"
+        style={{ top: 'var(--tg-top, 0px)', background: 'rgba(20,14,10,0.95)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border)' }}
       >
         <button onClick={() => navigate(-1)} className="p-1">
           <BackIcon />

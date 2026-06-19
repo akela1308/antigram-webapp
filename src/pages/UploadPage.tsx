@@ -127,8 +127,8 @@ export function UploadPage() {
         user_id:  user.id,
         photo_url: publicUrl,
         caption:   caption.trim() || null,
-        mood:      mood ?? null,
-        is_public: true,
+        mood:       mood ?? null,
+        visibility: 'public',
       })
       if (insErr) throw new Error(insErr.message)
 

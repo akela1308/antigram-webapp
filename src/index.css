@@ -1,8 +1,11 @@
+@import '@fontsource/jetbrains-mono/400.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
+  --tg-safe-top: 0px;
   --bg: #140E0A;
   --bg-warm: #1E1510;
   --amber: #C9922A;

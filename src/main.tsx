@@ -7,6 +7,7 @@ import './index.css'
 
 type TgWebApp = {
   initData?: string
+  platform?: string
   setHeaderColor?: (color: string) => void
   setBackgroundColor?: (color: string) => void
   expand?: () => void
@@ -26,46 +27,65 @@ function getTgWebApp(): TgWebApp | undefined {
 
 function applyTelegramSafeArea(tg: TgWebApp) {
   const contentTop = tg.contentSafeAreaInset?.top ?? 0
-  const deviceTop = tg.safeAreaInset?.top ?? 0
+  const deviceTop  = tg.safeAreaInset?.top ?? 0
+  const platform   = tg.platform ?? ''
 
   let topValue: string
   if (contentTop > 0) {
-    // Bot API 8.0+: exact value, accounts for everything (notch + Telegram bar)
+    // Bot API 8.0+ / Telegram 11+: точное значение, учитывает и notch и шапку Telegram
     topValue = `${contentTop}px`
   } else if (deviceTop > 0) {
-    // Bot API 7.10+: device notch height + ~50px for Telegram bar
-    topValue = `${deviceTop + 50}px`
+    // Bot API 7.10+: только notch устройства — добавляем 56px для шапки Telegram
+    topValue = `${deviceTop + 56}px`
   } else {
-    // Fallback: use env() for OS notch + 54px for Telegram bar.
-    // Minimum 94px ensures content clears Telegram's bar on iPhones where
-    // env(safe-area-inset-top) may report 0 inside the WebView.
-    topValue = 'max(calc(env(safe-area-inset-top, 44px) + 54px), 94px)'
+    // Старые клиенты без API safe area — определяем по платформе
+    if (platform === 'ios' || platform === 'macos') {
+      // iOS: есть notch/Dynamic Island, env() работает
+      topValue = `max(calc(env(safe-area-inset-top, 0px) + 56px), 96px)`
+    } else if (platform === 'android' || platform === 'android_x') {
+      // Android: нет env() safe area, только шапка Telegram (~56px)
+      topValue = '56px'
+    } else {
+      // desktop/tdesktop/weba — шапка не мешает или отсутствует
+      topValue = '0px'
+    }
   }
 
   document.documentElement.style.setProperty('--tg-top', topValue)
 
   const contentBottom = tg.contentSafeAreaInset?.bottom ?? 0
-  const deviceBottom = tg.safeAreaInset?.bottom ?? 0
-  const bottomValue = Math.max(contentBottom, deviceBottom)
+  const deviceBottom  = tg.safeAreaInset?.bottom ?? 0
+  const bottomValue   = Math.max(contentBottom, deviceBottom)
   document.documentElement.style.setProperty(
     '--tg-bottom',
-    bottomValue > 0 ? `${bottomValue}px` : 'env(safe-area-inset-bottom, 0px)',
+    bottomValue > 0
+      ? `${bottomValue}px`
+      : (platform === 'ios' ? 'env(safe-area-inset-bottom, 20px)' : '0px'),
   )
 }
 
 function initTelegram() {
   const tg = getTgWebApp()
-  // initData is non-empty only when truly running inside Telegram Mini App.
-  // In browsers, telegram-web-app.js sets initData = '' even though expand() exists.
-  if (!tg || !tg.initData) {
+  if (!tg) {
     document.documentElement.style.setProperty('--tg-top', '0px')
     document.documentElement.style.setProperty('--tg-bottom', '0px')
     return
   }
 
+  // Всегда вызываем при наличии объекта tg — expand() нужен даже с пустым initData
   tg.setHeaderColor?.('#140E0A')
   tg.setBackgroundColor?.('#140E0A')
   tg.expand?.()
+
+  // Safe area — только если реально внутри Telegram (не в браузере)
+  // В браузере telegram-web-app.js создаёт tg объект но platform = 'unknown' или ''
+  const isInsideTelegram = tg.platform && tg.platform !== 'unknown'
+  if (!isInsideTelegram) {
+    document.documentElement.style.setProperty('--tg-top', '0px')
+    document.documentElement.style.setProperty('--tg-bottom', '0px')
+    tg.ready?.()
+    return
+  }
 
   applyTelegramSafeArea(tg)
 
