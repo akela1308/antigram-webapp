@@ -87,8 +87,25 @@ export function MyProfilePage() {
 
   const handleHighlightPick = async (momentId: string) => {
     if (!user || pickerTarget === null) return
-    await setHighlightAtPosition(user.id, momentId, pickerTarget)
+
+    // Optimistic update: show photo immediately without waiting for DB
+    const pickedMoment = moments.find(m => m.id === momentId)
+    if (pickedMoment) {
+      setHighlights(prev => {
+        const without = prev.filter(h => h.position !== pickerTarget)
+        return [...without, {
+          id: `optimistic-${Date.now()}`,
+          user_id: user.id,
+          moment_id: momentId,
+          position: pickerTarget,
+          created_at: new Date().toISOString(),
+          moments: { id: momentId, photo_url: pickedMoment.photo_url },
+        }]
+      })
+    }
+
     setPickerTarget(null)
+    await setHighlightAtPosition(user.id, momentId, pickerTarget)
     const hl = await getHighlights(user.id)
     setHighlights(hl)
   }

@@ -126,6 +126,19 @@ export async function getFeedReactions(
   return (data as { moment_id: string; type: ReactionType }[]) ?? []
 }
 
+export async function getUserReactionsForMoments(
+  userId: string,
+  momentIds: string[],
+): Promise<{ moment_id: string; type: ReactionType }[]> {
+  if (momentIds.length === 0) return []
+  const { data } = await supabase
+    .from('reactions')
+    .select('moment_id, type')
+    .eq('user_id', userId)
+    .in('moment_id', momentIds)
+  return (data as { moment_id: string; type: ReactionType }[]) ?? []
+}
+
 export async function getReactions(
   momentId: string,
 ): Promise<{ moment_id: string; user_id: string; type: ReactionType }[]> {

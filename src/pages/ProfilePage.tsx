@@ -169,8 +169,12 @@ export function ProfilePage() {
             <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Нет моментов</p>
           </div>
         ) : (
-          moments.map(m => (
-            <Link key={m.id} to={`/moment/${m.id}`}>
+          moments.map((m, idx) => (
+            <div
+              key={m.id}
+              onClick={() => navigate('/moment-feed', { state: { moments, startIndex: idx, isOwner: isOwnProfile, userId: targetId } })}
+              style={{ cursor: 'pointer' }}
+            >
               <div className="relative w-full overflow-hidden rounded-xl" style={{ paddingBottom: '100%' }}>
                 <img
                   src={m.photo_url}
@@ -179,7 +183,7 @@ export function ProfilePage() {
                   loading="lazy"
                 />
               </div>
-            </Link>
+            </div>
           ))
         )}
       </div>
