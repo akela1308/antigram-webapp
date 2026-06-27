@@ -370,6 +370,7 @@ export function UploadPage() {
         custom_mood_emoji: mood === 'custom' ? customMoodEmoji || null : null,
         custom_mood_label: mood === 'custom' ? customMoodLabel || null : null,
         film_preset_id:   preset.id !== 'none' ? preset.id : null,
+        is_public:        true,
         visibility:       'public',
       })
       if (insErr) throw new Error(insErr.message)
