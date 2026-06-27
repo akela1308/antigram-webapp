@@ -530,21 +530,36 @@ export function UploadPage() {
                 <div style={{ width: 36, height: 4, borderRadius: 2, background: '#333' }} />
               </div>
               <p style={{ color: '#fff', fontSize: 17, fontWeight: 700, margin: '0 0 4px' }}>Своя эмоция</p>
-              <p style={{ color: '#555', fontSize: 13, margin: '0 0 14px' }}>Выбери эмодзи и назови её</p>
-              <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
-                <input
-                  value={draftEmoji}
-                  onChange={e => setDraftEmoji(e.target.value.slice(-2))}
-                  placeholder="😤"
-                  maxLength={2}
-                  style={{
-                    width: 54, padding: '12px 6px', borderRadius: 10,
-                    background: '#1A1208', color: '#fff',
-                    border: '1px solid #2E2218',
-                    fontSize: 22, textAlign: 'center', outline: 'none',
-                    fontFamily: 'inherit',
-                  }}
-                />
+              <p style={{ color: '#555', fontSize: 13, margin: '0 0 12px' }}>Выбери эмодзи и назови её</p>
+
+              {/* Emoji grid — no keyboard needed */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                {['😄','😂','🥰','😍','🤩','😎','🥺','😢','😭','😤','🤬','😰','😱','🤯','😴','🥱','😅','😬','🙄','😏','😒','😔','💀','🔥','💫','✨','💖','💔','🌅','🌙','🎭','📸','🤍','🖤','✦'].map(emoji => (
+                  <button
+                    key={emoji}
+                    onClick={() => setDraftEmoji(emoji)}
+                    style={{
+                      width: 42, height: 42, borderRadius: 10, fontSize: 20,
+                      background: draftEmoji === emoji ? 'rgba(196,168,130,0.2)' : 'rgba(255,255,255,0.05)',
+                      border: draftEmoji === emoji ? '1px solid var(--amber)' : '1px solid #2E2218',
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+
+              {/* Label input */}
+              <div style={{ display: 'flex', gap: 10, marginBottom: 12, alignItems: 'center' }}>
+                <div style={{
+                  width: 54, height: 50, borderRadius: 10, flexShrink: 0,
+                  background: '#1A1208', border: '1px solid #2E2218',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 24,
+                }}>
+                  {draftEmoji || '✦'}
+                </div>
                 <input
                   value={draftLabel}
                   onChange={e => setDraftLabel(e.target.value)}
