@@ -6,6 +6,7 @@ import { EMOTIONS } from '../lib/types'
 import { FILM_PRESETS } from '../lib/filmPresets'
 import type { FilmPreset, AlgoType, GrainConfig, FlareType } from '../lib/filmPresets'
 import type { ReactionType } from '../lib/types'
+import { trackPhotoPosted, trackFilterApplied } from '../lib/analytics'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -260,6 +261,11 @@ export function UploadPage() {
   const [photoBlob, setPhotoBlob]       = useState<Blob | null>(null)
   const [caption, setCaption]           = useState('')
   const [mood, setMood]                 = useState<ReactionType | null>(null)
+  const [customMoodEmoji, setCustomMoodEmoji] = useState('')
+  const [customMoodLabel, setCustomMoodLabel] = useState('')
+  const [showCustomMoodSheet, setShowCustomMoodSheet] = useState(false)
+  const [draftEmoji, setDraftEmoji]     = useState('')
+  const [draftLabel, setDraftLabel]     = useState('')
   const [camError, setCamError]         = useState<string | null>(null)
   const [error, setError]               = useState<string | null>(null)
 
@@ -357,15 +363,18 @@ export function UploadPage() {
 
       const { data: { publicUrl } } = supabase.storage.from('moments').getPublicUrl(fileName)
       const { error: insErr } = await supabase.from('moments').insert({
-        user_id:   user.id,
-        photo_url: publicUrl,
-        caption:        caption.trim() || null,
-        mood:           mood ?? null,
-        film_preset_id: preset.id !== 'none' ? preset.id : null,
-        visibility:     'public',
+        user_id:          user.id,
+        photo_url:        publicUrl,
+        caption:          caption.trim() || null,
+        mood:             mood ?? null,
+        custom_mood_emoji: mood === 'custom' ? customMoodEmoji || null : null,
+        custom_mood_label: mood === 'custom' ? customMoodLabel || null : null,
+        film_preset_id:   preset.id !== 'none' ? preset.id : null,
+        visibility:       'public',
       })
       if (insErr) throw new Error(insErr.message)
 
+      trackPhotoPosted(preset.id)
       setPhase('success')
       setTimeout(() => navigate('/'), 1800)
     } catch (err) {
@@ -380,6 +389,8 @@ export function UploadPage() {
     setPhotoBlob(null)
     setCaption('')
     setMood(null)
+    setCustomMoodEmoji('')
+    setCustomMoodLabel('')
     setPhase('viewfinder')
   }
 
@@ -447,7 +458,10 @@ export function UploadPage() {
               return (
                 <button
                   key={e.type}
-                  onClick={() => setMood(active ? null : e.type)}
+                  onClick={() => {
+                    setMood(active ? null : e.type)
+                    if (!active) { setCustomMoodEmoji(''); setCustomMoodLabel('') }
+                  }}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 6,
                     padding: '7px 13px', borderRadius: 20,
@@ -461,8 +475,111 @@ export function UploadPage() {
                 </button>
               )
             })}
+
+            {/* Custom emotion chip (when set) */}
+            {customMoodLabel ? (
+              <button
+                onClick={() => { setMood(null); setCustomMoodEmoji(''); setCustomMoodLabel('') }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '7px 13px', borderRadius: 20,
+                  border: 'none', background: 'var(--amber)',
+                  color: '#140E0A', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                <span>{customMoodEmoji || '✦'}</span>
+                <span>{customMoodLabel}</span>
+                <span style={{ fontSize: 11, opacity: 0.7, marginLeft: 2 }}>✕</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  setMood(null)
+                  setDraftEmoji(customMoodEmoji)
+                  setDraftLabel(customMoodLabel)
+                  setShowCustomMoodSheet(true)
+                }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '7px 12px', borderRadius: 20,
+                  border: '1px dashed #3E3228', background: 'transparent',
+                  color: '#555', fontSize: 13, cursor: 'pointer',
+                }}
+              >
+                <span>+</span><span>Своя</span>
+              </button>
+            )}
           </div>
         </div>
+
+        {/* Custom emotion bottom sheet */}
+        {showCustomMoodSheet && (
+          <>
+            <div
+              onClick={() => setShowCustomMoodSheet(false)}
+              style={{ position: 'fixed', inset: 0, zIndex: 99, background: 'rgba(0,0,0,0.55)' }}
+            />
+            <div style={{
+              position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100,
+              background: '#110C08', borderRadius: '20px 20px 0 0',
+              borderTop: '1px solid #2E2218',
+              padding: '12px 20px',
+              paddingBottom: 'max(32px, calc(var(--tg-bottom, 0px) + 16px))',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: 10 }}>
+                <div style={{ width: 36, height: 4, borderRadius: 2, background: '#333' }} />
+              </div>
+              <p style={{ color: '#fff', fontSize: 17, fontWeight: 700, margin: '0 0 4px' }}>Своя эмоция</p>
+              <p style={{ color: '#555', fontSize: 13, margin: '0 0 14px' }}>Выбери эмодзи и назови её</p>
+              <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+                <input
+                  value={draftEmoji}
+                  onChange={e => setDraftEmoji(e.target.value.slice(-2))}
+                  placeholder="😤"
+                  maxLength={2}
+                  style={{
+                    width: 54, padding: '12px 6px', borderRadius: 10,
+                    background: '#1A1208', color: '#fff',
+                    border: '1px solid #2E2218',
+                    fontSize: 22, textAlign: 'center', outline: 'none',
+                    fontFamily: 'inherit',
+                  }}
+                />
+                <input
+                  value={draftLabel}
+                  onChange={e => setDraftLabel(e.target.value)}
+                  placeholder="Нежно, Дерзко..."
+                  maxLength={24}
+                  style={{
+                    flex: 1, padding: '12px 14px', borderRadius: 10,
+                    background: '#1A1208', color: '#fff',
+                    border: '1px solid #2E2218',
+                    fontSize: 15, outline: 'none',
+                    fontFamily: 'inherit',
+                  }}
+                />
+              </div>
+              <button
+                onClick={() => {
+                  if (!draftLabel.trim()) return
+                  setCustomMoodEmoji(draftEmoji || '✦')
+                  setCustomMoodLabel(draftLabel.trim())
+                  setMood('custom')
+                  setShowCustomMoodSheet(false)
+                }}
+                disabled={!draftLabel.trim()}
+                style={{
+                  width: '100%', padding: '14px 0', borderRadius: 30,
+                  background: draftLabel.trim() ? 'var(--amber)' : '#2E1A0A',
+                  color: draftLabel.trim() ? '#140E0A' : '#555',
+                  fontSize: 15, fontWeight: 700, border: 'none', cursor: 'pointer',
+                }}
+              >
+                Добавить
+              </button>
+            </div>
+          </>
+        )}
 
         <textarea
           value={caption}
@@ -630,7 +747,7 @@ export function UploadPage() {
             return (
               <button
                 key={p.id}
-                onClick={() => setPreset(p)}
+                onClick={() => { setPreset(p); if (p.id !== 'none') trackFilterApplied(p.id) }}
                 style={{
                   flexShrink: 0,
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,

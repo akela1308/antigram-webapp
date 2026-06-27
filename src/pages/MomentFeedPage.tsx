@@ -12,6 +12,7 @@ import {
 } from '../lib/db'
 import { EMOTIONS } from '../lib/types'
 import type { Moment, ReactionType, AlbumWithMoments } from '../lib/types'
+import { trackReactionAdded, trackMomentSaved } from '../lib/analytics'
 
 type ReactionCounts = Partial<Record<ReactionType, number>>
 
@@ -33,7 +34,14 @@ function formatTime(iso: string): string {
   return `${Math.floor(hours / 24)} д назад`
 }
 
-async function savePhoto(photoUrl: string) {
+async function savePhoto(photoUrl: string): Promise<void> {
+  // Telegram Bot API 8.0+ native download
+  const tg = (window as any).Telegram?.WebApp
+  if (typeof tg?.downloadFile === 'function') {
+    tg.downloadFile(photoUrl, `antigram_${Date.now()}.jpg`)
+    return
+  }
+  // Fallback: fetch → blob → anchor download
   try {
     const res = await fetch(photoUrl)
     const blob = await res.blob()
@@ -144,6 +152,7 @@ export function MomentFeedPage() {
         return { ...prev, [momentId]: c }
       })
       await addReaction(momentId, user.id, type)
+      trackReactionAdded(type)
     }
   }
 
@@ -206,7 +215,7 @@ export function MomentFeedPage() {
               onReaction={type => handleReaction(m.id, type)}
               onMenu={() => setMenuMomentId(m.id)}
               onShare={() => { sharePhoto(m.id); showToast('Ссылка скопирована') }}
-              onSave={() => savePhoto(m.photo_url)}
+              onSave={() => { savePhoto(m.photo_url).then(() => showToast('Сохранено')).catch(() => {}); trackMomentSaved() }}
             />
           ))
         )}

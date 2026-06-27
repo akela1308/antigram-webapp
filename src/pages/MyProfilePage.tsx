@@ -4,6 +4,7 @@ import { Avatar } from '../components/Avatar'
 import { FilmStripHeader } from '../components/FilmStripHeader'
 import { ProfileSkeleton, MomentCardSkeleton } from '../components/Skeleton'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
 import {
   getUserMoments,
   getFollowersCount,
@@ -56,7 +57,10 @@ export function MyProfilePage() {
   const [newAlbumTitle, setNewAlbumTitle] = useState('')
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
+  const [uploadingSlot, setUploadingSlot] = useState<number | null>(null)
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
     if (!user) { setLoading(false); return }
@@ -80,6 +84,11 @@ export function MyProfilePage() {
     if (!authLoading) load()
   }, [authLoading, load])
 
+  const showToast = useCallback((msg: string) => {
+    setToast(msg)
+    setTimeout(() => setToast(null), 2500)
+  }, [])
+
   const handleSignOut = async () => {
     await signOut()
     navigate('/auth')
@@ -87,17 +96,18 @@ export function MyProfilePage() {
 
   const handleHighlightPick = async (momentId: string) => {
     if (!user || pickerTarget === null) return
+    const slot = pickerTarget  // capture before any state changes
 
-    // Optimistic update: show photo immediately without waiting for DB
+    // Optimistic update
     const pickedMoment = moments.find(m => m.id === momentId)
     if (pickedMoment) {
       setHighlights(prev => {
-        const without = prev.filter(h => h.position !== pickerTarget)
+        const without = prev.filter(h => h.position !== slot)
         return [...without, {
           id: `optimistic-${Date.now()}`,
           user_id: user.id,
           moment_id: momentId,
-          position: pickerTarget,
+          position: slot,
           created_at: new Date().toISOString(),
           moments: { id: momentId, photo_url: pickedMoment.photo_url },
         }]
@@ -105,9 +115,52 @@ export function MyProfilePage() {
     }
 
     setPickerTarget(null)
-    await setHighlightAtPosition(user.id, momentId, pickerTarget)
+    const { error } = await setHighlightAtPosition(user.id, momentId, slot)
+    if (error) {
+      console.error('setHighlightAtPosition error:', error)
+      showToast('Ошибка сохранения')
+      const hl = await getHighlights(user.id)
+      setHighlights(hl)
+      return
+    }
+
     const hl = await getHighlights(user.id)
     setHighlights(hl)
+    showToast('Фото добавлено в плёнку')
+  }
+
+  const handleGalleryUpload = async (file: File, slot: number) => {
+    if (!user) return
+    setUploadingSlot(slot)
+    try {
+      const ext = file.type === 'image/png' ? 'png' : 'jpg'
+      const fileName = `${user.id}/profile_${Date.now()}.${ext}`
+      const { error: upErr } = await supabase.storage
+        .from('moments')
+        .upload(fileName, file, { contentType: file.type || 'image/jpeg' })
+      if (upErr) throw upErr
+
+      const { data: { publicUrl } } = supabase.storage.from('moments').getPublicUrl(fileName)
+
+      const { data: moment, error: insErr } = await supabase
+        .from('moments')
+        .insert({ user_id: user.id, photo_url: publicUrl, is_public: false })
+        .select('id')
+        .single()
+      if (insErr || !moment) throw insErr ?? new Error('insert failed')
+
+      const { error: hlErr } = await setHighlightAtPosition(user.id, (moment as { id: string }).id, slot)
+      if (hlErr) throw hlErr
+
+      const hl = await getHighlights(user.id)
+      setHighlights(hl)
+      showToast('Фото добавлено в плёнку')
+    } catch (e) {
+      console.error('gallery upload error:', e)
+      showToast('Ошибка загрузки')
+    } finally {
+      setUploadingSlot(null)
+    }
   }
 
   const handleHighlightRemove = async (slotIndex: number) => {
@@ -394,6 +447,22 @@ export function MyProfilePage() {
         </div>
       )}
 
+      {/* Hidden file input for gallery upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={async e => {
+          const file = e.target.files?.[0]
+          const slot = pickerTarget
+          if (!file || slot === null) return
+          setPickerTarget(null)
+          await handleGalleryUpload(file, slot)
+          e.target.value = ''
+        }}
+      />
+
       {/* Photo picker for highlight */}
       {pickerTarget !== null && (
         <>
@@ -419,6 +488,31 @@ export function MyProfilePage() {
               </p>
               <button onClick={() => setPickerTarget(null)} style={{ background: 'none', border: 'none', color: '#555', fontSize: 22, cursor: 'pointer' }}>✕</button>
             </div>
+
+            {/* Upload from gallery */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              style={{
+                margin: '0 16px 10px',
+                padding: '12px 16px',
+                borderRadius: 12,
+                background: 'rgba(201,146,42,0.1)',
+                border: '1px dashed rgba(201,146,42,0.4)',
+                color: 'var(--amber)',
+                fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}
+            >
+              <span>📷</span>
+              <span>Загрузить из галереи</span>
+            </button>
+
+            {moments.length > 0 && (
+              <p style={{ color: 'var(--text-muted)', fontSize: 11, margin: '0 20px 8px', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                Из моих кадров
+              </p>
+            )}
+
             <div
               className="no-scrollbar"
               style={{ overflowY: 'auto', padding: '0 8px' }}
@@ -436,10 +530,29 @@ export function MyProfilePage() {
                     <img src={m.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                   </div>
                 ))}
+                {moments.length === 0 && (
+                  <p style={{ color: 'var(--text-muted)', fontSize: 13, gridColumn: '1/-1', padding: '8px 12px' }}>
+                    Нет опубликованных кадров
+                  </p>
+                )}
               </div>
             </div>
           </div>
         </>
+      )}
+
+      {/* Uploading overlay */}
+      {uploadingSlot !== null && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 200,
+          background: 'rgba(0,0,0,0.7)',
+          display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: 12,
+        }}>
+          <div className="w-10 h-10 rounded-full border-2 border-t-transparent animate-spin"
+            style={{ borderColor: 'var(--amber)', borderTopColor: 'transparent', width: 40, height: 40, borderRadius: '50%', borderWidth: 2, borderStyle: 'solid', animation: 'spin 0.8s linear infinite' }} />
+          <span style={{ color: 'var(--amber)', fontSize: 14 }}>Загрузка слот {uploadingSlot + 1}...</span>
+        </div>
       )}
 
       {/* Create album bottom sheet */}
@@ -485,6 +598,19 @@ export function MyProfilePage() {
             </button>
           </div>
         </>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: 100, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 300, background: '#1A1208', border: '1px solid var(--amber)',
+          color: 'var(--amber)', fontSize: 13, fontWeight: 600,
+          padding: '8px 18px', borderRadius: 20, whiteSpace: 'nowrap',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+        }}>
+          {toast}
+        </div>
       )}
 
       {/* Sign out confirm overlay */}

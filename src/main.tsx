@@ -26,41 +26,21 @@ function getTgWebApp(): TgWebApp | undefined {
 }
 
 function applyTelegramSafeArea(tg: TgWebApp) {
+  // Sum both insets: contentSafeAreaInset = Telegram UI buttons, safeAreaInset = device notch
   const contentTop = tg.contentSafeAreaInset?.top ?? 0
   const deviceTop  = tg.safeAreaInset?.top ?? 0
-  const platform   = tg.platform ?? ''
-
-  let topValue: string
-  if (contentTop > 0) {
-    // Bot API 8.0+ / Telegram 11+: точное значение, учитывает и notch и шапку Telegram
-    topValue = `${contentTop}px`
-  } else if (deviceTop > 0) {
-    // Bot API 7.10+: только notch устройства — добавляем 56px для шапки Telegram
-    topValue = `${deviceTop + 56}px`
-  } else {
-    // Старые клиенты без API safe area — определяем по платформе
-    if (platform === 'ios' || platform === 'macos') {
-      // iOS: есть notch/Dynamic Island, env() работает
-      topValue = `max(calc(env(safe-area-inset-top, 0px) + 56px), 96px)`
-    } else if (platform === 'android' || platform === 'android_x') {
-      // Android: нет env() safe area, только шапка Telegram (~56px)
-      topValue = '56px'
-    } else {
-      // desktop/tdesktop/weba — шапка не мешает или отсутствует
-      topValue = '0px'
-    }
-  }
-
-  document.documentElement.style.setProperty('--tg-top', topValue)
+  const totalTop   = contentTop + deviceTop
+  document.documentElement.style.setProperty(
+    '--tg-top',
+    totalTop > 10 ? `${totalTop}px` : '60px',
+  )
 
   const contentBottom = tg.contentSafeAreaInset?.bottom ?? 0
   const deviceBottom  = tg.safeAreaInset?.bottom ?? 0
-  const bottomValue   = Math.max(contentBottom, deviceBottom)
+  const totalBottom   = contentBottom + deviceBottom
   document.documentElement.style.setProperty(
     '--tg-bottom',
-    bottomValue > 0
-      ? `${bottomValue}px`
-      : (platform === 'ios' ? 'env(safe-area-inset-bottom, 20px)' : '0px'),
+    totalBottom > 0 ? `${totalBottom}px` : '0px',
   )
 }
 
