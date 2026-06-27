@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
+import { FilmStripHeader } from '../components/FilmStripHeader'
 import { ProfileSkeleton, MomentCardSkeleton } from '../components/Skeleton'
 import { useAuth } from '../contexts/AuthContext'
 import {
@@ -11,8 +12,9 @@ import {
   unfollowUser,
   getFollowersCount,
   getFollowingCount,
+  getHighlights,
 } from '../lib/db'
-import type { Profile, Moment } from '../lib/types'
+import type { Profile, Moment, HighlightWithMoment } from '../lib/types'
 
 export function ProfilePage() {
   const { userId } = useParams<{ userId: string }>()
@@ -21,6 +23,7 @@ export function ProfilePage() {
 
   const [profile, setProfile] = useState<Profile | null>(null)
   const [moments, setMoments] = useState<Moment[]>([])
+  const [highlights, setHighlights] = useState<HighlightWithMoment[]>([])
   const [following, setFollowing] = useState(false)
   const [followersCount, setFollowersCount] = useState(0)
   const [followingCount, setFollowingCount] = useState(0)
@@ -33,16 +36,18 @@ export function ProfilePage() {
   const load = useCallback(async () => {
     if (!targetId) return
     setLoading(true)
-    const [p, m, fc, fgc] = await Promise.all([
+    const [p, m, fc, fgc, hl] = await Promise.all([
       getProfile(targetId),
       getUserMoments(targetId),
       getFollowersCount(targetId),
       getFollowingCount(targetId),
+      getHighlights(targetId),
     ])
     setProfile(p)
     setMoments(m)
     setFollowersCount(fc)
     setFollowingCount(fgc)
+    setHighlights(hl)
 
     if (user && !isOwnProfile) {
       const f = await isFollowing(user.id, targetId)
@@ -92,6 +97,12 @@ export function ProfilePage() {
   }
 
   const displayName = profile.display_name ?? profile.username ?? 'Аноним'
+
+  const ringPhotos: (string | null)[] = Array.from({ length: 5 }, (_, i) => {
+    const hl = highlights.find(h => h.position === i)
+    return hl?.moments?.photo_url ?? null
+  })
+  const hasHighlights = highlights.length > 0
 
   return (
     <div className="flex flex-col" style={{ minHeight: '100dvh', background: 'var(--bg)', paddingTop: 'var(--tg-top, 56px)' }}>
@@ -157,6 +168,18 @@ export function ProfilePage() {
           </Link>
         )}
       </div>
+
+      {/* Film strip highlights (shown only if user has at least 1) */}
+      {hasHighlights && (
+        <FilmStripHeader
+          photos={ringPhotos}
+          isOwner={false}
+          onOpenPhoto={i => {
+            const hl = highlights.find(h => h.position === i)
+            if (hl?.moments?.id) navigate(`/moment/${hl.moments.id}`)
+          }}
+        />
+      )}
 
       {/* Divider */}
       <div style={{ height: 1, background: 'var(--border)', margin: '0 16px 12px' }} />
