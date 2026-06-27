@@ -1,10 +1,9 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
 import { FilmStripHeader } from '../components/FilmStripHeader'
 import { ProfileSkeleton, MomentCardSkeleton } from '../components/Skeleton'
 import { useAuth } from '../contexts/AuthContext'
-import { supabase } from '../lib/supabase'
 import {
   getUserMoments,
   getFollowersCount,
@@ -15,6 +14,7 @@ import {
   getUserAlbums,
   createAlbum,
   deleteMoment,
+  updateProfile,
 } from '../lib/db'
 import type { Moment, HighlightWithMoment, AlbumWithMoments } from '../lib/types'
 
@@ -57,10 +57,9 @@ export function MyProfilePage() {
   const [newAlbumTitle, setNewAlbumTitle] = useState('')
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
-  const [uploadingSlot, setUploadingSlot] = useState<number | null>(null)
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const longPressTimer = { current: null as ReturnType<typeof setTimeout> | null }
 
   const load = useCallback(async () => {
     if (!user) { setLoading(false); return }
@@ -127,40 +126,6 @@ export function MyProfilePage() {
     const hl = await getHighlights(user.id)
     setHighlights(hl)
     showToast('Фото добавлено в плёнку')
-  }
-
-  const handleGalleryUpload = async (file: File, slot: number) => {
-    if (!user) return
-    setUploadingSlot(slot)
-    try {
-      const ext = file.type === 'image/png' ? 'png' : 'jpg'
-      const fileName = `${user.id}/profile_${Date.now()}.${ext}`
-      const { error: upErr } = await supabase.storage
-        .from('moments')
-        .upload(fileName, file, { contentType: file.type || 'image/jpeg' })
-      if (upErr) throw upErr
-
-      const { data: { publicUrl } } = supabase.storage.from('moments').getPublicUrl(fileName)
-
-      const { data: moment, error: insErr } = await supabase
-        .from('moments')
-        .insert({ user_id: user.id, photo_url: publicUrl, is_public: false })
-        .select('id')
-        .single()
-      if (insErr || !moment) throw insErr ?? new Error('insert failed')
-
-      const { error: hlErr } = await setHighlightAtPosition(user.id, (moment as { id: string }).id, slot)
-      if (hlErr) throw hlErr
-
-      const hl = await getHighlights(user.id)
-      setHighlights(hl)
-      showToast('Фото добавлено в плёнку')
-    } catch (e) {
-      console.error('gallery upload error:', e)
-      showToast('Ошибка загрузки')
-    } finally {
-      setUploadingSlot(null)
-    }
   }
 
   const handleHighlightRemove = async (slotIndex: number) => {
@@ -275,7 +240,7 @@ export function MyProfilePage() {
       >
         <h2 style={{ color: 'var(--brown)', fontSize: 17, fontWeight: 700, margin: 0, fontFamily: 'Georgia, serif' }}>Мой профиль</h2>
         <button
-          onClick={() => setShowSignOutConfirm(true)}
+          onClick={() => setShowSettings(true)}
           style={{
             width: 36, height: 36, borderRadius: 18,
             background: 'rgba(255,255,255,0.05)', border: 'none',
@@ -447,22 +412,6 @@ export function MyProfilePage() {
         </div>
       )}
 
-      {/* Hidden file input for gallery upload */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        style={{ display: 'none' }}
-        onChange={async e => {
-          const file = e.target.files?.[0]
-          const slot = pickerTarget
-          if (!file || slot === null) return
-          setPickerTarget(null)
-          await handleGalleryUpload(file, slot)
-          e.target.value = ''
-        }}
-      />
-
       {/* Photo picker for highlight */}
       {pickerTarget !== null && (
         <>
@@ -488,24 +437,6 @@ export function MyProfilePage() {
               </p>
               <button onClick={() => setPickerTarget(null)} style={{ background: 'none', border: 'none', color: '#555', fontSize: 22, cursor: 'pointer' }}>✕</button>
             </div>
-
-            {/* Upload from gallery */}
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              style={{
-                margin: '0 16px 10px',
-                padding: '12px 16px',
-                borderRadius: 12,
-                background: 'rgba(201,146,42,0.1)',
-                border: '1px dashed rgba(201,146,42,0.4)',
-                color: 'var(--amber)',
-                fontSize: 14, fontWeight: 600, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: 8,
-              }}
-            >
-              <span>📷</span>
-              <span>Загрузить из галереи</span>
-            </button>
 
             {moments.length > 0 && (
               <p style={{ color: 'var(--text-muted)', fontSize: 11, margin: '0 20px 8px', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>
@@ -539,20 +470,6 @@ export function MyProfilePage() {
             </div>
           </div>
         </>
-      )}
-
-      {/* Uploading overlay */}
-      {uploadingSlot !== null && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 200,
-          background: 'rgba(0,0,0,0.7)',
-          display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center', gap: 12,
-        }}>
-          <div className="w-10 h-10 rounded-full border-2 border-t-transparent animate-spin"
-            style={{ borderColor: 'var(--amber)', borderTopColor: 'transparent', width: 40, height: 40, borderRadius: '50%', borderWidth: 2, borderStyle: 'solid', animation: 'spin 0.8s linear infinite' }} />
-          <span style={{ color: 'var(--amber)', fontSize: 14 }}>Загрузка слот {uploadingSlot + 1}...</span>
-        </div>
       )}
 
       {/* Create album bottom sheet */}
@@ -613,42 +530,19 @@ export function MyProfilePage() {
         </div>
       )}
 
-      {/* Sign out confirm overlay */}
-      {showSignOutConfirm && (
-        <>
-          <div onClick={() => setShowSignOutConfirm(false)} style={{ position: 'fixed', inset: 0, zIndex: 99, background: 'rgba(0,0,0,0.7)' }} />
-          <div style={{
-            position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100,
-            background: '#110C08',
-            borderRadius: '24px 24px 0 0',
-            borderTop: '1px solid #2E2218',
-            padding: '24px 20px',
-            paddingBottom: 'max(32px, env(safe-area-inset-bottom, 20px))',
-          }}>
-            <p style={{ color: '#fff', fontSize: 17, fontWeight: 600, margin: '0 0 8px', textAlign: 'center' }}>Выйти из аккаунта?</p>
-            <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: '0 0 20px', textAlign: 'center' }}>Вы можете войти снова в любое время</p>
-            <button
-              onClick={handleSignOut}
-              style={{
-                width: '100%', padding: '14px 0', borderRadius: 30,
-                background: '#e05a5a', color: '#fff',
-                fontSize: 15, fontWeight: 700, border: 'none', cursor: 'pointer', marginBottom: 10,
-              }}
-            >
-              Выйти
-            </button>
-            <button
-              onClick={() => setShowSignOutConfirm(false)}
-              style={{
-                width: '100%', padding: '12px 0',
-                background: 'none', border: 'none',
-                color: 'var(--text-muted)', fontSize: 14, cursor: 'pointer',
-              }}
-            >
-              Отмена
-            </button>
-          </div>
-        </>
+      {/* Settings bottom sheet */}
+      {showSettings && (
+        <SettingsSheet
+          profile={profile}
+          userId={user.id}
+          isTelegram={isTelegram}
+          onClose={() => setShowSettings(false)}
+          onSignOut={handleSignOut}
+          onSaved={async () => { await load(); showToast('Сохранено') }}
+          showSignOutConfirm={showSignOutConfirm}
+          setShowSignOutConfirm={setShowSignOutConfirm}
+          handleSignOut={handleSignOut}
+        />
       )}
     </div>
   )
@@ -829,6 +723,190 @@ function AlbumCard({ cover, placeholder, placeholderBg, title, subtitle, isPriva
         )}
       </div>
     </div>
+  )
+}
+
+// ── SettingsSheet ─────────────────────────────────────────────────────────────
+
+function SettingsSheet({
+  profile, userId, isTelegram,
+  onClose, onSaved,
+  showSignOutConfirm, setShowSignOutConfirm, handleSignOut,
+}: {
+  profile: import('../lib/types').Profile
+  userId: string
+  isTelegram: boolean
+  onClose: () => void
+  onSignOut: () => void
+  onSaved: () => void
+  showSignOutConfirm: boolean
+  setShowSignOutConfirm: (v: boolean) => void
+  handleSignOut: () => void
+}) {
+  const [displayName, setDisplayName] = useState(profile.display_name ?? '')
+  const [username, setUsername]       = useState(profile.username ?? '')
+  const [website, setWebsite]         = useState(profile.website ?? '')
+  const [bio, setBio]                 = useState(profile.bio ?? '')
+  const [lang, setLang]               = useState<'ru' | 'en'>('ru')
+  const [saving, setSaving]           = useState(false)
+
+  const handleSave = async () => {
+    setSaving(true)
+    const { error } = await updateProfile(userId, {
+      display_name: displayName.trim() || null,
+      username: username.trim() || null,
+      bio: bio.trim() || null,
+      website: website.trim() || null,
+    })
+    setSaving(false)
+    if (!error) { onSaved(); onClose() }
+  }
+
+  const sheetStyle: React.CSSProperties = {
+    position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100,
+    background: '#110C08',
+    borderRadius: '24px 24px 0 0',
+    borderTop: '1px solid #2E2218',
+    maxHeight: '90vh',
+    display: 'flex', flexDirection: 'column',
+    paddingBottom: 'max(24px, env(safe-area-inset-bottom, 20px))',
+  }
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%', padding: '12px 14px', borderRadius: 12,
+    background: '#1A1208', color: '#fff',
+    border: '1px solid #2E1A0A', fontSize: 15, outline: 'none',
+    boxSizing: 'border-box', fontFamily: 'inherit',
+  }
+
+  const labelStyle: React.CSSProperties = {
+    color: 'var(--text-muted)', fontSize: 12, fontWeight: 600,
+    letterSpacing: 0.5, textTransform: 'uppercase', margin: '14px 0 6px',
+  }
+
+  const sectionTitleStyle: React.CSSProperties = {
+    color: 'var(--amber)', fontSize: 11, fontWeight: 700,
+    letterSpacing: 1, textTransform: 'uppercase',
+    margin: '18px 0 4px', borderBottom: '1px solid #2E1A0A', paddingBottom: 6,
+  }
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 99, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }} />
+      <div style={sheetStyle}>
+        {/* Handle */}
+        <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 12, paddingBottom: 4 }}>
+          <div style={{ width: 36, height: 4, borderRadius: 2, background: '#333' }} />
+        </div>
+        {/* Header */}
+        <div style={{ padding: '8px 20px 4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <p style={{ color: '#fff', fontSize: 17, fontWeight: 700, margin: 0 }}>Настройки</p>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#555', fontSize: 22, cursor: 'pointer' }}>✕</button>
+        </div>
+
+        {/* Scrollable content */}
+        <div style={{ overflowY: 'auto', padding: '0 20px' }}>
+          {/* Profile section */}
+          <p style={sectionTitleStyle}>Профиль</p>
+          <p style={labelStyle}>Имя</p>
+          <input style={inputStyle} value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="Как тебя зовут" maxLength={40} />
+          <p style={labelStyle}>Имя пользователя</p>
+          <input style={inputStyle} value={username} onChange={e => setUsername(e.target.value)} placeholder="username" maxLength={30} autoCapitalize="none" />
+          <p style={labelStyle}>Вебсайт</p>
+          <input style={inputStyle} value={website} onChange={e => setWebsite(e.target.value)} placeholder="https://" maxLength={100} type="url" />
+          <p style={labelStyle}>Инфо</p>
+          <textarea
+            style={{ ...inputStyle, minHeight: 80, resize: 'none' }}
+            value={bio}
+            onChange={e => setBio(e.target.value)}
+            placeholder="О себе..."
+            maxLength={150}
+          />
+
+          {/* Language */}
+          <p style={sectionTitleStyle}>Язык / Language</p>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+            {(['ru', 'en'] as const).map(l => (
+              <button
+                key={l}
+                onClick={() => setLang(l)}
+                style={{
+                  flex: 1, padding: '11px 0', borderRadius: 12, fontSize: 14, fontWeight: 600,
+                  border: `1px solid ${lang === l ? 'var(--amber)' : '#2E1A0A'}`,
+                  background: lang === l ? 'rgba(201,146,42,0.1)' : 'transparent',
+                  color: lang === l ? 'var(--amber)' : 'var(--text-muted)',
+                  cursor: 'pointer',
+                }}
+              >
+                {l === 'ru' ? '🇷🇺  Русский' : '🇬🇧  English'}
+              </button>
+            ))}
+          </div>
+
+          {/* Account */}
+          {!isTelegram && (
+            <>
+              <p style={sectionTitleStyle}>Аккаунт</p>
+              <button
+                style={{
+                  width: '100%', padding: '12px 14px', borderRadius: 12,
+                  background: 'transparent', border: '1px solid #2E1A0A',
+                  color: 'var(--amber)', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                Сменить пароль
+              </button>
+            </>
+          )}
+
+          {/* Save */}
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            style={{
+              width: '100%', padding: '14px 0', borderRadius: 30, marginTop: 20,
+              background: saving ? '#2E1A0A' : 'var(--amber)',
+              color: saving ? '#555' : '#140E0A',
+              fontSize: 15, fontWeight: 700, border: 'none', cursor: saving ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {saving ? 'Сохраняем...' : 'Сохранить'}
+          </button>
+
+          {/* Sign out */}
+          <button
+            onClick={() => setShowSignOutConfirm(true)}
+            style={{
+              width: '100%', padding: '12px 0', marginTop: 8,
+              background: 'none', border: 'none',
+              color: '#e05a5a', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+            }}
+          >
+            Выйти из аккаунта
+          </button>
+          <div style={{ height: 8 }} />
+        </div>
+      </div>
+
+      {/* Sign out confirm */}
+      {showSignOutConfirm && (
+        <>
+          <div onClick={() => setShowSignOutConfirm(false)} style={{ position: 'fixed', inset: 0, zIndex: 199, background: 'rgba(0,0,0,0.5)' }} />
+          <div style={{
+            position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 200,
+            background: '#110C08', borderRadius: '24px 24px 0 0', borderTop: '1px solid #2E2218',
+            padding: '24px 20px',
+            paddingBottom: 'max(32px, env(safe-area-inset-bottom, 20px))',
+          }}>
+            <p style={{ color: '#fff', fontSize: 17, fontWeight: 600, margin: '0 0 8px', textAlign: 'center' }}>Выйти из аккаунта?</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: '0 0 20px', textAlign: 'center' }}>Вы можете войти снова в любое время</p>
+            <button onClick={handleSignOut} style={{ width: '100%', padding: '14px 0', borderRadius: 30, background: '#e05a5a', color: '#fff', fontSize: 15, fontWeight: 700, border: 'none', cursor: 'pointer', marginBottom: 10 }}>Выйти</button>
+            <button onClick={() => setShowSignOutConfirm(false)} style={{ width: '100%', padding: '12px 0', background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 14, cursor: 'pointer' }}>Отмена</button>
+          </div>
+        </>
+      )}
+    </>
   )
 }
 

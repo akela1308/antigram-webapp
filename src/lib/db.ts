@@ -302,9 +302,12 @@ export async function getHighlights(userId: string): Promise<HighlightWithMoment
 export async function setHighlightAtPosition(
   userId: string, momentId: string, position: number
 ): Promise<{ error: unknown }> {
-  const { error } = await supabase
-    .from('highlights')
-    .upsert({ user_id: userId, moment_id: momentId, position }, { onConflict: 'user_id,position' })
+  // Delete existing highlight at this position (if any)
+  await supabase.from('highlights').delete().eq('user_id', userId).eq('position', position)
+  // Also remove if this moment is already pinned to another slot (UNIQUE user_id,moment_id)
+  await supabase.from('highlights').delete().eq('user_id', userId).eq('moment_id', momentId)
+  // Insert fresh
+  const { error } = await supabase.from('highlights').insert({ user_id: userId, moment_id: momentId, position })
   return { error }
 }
 
