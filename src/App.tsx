@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 import { FeedPage } from './pages/FeedPage'
@@ -12,10 +13,14 @@ import { SearchPage } from './pages/SearchPage'
 import { MomentFeedPage } from './pages/MomentFeedPage'
 import { AlbumDetailPage } from './pages/AlbumDetailPage'
 import { BottomNav } from './components/BottomNav'
+import { PrivacyPage } from './pages/PrivacyPage'
+import { trackSessionStart } from './lib/analytics'
 
 export function App() {
   const { loading } = useAuth()
   const location = useLocation()
+
+  useEffect(() => { trackSessionStart() }, [])
 
   if (loading) {
     return (
@@ -55,6 +60,7 @@ export function App() {
         <Route path="/moment-feed" element={<MomentFeedPage />} />
         <Route path="/album/:albumId" element={<AlbumDetailPage />} />
         <Route path="/auth" element={<AuthPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       {!hideNav && <BottomNav />}
