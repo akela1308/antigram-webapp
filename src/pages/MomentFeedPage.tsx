@@ -9,6 +9,7 @@ import {
   deleteMoment,
   getUserAlbums,
   addMomentToAlbum,
+  adminShadowBanUser,
 } from '../lib/db'
 import { EMOTIONS } from '../lib/types'
 import type { Moment, ReactionType, AlbumWithMoments } from '../lib/types'
@@ -62,7 +63,8 @@ function sharePhoto(momentId: string) {
 export function MomentFeedPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user } = useAuth()
+  const { user, profile: myProfile } = useAuth()
+  const isAdmin = myProfile?.is_admin === true
   const state = location.state as FeedState | null
 
   const moments: Moment[] = state?.moments ?? []
@@ -265,12 +267,38 @@ export function MomentFeedPage() {
                 />
               </>
             ) : (
-              <MenuBtn
-                label="Пожаловаться"
-                icon="⚑"
-                danger
-                onClick={() => { setMenuMomentId(null); showToast('Жалоба отправлена') }}
-              />
+              <>
+                <MenuBtn
+                  label="Пожаловаться"
+                  icon="⚑"
+                  danger
+                  onClick={() => { setMenuMomentId(null); showToast('Жалоба отправлена') }}
+                />
+                {isAdmin && (() => {
+                  const menuMoment = localMoments.find(m => m.id === menuMomentId)
+                  return (
+                    <>
+                      <MenuBtn
+                        label="🛡 Удалить (Admin)"
+                        icon=""
+                        danger
+                        onClick={() => handleDelete(menuMomentId)}
+                      />
+                      <MenuBtn
+                        label="🛡 Теневой бан"
+                        icon=""
+                        danger
+                        onClick={async () => {
+                          if (!menuMoment) return
+                          await adminShadowBanUser(menuMoment.user_id)
+                          setMenuMomentId(null)
+                          showToast('Пользователь в теневом бане')
+                        }}
+                      />
+                    </>
+                  )
+                })()}
+              </>
             )}
 
             <MenuBtn label="Отмена" icon="" muted onClick={() => setMenuMomentId(null)} />

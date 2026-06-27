@@ -6,6 +6,8 @@ export interface Profile {
   avatar_url: string | null
   website: string | null
   created_at: string
+  is_admin?: boolean
+  is_banned?: boolean
 }
 
 export interface Moment {

@@ -411,6 +411,24 @@ export async function deleteMoment(momentId: string): Promise<{ error: unknown }
   return { error }
 }
 
+// ── Admin ─────────────────────────────────────────────────────────────────────
+
+export async function adminShadowBanUser(userId: string): Promise<{ error: unknown }> {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ is_banned: true })
+    .eq('id', userId)
+  return { error }
+}
+
+export async function adminUnbanUser(userId: string): Promise<{ error: unknown }> {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ is_banned: false })
+    .eq('id', userId)
+  return { error }
+}
+
 export async function addComment(
   momentId: string,
   userId: string,
