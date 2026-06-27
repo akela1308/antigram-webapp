@@ -35,27 +35,19 @@ function formatTime(iso: string): string {
 }
 
 async function savePhoto(photoUrl: string): Promise<void> {
-  // Telegram Bot API 8.0+ native download
   const tg = (window as any).Telegram?.WebApp
+  // Bot API 8.0+ native download
   if (typeof tg?.downloadFile === 'function') {
     tg.downloadFile(photoUrl, `antigram_${Date.now()}.jpg`)
     return
   }
-  // Fallback: fetch → blob → anchor download
-  try {
-    const res = await fetch(photoUrl)
-    const blob = await res.blob()
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `antigram_${Date.now()}.jpg`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-  } catch {
-    window.open(photoUrl, '_blank')
+  // In Telegram: open link so user can long-press to save
+  if (typeof tg?.openLink === 'function') {
+    tg.openLink(photoUrl)
+    return
   }
+  // Browser fallback: open in new tab
+  window.open(photoUrl, '_blank')
 }
 
 function sharePhoto(momentId: string) {
@@ -214,8 +206,6 @@ export function MomentFeedPage() {
               myReaction={myReactions[m.id] ?? null}
               onReaction={type => handleReaction(m.id, type)}
               onMenu={() => setMenuMomentId(m.id)}
-              onShare={() => { sharePhoto(m.id); showToast('Ссылка скопирована') }}
-              onSave={() => { savePhoto(m.photo_url).then(() => showToast('Сохранено')).catch(() => {}); trackMomentSaved() }}
             />
           ))
         )}
@@ -238,6 +228,28 @@ export function MomentFeedPage() {
               <div style={{ width: 36, height: 4, borderRadius: 2, background: '#333' }} />
             </div>
 
+            {/* Common actions for everyone */}
+            {(() => {
+              const menuMoment = localMoments.find(m => m.id === menuMomentId)
+              return (
+                <>
+                  <MenuBtn
+                    label="Скачать фото"
+                    icon="↓"
+                    onClick={() => {
+                      if (menuMoment) savePhoto(menuMoment.photo_url).then(() => showToast('Открываем фото...')).catch(() => {})
+                      trackMomentSaved()
+                      setMenuMomentId(null)
+                    }}
+                  />
+                  <MenuBtn
+                    label="Поделиться"
+                    icon="→"
+                    onClick={() => { sharePhoto(menuMomentId!); showToast('Ссылка скопирована'); setMenuMomentId(null) }}
+                  />
+                </>
+              )
+            })()}
             {isOwner ? (
               <>
                 <MenuBtn
@@ -253,19 +265,12 @@ export function MomentFeedPage() {
                 />
               </>
             ) : (
-              <>
-                <MenuBtn
-                  label="Поделиться"
-                  icon="→"
-                  onClick={() => { sharePhoto(menuMomentId); showToast('Ссылка скопирована'); setMenuMomentId(null) }}
-                />
-                <MenuBtn
-                  label="Пожаловаться"
-                  icon="⚑"
-                  danger
-                  onClick={() => { setMenuMomentId(null); showToast('Жалоба отправлена') }}
-                />
-              </>
+              <MenuBtn
+                label="Пожаловаться"
+                icon="⚑"
+                danger
+                onClick={() => { setMenuMomentId(null); showToast('Жалоба отправлена') }}
+              />
             )}
 
             <MenuBtn label="Отмена" icon="" muted onClick={() => setMenuMomentId(null)} />
@@ -347,18 +352,16 @@ interface ShotCardProps {
   myReaction: ReactionType | null
   onReaction: (type: ReactionType) => void
   onMenu: () => void
-  onShare: () => void
-  onSave: () => void
 }
 
-function ShotCard({ moment: m, cardRef, reactionCounts, myReaction, onReaction, onMenu, onShare, onSave }: ShotCardProps) {
+function ShotCard({ moment: m, cardRef, reactionCounts, myReaction, onReaction, onMenu }: ShotCardProps) {
   const [showAllReactions, setShowAllReactions] = useState(false)
 
   const totalReactions = Object.values(reactionCounts).reduce((a, b) => a + (b ?? 0), 0)
   const hasAnyReaction = totalReactions > 0
 
   return (
-    <div ref={cardRef} style={{ borderBottom: '1px solid var(--border)' }}>
+    <div ref={cardRef} style={{ marginBottom: 8, borderBottom: '8px solid #080503' }}>
       {/* Photo with "..." button */}
       <div style={{ position: 'relative' }}>
         <img
@@ -385,7 +388,7 @@ function ShotCard({ moment: m, cardRef, reactionCounts, myReaction, onReaction, 
         </button>
       </div>
 
-      {/* Caption + meta */}
+      {/* Caption + mood tag */}
       <div style={{ padding: '10px 14px 4px' }}>
         {m.mood && (
           <span style={{
@@ -396,13 +399,10 @@ function ShotCard({ moment: m, cardRef, reactionCounts, myReaction, onReaction, 
           </span>
         )}
         {m.caption && (
-          <p style={{ color: 'var(--text)', fontSize: 14, lineHeight: 1.5, margin: '0 0 4px' }}>
+          <p style={{ color: 'var(--text)', fontSize: 14, lineHeight: 1.5, margin: 0 }}>
             {m.caption}
           </p>
         )}
-        <p style={{ color: 'var(--text-muted)', fontSize: 11, margin: 0 }}>
-          {formatTime(m.created_at)}
-        </p>
       </div>
 
       {/* Existing reactions summary (pills) */}
@@ -434,8 +434,8 @@ function ShotCard({ moment: m, cardRef, reactionCounts, myReaction, onReaction, 
         </div>
       )}
 
-      {/* Reaction picker + action buttons */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 14px 12px' }}>
+      {/* Reaction picker row — time on the right */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 14px 14px' }}>
         {/* Reaction toggle */}
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           {showAllReactions ? (
@@ -487,35 +487,16 @@ function ShotCard({ moment: m, cardRef, reactionCounts, myReaction, onReaction, 
           )}
         </div>
 
-        {/* Action buttons: share + save */}
-        <div style={{ display: 'flex', gap: 8 }}>
-          <ActionBtn icon="→" label="Поделиться" onClick={onShare} />
-          <ActionBtn icon="↓" label="Сохранить" onClick={onSave} />
-        </div>
+        {/* Timestamp — right side */}
+        <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+          {formatTime(m.created_at)}
+        </span>
       </div>
     </div>
   )
 }
 
 // ── Small helpers ──────────────────────────────────────────────────────────────
-
-function ActionBtn({ icon, label, onClick }: { icon: string; label: string; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      title={label}
-      style={{
-        width: 36, height: 36, borderRadius: 18,
-        background: 'rgba(201,146,42,0.1)',
-        border: '1px solid #2E2218',
-        color: 'var(--amber)', fontSize: 16, cursor: 'pointer',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}
-    >
-      {icon}
-    </button>
-  )
-}
 
 function MenuBtn({ label, icon, danger, muted, onClick }: {
   label: string; icon: string; danger?: boolean; muted?: boolean; onClick: () => void
