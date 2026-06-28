@@ -140,6 +140,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(existingSession.user)
         await loadProfile(existingSession.user.id)
         setLoading(false)
+
+        // Silently sync Telegram avatar_url in background (non-blocking)
+        const tgUser = getTelegramUser()
+        if (tgUser?.photo_url) {
+          supabase.from('profiles')
+            .update({ avatar_url: tgUser.photo_url })
+            .eq('id', existingSession.user.id)
+            .then(() => { if (mounted) loadProfile(existingSession.user.id) })
+        }
+
         return
       }
 
