@@ -12,17 +12,24 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
+interface TelegramUser {
+  id?: number
+  first_name?: string
+  last_name?: string
+  username?: string
+}
+
 interface TelegramUpdate {
   update_id?: number
   pre_checkout_query?: {
     id: string
-    from?: { id?: number }
+    from?: TelegramUser
     currency: string
     total_amount: number
     invoice_payload: string
   }
   message?: {
-    from?: { id?: number }
+    from?: TelegramUser
     successful_payment?: {
       currency: string
       total_amount: number
@@ -40,6 +47,14 @@ interface StarPaymentRow {
   status: string
 }
 
+interface CompletePaymentResult {
+  payment_id: string
+  moment_id: string
+  author_id: string
+  amount: number
+  already_paid: boolean
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -55,6 +70,7 @@ Deno.serve(async (req) => {
 
   try {
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !BOT_TOKEN) {
+      console.error('[Stars] missing env vars')
       return json({ ok: false, error: 'Server is not configured' }, 500)
     }
 
@@ -63,11 +79,13 @@ Deno.serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false },
     })
 
+    // ── pre_checkout_query ──────────────────────────────────────────────────────
     if (update.pre_checkout_query) {
       await handlePreCheckout(admin, update.pre_checkout_query)
       return json({ ok: true })
     }
 
+    // ── successful_payment ──────────────────────────────────────────────────────
     const successfulPayment = update.message?.successful_payment
     if (successfulPayment) {
       if (successfulPayment.currency !== 'XTR') {
@@ -75,7 +93,7 @@ Deno.serve(async (req) => {
         return json({ ok: true })
       }
 
-      const { error } = await admin.rpc('complete_star_payment', {
+      const { data, error } = await admin.rpc('complete_star_payment', {
         p_invoice_payload: successfulPayment.invoice_payload,
         p_telegram_payment_charge_id: successfulPayment.telegram_payment_charge_id,
         p_provider_payment_charge_id: successfulPayment.provider_payment_charge_id ?? null,
@@ -88,6 +106,15 @@ Deno.serve(async (req) => {
         return json({ ok: false, error: 'Payment completion failed' }, 500)
       }
 
+      const result = (data as CompletePaymentResult[] | null)?.[0]
+
+      // Send author notification (fire-and-forget — never fails the webhook)
+      if (result && !result.already_paid) {
+        notifyAuthor(admin, result, update.message?.from).catch(err => {
+          console.error('[Stars] author notification failed:', err)
+        })
+      }
+
       return json({ ok: true })
     }
 
@@ -97,6 +124,73 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: 'Unexpected error' }, 500)
   }
 })
+
+// ── notifyAuthor ────────────────────────────────────────────────────────────────
+
+async function notifyAuthor(
+  admin: ReturnType<typeof createClient>,
+  payment: CompletePaymentResult,
+  payer?: TelegramUser,
+): Promise<void> {
+  // Get author's Telegram ID from auth.users metadata
+  const { data: authorUserData, error: userErr } = await admin.auth.admin.getUserById(payment.author_id)
+  if (userErr || !authorUserData?.user) {
+    console.error('[Stars] could not fetch author user:', userErr)
+    return
+  }
+
+  const meta = authorUserData.user.user_metadata as Record<string, unknown> | undefined
+  let authorTelegramId: number | null =
+    typeof meta?.telegram_id === 'number' ? meta.telegram_id : null
+
+  // Fallback: parse from email tg{ID}@antigram.internal
+  if (!authorTelegramId) {
+    const match = authorUserData.user.email?.match(/^tg(\d+)@/)
+    if (match) authorTelegramId = Number(match[1])
+  }
+
+  if (!authorTelegramId) {
+    console.error('[Stars] author has no Telegram ID, skipping notification')
+    return
+  }
+
+  // Don't notify if author == payer
+  if (payer?.id && authorTelegramId === payer.id) return
+
+  // Build payer display name
+  let payerName = 'кто-то'
+  if (payer?.username) {
+    payerName = `@${payer.username}`
+  } else if (payer?.first_name) {
+    payerName = payer.first_name
+  }
+
+  // Star word form: 1 звезда / 2-4 звезды / 5+ звёзд
+  const starLabel = starWordForm(payment.amount)
+
+  const text =
+    `★ ${payment.amount} ${starLabel}\n\n` +
+    `${payerName} поддержал твой кадр в Antigram.\n\n` +
+    `Stars увеличивают твой рейтинг в приложении.`
+
+  await telegramApi('sendMessage', {
+    chat_id: authorTelegramId,
+    text,
+  })
+
+  console.log(`[Stars] notified author ${authorTelegramId} — ${payment.amount} Stars from ${payerName}`)
+}
+
+function starWordForm(n: number): string {
+  const mod10 = n % 10
+  const mod100 = n % 100
+  if (mod100 >= 11 && mod100 <= 19) return 'звёзд'
+  if (mod10 === 1) return 'звезда'
+  if (mod10 >= 2 && mod10 <= 4) return 'звезды'
+  return 'звёзд'
+}
+
+// ── handlePreCheckout ───────────────────────────────────────────────────────────
 
 async function handlePreCheckout(
   admin: ReturnType<typeof createClient>,
@@ -119,13 +213,15 @@ async function handlePreCheckout(
   await telegramApi('answerPreCheckoutQuery', {
     pre_checkout_query_id: query.id,
     ok,
-    error_message: ok ? undefined : 'Не удалось подтвердить счет Antigram. Попробуйте еще раз.',
+    error_message: ok ? undefined : 'Не удалось подтвердить счёт Antigram. Попробуйте ещё раз.',
   })
 
   if (!ok) {
     console.error('[Stars] pre_checkout rejected:', { query, error, payment })
   }
 }
+
+// ── helpers ─────────────────────────────────────────────────────────────────────
 
 async function telegramApi(method: string, payload: Record<string, unknown>) {
   const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/${method}`, {
