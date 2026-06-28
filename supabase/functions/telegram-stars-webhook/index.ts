@@ -108,9 +108,9 @@ Deno.serve(async (req) => {
 
       const result = (data as CompletePaymentResult[] | null)?.[0]
 
-      // Send author notification (fire-and-forget — never fails the webhook)
+      // Notify author — awaited but never fails the webhook
       if (result && !result.already_paid) {
-        notifyAuthor(admin, result, update.message?.from).catch(err => {
+        await notifyAuthor(admin, result, update.message?.from).catch(err => {
           console.error('[Stars] author notification failed:', err)
         })
       }

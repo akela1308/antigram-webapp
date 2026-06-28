@@ -3,3 +3,9 @@ dist/
 .env
 *.local
 .DS_Store
+
+# Deploy scripts with secrets — never commit
+deploy_stars.sh
+
+# Supabase CLI temp files
+supabase/.temp/

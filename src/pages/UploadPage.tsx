@@ -394,6 +394,14 @@ export function UploadPage() {
     setPhase('uploading')
     setError(null)
     try {
+      // Server-side double-check before upload (DB trigger is the final guard)
+      const currentCount = await getTodaysMomentCount(user.id)
+      if (currentCount >= DAILY_FRAME_LIMIT) {
+        setTodayCount(currentCount)
+        setError('Лимит кадров на сегодня исчерпан')
+        setPhase('preview')
+        return
+      }
       const fileName = `${user.id}/${Date.now()}.jpg`
       const { error: upErr } = await supabase.storage
         .from('moments')
@@ -419,7 +427,13 @@ export function UploadPage() {
       setPhase('success')
       setTimeout(() => navigate('/'), 1800)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Ошибка при публикации')
+      const msg = err instanceof Error ? err.message : String(err)
+      if (msg.includes('daily_frame_limit_exceeded')) {
+        setError('Лимит кадров на сегодня исчерпан')
+        setTodayCount(DAILY_FRAME_LIMIT)
+      } else {
+        setError('Ошибка при публикации')
+      }
       setPhase('preview')
     }
   }

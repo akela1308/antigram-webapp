@@ -36,6 +36,7 @@ Deno.serve(async (req) => {
 
   try {
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SERVICE_ROLE_KEY || !BOT_TOKEN) {
+      console.error('[Stars] missing env vars — URL:', !!SUPABASE_URL, 'ANON:', !!SUPABASE_ANON_KEY, 'SERVICE:', !!SUPABASE_SERVICE_ROLE_KEY, 'BOT:', !!BOT_TOKEN)
       return json({ error: 'Server is not configured' }, 500)
     }
 
