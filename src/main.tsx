@@ -12,6 +12,8 @@ type TgWebApp = {
   setHeaderColor?: (color: string) => void
   setBackgroundColor?: (color: string) => void
   expand?: () => void
+  requestFullscreen?: () => void
+  isVersionAtLeast?: (version: string) => boolean
   ready?: () => void
   onEvent?: (event: string, handler: () => void) => void
   contentSafeAreaInset?: { top: number; bottom: number; left: number; right: number }
@@ -45,6 +47,17 @@ function applyTelegramSafeArea(tg: TgWebApp) {
   )
 }
 
+function requestTelegramFullscreen(tg: TgWebApp) {
+  if (!tg.requestFullscreen) return
+  if (tg.isVersionAtLeast && !tg.isVersionAtLeast('8.0')) return
+
+  try {
+    tg.requestFullscreen()
+  } catch (error) {
+    console.warn('[Telegram] requestFullscreen failed:', error)
+  }
+}
+
 function initTelegram() {
   const tg = getTgWebApp()
   if (!tg) {
@@ -69,6 +82,7 @@ function initTelegram() {
   }
 
   applyTelegramSafeArea(tg)
+  requestTelegramFullscreen(tg)
 
   tg.onEvent?.('contentSafeAreaChanged', () => applyTelegramSafeArea(tg))
   tg.onEvent?.('safeAreaChanged', () => applyTelegramSafeArea(tg))
