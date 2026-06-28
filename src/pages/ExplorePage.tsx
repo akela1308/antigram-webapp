@@ -2,7 +2,8 @@ import { useEffect, useState, useCallback, Children } from 'react'
 import { CategoryFilmStrip } from '../components/CategoryFilmStrip'
 import { MomentCard } from '../components/MomentCard'
 import { MomentCardSkeleton } from '../components/Skeleton'
-import { getRandomMoments, getMomentsByEmotion, getFeedReactions, getMomentStarTotals } from '../lib/db'
+import { getRandomMoments, getMomentsByEmotion, getFeedReactions, getMomentStarTotals, getUserReactionsForMoments, addReaction, removeReaction } from '../lib/db'
+import { useAuth } from '../contexts/AuthContext'
 import type { MomentWithProfile, ReactionType } from '../lib/types'
 
 type FilterValue = 'for_you' | ReactionType
@@ -12,9 +13,11 @@ interface ReactionsMap {
 }
 
 export function ExplorePage() {
+  const { user } = useAuth()
   const [filter, setFilter] = useState<FilterValue>('for_you')
   const [moments, setMoments] = useState<MomentWithProfile[]>([])
   const [reactionsMap, setReactionsMap] = useState<ReactionsMap>({})
+  const [userReactionsMap, setUserReactionsMap] = useState<Record<string, ReactionType | null>>({})
   const [starTotals, setStarTotals] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
 
@@ -32,9 +35,10 @@ export function ExplorePage() {
 
     if (data.length > 0) {
       const ids = data.map(m => m.id)
-      const [reactions, stars] = await Promise.all([
+      const [reactions, stars, userRxs] = await Promise.all([
         getFeedReactions(ids),
         getMomentStarTotals(ids),
+        user ? getUserReactionsForMoments(user.id, ids) : Promise.resolve([]),
       ])
       const map: ReactionsMap = {}
       for (const r of reactions) {
@@ -43,13 +47,40 @@ export function ExplorePage() {
       }
       setReactionsMap(map)
       setStarTotals(stars)
+      const userMap: Record<string, ReactionType | null> = {}
+      for (const r of userRxs) { userMap[r.moment_id] = r.type }
+      setUserReactionsMap(userMap)
     } else {
       setReactionsMap({})
       setStarTotals({})
+      setUserReactionsMap({})
     }
 
     setLoading(false)
-  }, [filter])
+  }, [filter, user])
+
+  const handleReact = useCallback(async (momentId: string, type: ReactionType) => {
+    if (!user) return
+    const current = userReactionsMap[momentId] ?? null
+    if (current === type) {
+      setUserReactionsMap(prev => ({ ...prev, [momentId]: null }))
+      setReactionsMap(prev => {
+        const existing = prev[momentId] ?? []
+        let removed = false
+        return { ...prev, [momentId]: existing.filter(r => { if (!removed && r.type === type) { removed = true; return false } return true }) }
+      })
+      await removeReaction(momentId, user.id)
+    } else {
+      setUserReactionsMap(prev => ({ ...prev, [momentId]: type }))
+      setReactionsMap(prev => {
+        const existing = prev[momentId] ?? []
+        let removedOld = false
+        const filtered = current ? existing.filter(r => { if (!removedOld && r.type === current) { removedOld = true; return false } return true }) : existing
+        return { ...prev, [momentId]: [...filtered, { type }] }
+      })
+      await addReaction(momentId, user.id, type)
+    }
+  }, [user, userReactionsMap])
 
   useEffect(() => {
     loadFeed()
@@ -91,6 +122,8 @@ export function ExplorePage() {
                 reactions={reactionsMap[moment.id] ?? []}
                 starTotal={starTotals[moment.id] ?? 0}
                 onStarTotalChange={(momentId, total) => setStarTotals(prev => ({ ...prev, [momentId]: total }))}
+                userReaction={userReactionsMap[moment.id] ?? null}
+                onReact={user ? handleReact : undefined}
               />
             ))}
           </PhotoGrid>

@@ -10,12 +10,15 @@ interface MomentCardProps {
   reactions: { type: ReactionType }[]
   starTotal?: number
   onStarTotalChange?: (momentId: string, total: number) => void
+  userReaction?: ReactionType | null
+  onReact?: (momentId: string, type: ReactionType) => void
 }
 
-export function MomentCard({ moment, reactions, starTotal = 0, onStarTotalChange }: MomentCardProps) {
+export function MomentCard({ moment, reactions, starTotal = 0, onStarTotalChange, userReaction, onReact }: MomentCardProps) {
   const navigate = useNavigate()
   const profile = moment.profiles
   const topReaction = getTopReaction(reactions)
+  const isReacted = topReaction ? userReaction === topReaction.type : false
 
   return (
     <div
@@ -43,11 +46,18 @@ export function MomentCard({ moment, reactions, starTotal = 0, onStarTotalChange
         />
         {topReaction && (
           <div
-            className="absolute bottom-2 left-2 text-xs flex items-center gap-0.5 px-2 py-0.5 rounded-full"
-            style={{ background: 'rgba(20,14,10,0.75)', color: 'var(--text-muted)' }}
+            role={onReact ? 'button' : undefined}
+            onClick={onReact ? (e) => { e.stopPropagation(); onReact(moment.id, topReaction.type) } : undefined}
+            className="absolute bottom-2 left-2 flex items-center gap-1 px-2 py-1 rounded-full"
+            style={{
+              background: isReacted ? 'rgba(201,132,62,0.3)' : 'rgba(20,14,10,0.78)',
+              border: `1px solid ${isReacted ? 'var(--amber)' : 'rgba(255,255,255,0.12)'}`,
+              cursor: onReact ? 'pointer' : 'default',
+            }}
           >
-            <span>{topReaction.emoji}</span>
-            <span>{topReaction.count}</span>
+            <span style={{ fontSize: 12 }}>{topReaction.emoji}</span>
+            <span style={{ fontSize: 10, color: isReacted ? 'var(--amber)' : 'var(--text-muted)', fontWeight: 600 }}>{topReaction.label}</span>
+            <span style={{ fontSize: 10, color: isReacted ? 'var(--amber)' : 'var(--text-muted)' }}>{topReaction.count}</span>
           </div>
         )}
         <div style={{ position: 'absolute', right: 8, bottom: 8 }}>
@@ -77,5 +87,5 @@ function getTopReaction(reactions: { type: ReactionType }[]) {
   }
   const [topType, count] = Object.entries(counts).sort(([, a], [, b]) => b - a)[0]
   const emotion = EMOTIONS.find(e => e.type === topType)
-  return emotion ? { emoji: emotion.emoji, count } : null
+  return emotion ? { emoji: emotion.emoji, label: emotion.label, type: emotion.type, count } : null
 }

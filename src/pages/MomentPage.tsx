@@ -16,7 +16,6 @@ import {
   unsaveMoment,
   deleteMoment,
 } from '../lib/db'
-import { EMOTIONS } from '../lib/types'
 import type { MomentWithProfile, ReactionType } from '../lib/types'
 
 export function MomentPage() {
@@ -108,9 +107,6 @@ export function MomentPage() {
 
   const profile = moment.profiles
   const displayName = profile?.display_name ?? profile?.username ?? 'Аноним'
-  const moodEmotion = EMOTIONS.find(e => e.type === moment.mood)
-  const moodLabel = moment.custom_mood_label ?? moodEmotion?.label ?? moment.mood
-  const moodEmoji = moment.custom_mood_emoji ?? moodEmotion?.emoji
   const dateStr = new Date(moment.created_at).toLocaleDateString('ru-RU', {
     day: 'numeric', month: 'long', year: 'numeric',
   })
@@ -119,13 +115,27 @@ export function MomentPage() {
     <div className="flex flex-col" style={{ minHeight: '100dvh', background: 'var(--bg)', paddingTop: 'var(--tg-top, 56px)' }}>
       {/* Header */}
       <div
-        className="flex items-center justify-between px-4 py-3"
-        style={{ background: 'rgba(20,14,10,0.95)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border)' }}
+        className="flex items-center px-4 py-3"
+        style={{ background: 'rgba(20,14,10,0.95)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border)', gap: 10 }}
       >
-        <button onClick={() => navigate(-1)} className="p-1">
+        <button onClick={() => navigate(-1)} className="p-1" style={{ flexShrink: 0 }}>
           <BackIcon />
         </button>
-        <div style={{ display: 'flex', gap: 4 }}>
+        {/* Author in header */}
+        <Link
+          to={`/profile/${profile?.id}`}
+          className="flex items-center gap-2"
+          style={{ flex: 1, minWidth: 0, textDecoration: 'none' }}
+        >
+          <Avatar url={profile?.avatar_url} name={displayName} size={30} />
+          <div style={{ minWidth: 0 }}>
+            <span style={{ color: 'var(--text)', fontSize: 13, fontWeight: 600, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName}</span>
+            {profile?.username && (
+              <span style={{ color: 'var(--text-muted)', fontSize: 11, display: 'block' }}>@{profile.username}</span>
+            )}
+          </div>
+        </Link>
+        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
           {user && moment && user.id === moment.user_id && (
             <button
               onClick={() => setShowDeleteConfirm(true)}
@@ -159,20 +169,6 @@ export function MomentPage() {
 
       {/* Content */}
       <div className="flex flex-col gap-3 p-4 pb-28">
-        {/* Author */}
-        <Link
-          to={`/profile/${profile?.id}`}
-          className="flex items-center gap-3"
-        >
-          <Avatar url={profile?.avatar_url} name={displayName} size={40} />
-          <div className="flex flex-col">
-            <span className="font-semibold text-sm" style={{ color: 'var(--text)' }}>{displayName}</span>
-            {profile?.username && (
-              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>@{profile.username}</span>
-            )}
-          </div>
-        </Link>
-
         {/* Caption */}
         {moment.caption && (
           <p className="text-sm leading-relaxed" style={{ color: 'var(--text)' }}>
@@ -181,15 +177,7 @@ export function MomentPage() {
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 9, minWidth: 0 }}>
-          {moment.mood && (
-            <div
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm self-start"
-              style={{ background: 'rgba(201,132,62,0.1)', border: '1px solid var(--border)', color: 'var(--amber)' }}
-            >
-              {moodEmoji && <span>{moodEmoji}</span>}
-              <span>{moodLabel}</span>
-            </div>
-          )}
+          {/* mood chip removed — mood shows as a reaction button in ReactionBar */}
 
           <div
             className="no-scrollbar"

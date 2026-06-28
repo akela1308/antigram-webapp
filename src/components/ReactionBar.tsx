@@ -45,7 +45,7 @@ export function ReactionBar({ reactions, userReaction, onReact, size = 'sm', cus
         }}
       >
         <span style={{ fontSize: efs }}>{emoji}</span>
-        {!isSm && <span style={{ fontSize: 12, marginLeft: 2 }}>{label}</span>}
+        <span style={{ fontSize: 12, marginLeft: 2 }}>{label}</span>
         {count > 0 && <span>{count}</span>}
       </button>
     )

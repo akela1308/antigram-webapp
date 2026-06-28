@@ -1,12 +1,11 @@
-import { useEffect, useState, useCallback, Children } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CategoryFilmStrip } from '../components/CategoryFilmStrip'
-import { MomentCard } from '../components/MomentCard'
 import { StarSupportButton } from '../components/StarSupportButton'
 import { MomentCardSkeleton } from '../components/Skeleton'
 import { Avatar } from '../components/Avatar'
 import { useAuth } from '../contexts/AuthContext'
-import { getFeed, getRandomMoments, getMomentsByEmotion, getFeedReactions, getMomentStarTotals } from '../lib/db'
+import { getFeed, getRandomMoments, getMomentsByEmotion, getFeedReactions, getMomentStarTotals, getUserReactionsForMoments, addReaction, removeReaction } from '../lib/db'
 import { EMOTIONS } from '../lib/types'
 import type { MomentWithProfile, ReactionType } from '../lib/types'
 
@@ -33,6 +32,7 @@ export function FeedPage() {
   const [filter, setFilter] = useState<FilterValue>('for_you')
   const [moments, setMoments] = useState<MomentWithProfile[]>([])
   const [reactionsMap, setReactionsMap] = useState<ReactionsMap>({})
+  const [userReactionsMap, setUserReactionsMap] = useState<Record<string, ReactionType | null>>({})
   const [starTotals, setStarTotals] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
 
@@ -55,9 +55,10 @@ export function FeedPage() {
 
     if (data.length > 0) {
       const ids = data.map(m => m.id)
-      const [reactions, stars] = await Promise.all([
+      const [reactions, stars, userRxs] = await Promise.all([
         getFeedReactions(ids),
         getMomentStarTotals(ids),
+        user ? getUserReactionsForMoments(user.id, ids) : Promise.resolve([]),
       ])
       const map: ReactionsMap = {}
       for (const r of reactions) {
@@ -66,13 +67,40 @@ export function FeedPage() {
       }
       setReactionsMap(map)
       setStarTotals(stars)
+      const userMap: Record<string, ReactionType | null> = {}
+      for (const r of userRxs) { userMap[r.moment_id] = r.type }
+      setUserReactionsMap(userMap)
     } else {
       setReactionsMap({})
       setStarTotals({})
+      setUserReactionsMap({})
     }
 
     setLoading(false)
   }, [filter, user])
+
+  const handleReact = useCallback(async (momentId: string, type: ReactionType) => {
+    if (!user) return
+    const current = userReactionsMap[momentId] ?? null
+    if (current === type) {
+      setUserReactionsMap(prev => ({ ...prev, [momentId]: null }))
+      setReactionsMap(prev => {
+        const existing = prev[momentId] ?? []
+        let removed = false
+        return { ...prev, [momentId]: existing.filter(r => { if (!removed && r.type === type) { removed = true; return false } return true }) }
+      })
+      await removeReaction(momentId, user.id)
+    } else {
+      setUserReactionsMap(prev => ({ ...prev, [momentId]: type }))
+      setReactionsMap(prev => {
+        const existing = prev[momentId] ?? []
+        let removedOld = false
+        const filtered = current ? existing.filter(r => { if (!removedOld && r.type === current) { removedOld = true; return false } return true }) : existing
+        return { ...prev, [momentId]: [...filtered, { type }] }
+      })
+      await addReaction(momentId, user.id, type)
+    }
+  }, [user, userReactionsMap])
 
   useEffect(() => {
     loadFeed()
@@ -184,10 +212,8 @@ export function FeedPage() {
       {/* ── Feed ── */}
       <div style={{ flex: 1, padding: '0 0 96px' }}>
         {loading ? (
-          <div style={{ padding: '8px 12px' }}>
-            <PhotoGrid>
-              {Array.from({ length: 8 }).map((_, i) => <MomentCardSkeleton key={i} />)}
-            </PhotoGrid>
+          <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {Array.from({ length: 4 }).map((_, i) => <MomentCardSkeleton key={i} />)}
           </div>
         ) : moments.length === 0 ? (
           <EmptyState filter={filter} />
@@ -215,27 +241,27 @@ export function FeedPage() {
               reactions={reactionsMap[moments[0].id] ?? []}
               starTotal={starTotals[moments[0].id] ?? 0}
               onStarTotalChange={(momentId, total) => setStarTotals(prev => ({ ...prev, [momentId]: total }))}
+              userReaction={userReactionsMap[moments[0].id] ?? null}
+              onReact={handleReact}
             />
 
             {/* Film strip divider */}
             <FilmStripDivider />
 
-            {/* Grid for the rest */}
-            {moments.length > 1 && (
-              <div style={{ padding: '8px 12px' }}>
-                <PhotoGrid>
-                  {moments.slice(1).map(moment => (
-                    <MomentCard
-                      key={moment.id}
-                      moment={moment}
-                      reactions={reactionsMap[moment.id] ?? []}
-                      starTotal={starTotals[moment.id] ?? 0}
-                      onStarTotalChange={(momentId, total) => setStarTotals(prev => ({ ...prev, [momentId]: total }))}
-                    />
-                  ))}
-                </PhotoGrid>
+            {/* Single-column large photos for the rest */}
+            {moments.length > 1 && moments.slice(1).map(moment => (
+              <div key={moment.id}>
+                <PhotoOfDayCard
+                  moment={moment}
+                  reactions={reactionsMap[moment.id] ?? []}
+                  starTotal={starTotals[moment.id] ?? 0}
+                  onStarTotalChange={(momentId, total) => setStarTotals(prev => ({ ...prev, [momentId]: total }))}
+                  userReaction={userReactionsMap[moment.id] ?? null}
+                  onReact={handleReact}
+                />
+                <div style={{ height: 12 }} />
               </div>
-            )}
+            ))}
           </>
         )}
       </div>
@@ -248,16 +274,21 @@ function PhotoOfDayCard({
   reactions,
   starTotal,
   onStarTotalChange,
+  userReaction,
+  onReact,
 }: {
   moment: MomentWithProfile
   reactions: { type: ReactionType }[]
   starTotal: number
   onStarTotalChange: (momentId: string, total: number) => void
+  userReaction?: ReactionType | null
+  onReact?: (momentId: string, type: ReactionType) => void
 }) {
   const navigate = useNavigate()
   const profile = moment.profiles
   const displayName = profile?.display_name ?? profile?.username ?? 'Аноним'
   const topReaction = getTopReaction(reactions)
+  const isReacted = topReaction ? userReaction === topReaction.type : false
 
   return (
     <div
@@ -312,18 +343,22 @@ function PhotoOfDayCard({
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             {topReaction && (
               <div
+                role="button"
+                onClick={onReact ? (e) => { e.stopPropagation(); onReact(moment.id, topReaction.type) } : undefined}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: 4,
-                  background: 'rgba(20,14,10,0.65)',
+                  background: isReacted ? 'rgba(201,132,62,0.3)' : 'rgba(20,14,10,0.65)',
                   borderRadius: 20,
                   padding: '5px 10px',
-                  border: '1px solid var(--amber)',
+                  border: `1px solid ${isReacted ? 'var(--amber)' : 'rgba(201,132,62,0.6)'}`,
+                  cursor: onReact ? 'pointer' : 'default',
                 }}
               >
                 <span style={{ fontSize: 14 }}>{topReaction.emoji}</span>
-                <span style={{ color: 'var(--amber)', fontSize: 12, fontWeight: 700 }}>{topReaction.count}</span>
+                <span style={{ color: isReacted ? 'var(--amber)' : 'rgba(255,255,255,0.8)', fontSize: 11 }}>{topReaction.label}</span>
+                <span style={{ color: isReacted ? 'var(--amber)' : 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: 700 }}>{topReaction.count}</span>
               </div>
             )}
             <StarSupportButton
@@ -381,21 +416,6 @@ function FilmStripDivider() {
   )
 }
 
-function PhotoGrid({ children }: { children: React.ReactNode }) {
-  const items = Children.toArray(children)
-  const left = items.filter((_, i) => i % 2 === 0)
-  const right = items.filter((_, i) => i % 2 === 1)
-  return (
-    <div style={{ display: 'flex', gap: 8 }}>
-      <div style={{ flex: '1 1 0%', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {left}
-      </div>
-      <div style={{ flex: '1 1 0%', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {right}
-      </div>
-    </div>
-  )
-}
 
 function EmptyState({ filter }: { filter: FilterValue }) {
   return (
@@ -418,5 +438,5 @@ function getTopReaction(reactions: { type: ReactionType }[]) {
   }
   const [topType, count] = Object.entries(counts).sort(([, a], [, b]) => b - a)[0]
   const emotion = EMOTIONS.find(e => e.type === topType)
-  return emotion ? { emoji: emotion.emoji, count } : null
+  return emotion ? { emoji: emotion.emoji, label: emotion.label, type: emotion.type, count } : null
 }
