@@ -313,7 +313,7 @@ export function UploadPage() {
 
   // ── Capture ─────────────────────────────────────────────────────────────────
 
-  async function capture() {
+  const capture = useCallback(async () => {
     const video  = videoRef.current
     const canvas = canvasRef.current
     if (!video || !canvas) return
@@ -359,7 +359,33 @@ export function UploadPage() {
       streamRef.current?.getTracks().forEach(t => t.stop())
       setPhase('preview')
     }, 'image/jpeg', 0.92)
-  }
+  }, [preset, selectedFlare])
+
+  // ── Hardware volume buttons → shutter ────────────────────────────────────────
+
+  useEffect(() => {
+    if (phase !== 'viewfinder' || limitReached) return
+
+    const handleKey = (e: KeyboardEvent) => {
+      // Volume Up (24) / Volume Down (25) on Android WebView
+      // Some devices also emit AudioVolume* key names
+      const isVolumeKey =
+        e.keyCode === 24 ||
+        e.keyCode === 25 ||
+        e.key === 'AudioVolumeUp' ||
+        e.key === 'AudioVolumeDown' ||
+        e.key === 'VolumeUp' ||
+        e.key === 'VolumeDown'
+
+      if (isVolumeKey) {
+        e.preventDefault()
+        void capture()
+      }
+    }
+
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [phase, limitReached, capture])
 
   // ── Publish ──────────────────────────────────────────────────────────────────
 
