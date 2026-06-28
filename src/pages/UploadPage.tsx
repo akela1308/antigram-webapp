@@ -478,6 +478,30 @@ export function UploadPage() {
   if (phase === 'preview' || phase === 'uploading') {
     return (
       <div style={{ ...S.root, overflowY: 'auto', paddingTop: 'var(--tg-top, 56px)' }}>
+        {/* Sticky back bar */}
+        <div style={{
+          position: 'sticky', top: 0, zIndex: 20,
+          display: 'flex', alignItems: 'center',
+          padding: '8px 16px',
+          background: 'rgba(13,13,13,0.92)',
+          backdropFilter: 'blur(10px)',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+        }}>
+          <button
+            onClick={retake}
+            disabled={phase === 'uploading'}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: 'none', border: 'none', color: '#C4A882',
+              fontSize: 15, fontWeight: 600, cursor: 'pointer',
+              padding: '4px 0', opacity: phase === 'uploading' ? 0.4 : 1,
+            }}
+          >
+            <span style={{ fontSize: 20, lineHeight: 1 }}>←</span>
+            <span>Переснять</span>
+          </button>
+        </div>
+
         <FilmStripBar />
 
         <img
@@ -716,18 +740,17 @@ export function UploadPage() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px' }}>
-          <button onClick={() => navigate(-1)} style={S.topBtn}>✕</button>
-
           {/* Active film indicator */}
-          {preset.id !== 'none' && (
+          {preset.id !== 'none' ? (
             <div style={{
               display: 'flex', alignItems: 'center', gap: 6,
-              background: 'rgba(0,0,0,0.5)', borderRadius: 20, padding: '5px 12px',
+              background: 'rgba(0,0,0,0.55)', borderRadius: 20, padding: '5px 12px',
+              border: '1px solid rgba(255,255,255,0.12)',
             }}>
               <div style={{ width: 10, height: 10, borderRadius: 5, background: preset.color }} />
               <span style={{ color: '#fff', fontSize: 12, fontWeight: 600 }}>{preset.name}</span>
             </div>
-          )}
+          ) : <div />}
 
           <button
             onClick={() => setFlash(f => !f)}
@@ -985,7 +1008,7 @@ const S: Record<string, React.CSSProperties> = {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    paddingTop: 'calc(var(--tg-top, 56px) + 64px)',
+    paddingTop: 'calc(var(--tg-top, 56px) + 80px)',
     paddingLeft: 16,
     paddingRight: 16,
     paddingBottom: 8,
@@ -1008,8 +1031,8 @@ const S: Record<string, React.CSSProperties> = {
     width: 40,
     height: 40,
     borderRadius: 20,
-    background: 'rgba(255,255,255,0.07)',
-    border: 'none',
+    background: 'rgba(0,0,0,0.55)',
+    border: '1px solid rgba(255,255,255,0.15)',
     color: '#fff',
     fontSize: 18,
     display: 'flex',
