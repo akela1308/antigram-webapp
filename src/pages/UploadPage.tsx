@@ -729,20 +729,12 @@ export function UploadPage() {
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              onClick={() => setFlash(f => !f)}
-              style={{ ...S.topBtn, color: flash ? '#E8B84B' : '#fff' }}
-            >
-              ⚡
-            </button>
-            <button
-              onClick={() => setFacing(f => f === 'environment' ? 'user' : 'environment')}
-              style={S.topBtn}
-            >
-              ⇄
-            </button>
-          </div>
+          <button
+            onClick={() => setFlash(f => !f)}
+            style={{ ...S.topBtn, color: flash ? '#E8B84B' : '#fff' }}
+          >
+            ⚡
+          </button>
         </div>
       </div>
 
@@ -907,8 +899,11 @@ export function UploadPage() {
           )}
         </div>
 
-        {/* Shutter */}
-        <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: 'max(36px, calc(var(--tg-bottom,0px) + 24px))' }}>
+        {/* Shutter + flip */}
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 32, paddingBottom: 'max(36px, calc(var(--tg-bottom,0px) + 24px))' }}>
+          {/* spacer left */}
+          <div style={{ width: 52 }} />
+
           <button
             onClick={() => {
               if (limitReached) {
@@ -928,6 +923,19 @@ export function UploadPage() {
             <div style={S.shutterInner}>
               <div style={S.shutterGlow} />
             </div>
+          </button>
+
+          <button
+            onClick={() => setFacing(f => f === 'environment' ? 'user' : 'environment')}
+            style={{
+              width: 52, height: 52, borderRadius: 26,
+              background: 'rgba(255,255,255,0.07)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              color: '#fff', fontSize: 22, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            ⇄
           </button>
         </div>
       </div>
@@ -957,7 +965,7 @@ function FilmStripBar() {
 
 const S: Record<string, React.CSSProperties> = {
   root: {
-    minHeight: '100dvh',
+    height: '100dvh',
     background: '#0D0D0D',
     display: 'flex',
     flexDirection: 'column',
