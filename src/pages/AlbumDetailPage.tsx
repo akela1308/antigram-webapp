@@ -81,9 +81,8 @@ export function AlbumDetailPage() {
 
       {/* Header */}
       <div
-        className="sticky z-40 flex items-center gap-3 px-4 py-3"
+        className="flex items-center gap-3 px-4 py-3"
         style={{
-          top: 'var(--tg-top, 56px)',
           background: 'rgba(20,14,10,0.95)',
           backdropFilter: 'blur(12px)',
           borderBottom: '1px solid var(--border)',

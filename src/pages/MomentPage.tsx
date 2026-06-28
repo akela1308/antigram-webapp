@@ -111,8 +111,8 @@ export function MomentPage() {
     <div className="flex flex-col" style={{ minHeight: '100dvh', background: 'var(--bg)', paddingTop: 'var(--tg-top, 56px)' }}>
       {/* Header */}
       <div
-        className="sticky z-40 flex items-center justify-between px-4 py-3"
-        style={{ top: 'var(--tg-top, 56px)', background: 'rgba(20,14,10,0.95)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border)' }}
+        className="flex items-center justify-between px-4 py-3"
+        style={{ background: 'rgba(20,14,10,0.95)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border)' }}
       >
         <button onClick={() => navigate(-1)} className="p-1">
           <BackIcon />

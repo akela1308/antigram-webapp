@@ -108,14 +108,26 @@ export function ProfilePage() {
     <div className="flex flex-col" style={{ minHeight: '100dvh', background: 'var(--bg)', paddingTop: 'var(--tg-top, 56px)' }}>
       {/* Header */}
       <div
-        className="sticky z-40 flex items-center gap-3 px-4 py-3"
-        style={{ top: 'var(--tg-top, 56px)', background: 'rgba(20,14,10,0.95)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border)' }}
+        className="flex items-center gap-3 px-4 py-3"
+        style={{ background: 'rgba(20,14,10,0.95)', backdropFilter: 'blur(12px)', borderBottom: '1px solid var(--border)' }}
       >
         <button onClick={() => navigate(-1)} className="p-1"><BackIcon /></button>
         <span className="font-semibold text-sm" style={{ color: 'var(--text)' }}>
           {profile.username ? `@${profile.username}` : displayName}
         </span>
       </div>
+
+      {/* Film strip highlights — сразу под шапкой, если есть */}
+      {hasHighlights && (
+        <FilmStripHeader
+          photos={ringPhotos}
+          isOwner={false}
+          onOpenPhoto={i => {
+            const hl = highlights.find(h => h.position === i)
+            if (hl?.moments?.id) navigate(`/moment/${hl.moments.id}`)
+          }}
+        />
+      )}
 
       {/* Profile header */}
       <div className="flex flex-col items-center gap-3 pt-6 pb-4 px-6">
@@ -168,18 +180,6 @@ export function ProfilePage() {
           </Link>
         )}
       </div>
-
-      {/* Film strip highlights (shown only if user has at least 1) */}
-      {hasHighlights && (
-        <FilmStripHeader
-          photos={ringPhotos}
-          isOwner={false}
-          onOpenPhoto={i => {
-            const hl = highlights.find(h => h.position === i)
-            if (hl?.moments?.id) navigate(`/moment/${hl.moments.id}`)
-          }}
-        />
-      )}
 
       {/* Divider */}
       <div style={{ height: 1, background: 'var(--border)', margin: '0 16px 12px' }} />

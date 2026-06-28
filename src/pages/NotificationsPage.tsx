@@ -97,9 +97,7 @@ export function NotificationsPage() {
       style={{ minHeight: '100dvh', paddingTop: 'var(--tg-top, 56px)' }}
     >
       <div
-        className="sticky z-40"
         style={{
-          top: 'var(--tg-top, 56px)',
           background: 'rgba(20,14,10,0.97)',
           backdropFilter: 'blur(12px)',
           borderBottom: '1px solid var(--border)',
