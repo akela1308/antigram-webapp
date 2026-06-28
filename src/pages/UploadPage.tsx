@@ -7,6 +7,7 @@ import { FILM_PRESETS } from '../lib/filmPresets'
 import type { FilmPreset, AlgoType, GrainConfig, FlareType } from '../lib/filmPresets'
 import type { ReactionType } from '../lib/types'
 import { trackPhotoPosted, trackFilterApplied } from '../lib/analytics'
+import { getTodaysMomentCount, DAILY_FRAME_LIMIT } from '../lib/db'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -268,6 +269,18 @@ export function UploadPage() {
   const [draftLabel, setDraftLabel]     = useState('')
   const [camError, setCamError]         = useState<string | null>(null)
   const [error, setError]               = useState<string | null>(null)
+  const [todayCount, setTodayCount]     = useState<number | null>(null)
+  const [limitMsg, setLimitMsg]         = useState(false)
+
+  const framesUsed      = todayCount ?? 0
+  const framesRemaining = Math.max(0, DAILY_FRAME_LIMIT - framesUsed)
+  const limitReached    = todayCount !== null && framesRemaining === 0
+
+  useEffect(() => {
+    if (user) {
+      getTodaysMomentCount(user.id).then(setTodayCount)
+    }
+  }, [user])
 
   // ── Camera lifecycle ────────────────────────────────────────────────────────
 
@@ -376,6 +389,7 @@ export function UploadPage() {
       if (insErr) throw new Error(insErr.message)
 
       trackPhotoPosted(preset.id)
+      setTodayCount(prev => (prev ?? 0) + 1)
       setPhase('success')
       setTimeout(() => navigate('/'), 1800)
     } catch (err) {
@@ -803,9 +817,72 @@ export function UploadPage() {
           })}
         </div>
 
+        {/* Frame counter */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+          <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
+            {Array.from({ length: DAILY_FRAME_LIMIT }).map((_, i) => {
+              const isAvailable = todayCount === null || i >= framesUsed
+              return (
+                <div
+                  key={i}
+                  style={{
+                    width: 22,
+                    height: 14,
+                    borderRadius: 3,
+                    background: todayCount === null
+                      ? 'rgba(255,255,255,0.06)'
+                      : isAvailable
+                        ? 'rgba(201,132,62,0.85)'
+                        : 'rgba(255,255,255,0.05)',
+                    border: isAvailable && todayCount !== null
+                      ? '1px solid rgba(201,132,62,0.3)'
+                      : '1px solid rgba(255,255,255,0.07)',
+                    boxShadow: isAvailable && todayCount !== null
+                      ? '0 0 8px rgba(201,132,62,0.3)'
+                      : 'none',
+                    transition: 'background 0.3s, box-shadow 0.3s',
+                  }}
+                />
+              )
+            })}
+          </div>
+          <span style={{
+            fontSize: 11,
+            letterSpacing: 0.3,
+            color: limitReached ? 'rgba(201,132,62,0.4)' : 'var(--text-muted)',
+          }}>
+            {todayCount === null
+              ? ''
+              : limitReached
+                ? 'кадры обновятся в полночь'
+                : `${framesRemaining} из ${DAILY_FRAME_LIMIT} кадров сегодня`
+            }
+          </span>
+          {limitMsg && (
+            <span style={{ fontSize: 12, color: 'rgba(201,132,62,0.7)', marginTop: 2 }}>
+              Лимит на сегодня исчерпан
+            </span>
+          )}
+        </div>
+
         {/* Shutter */}
         <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: 'max(36px, calc(var(--tg-bottom,0px) + 24px))' }}>
-          <button onClick={capture} style={S.shutter}>
+          <button
+            onClick={() => {
+              if (limitReached) {
+                setLimitMsg(true)
+                setTimeout(() => setLimitMsg(false), 2000)
+                return
+              }
+              void capture()
+            }}
+            style={{
+              ...S.shutter,
+              opacity: limitReached ? 0.35 : 1,
+              cursor: limitReached ? 'default' : 'pointer',
+              transition: 'opacity 0.3s',
+            }}
+          >
             <div style={S.shutterInner}>
               <div style={S.shutterGlow} />
             </div>

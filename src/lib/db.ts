@@ -185,6 +185,25 @@ export async function removeReaction(
   return { error }
 }
 
+// ─── DAILY FRAME LIMIT ───────────────────────────────────────────────────────
+
+export const DAILY_FRAME_LIMIT = 4
+
+/** Returns how many moments the user has published today (local midnight reset). */
+export async function getTodaysMomentCount(userId: string): Promise<number> {
+  const startOfDay = new Date()
+  startOfDay.setHours(0, 0, 0, 0)
+
+  const { count, error } = await supabase
+    .from('moments')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .gte('created_at', startOfDay.toISOString())
+
+  if (error) return 0
+  return count ?? 0
+}
+
 // ─── TELEGRAM STARS ──────────────────────────────────────────────────────────
 
 export const STAR_SUPPORT_AMOUNTS = [1, 5, 10, 50] as const
