@@ -52,7 +52,7 @@ supabase link --project-ref kwjjwmpcnukfxmwhjwed
 
 ### 2.4 Установить секреты для Edge Function
 ```bash
-supabase secrets set BOT_TOKEN=8901424423:AAGuhd767jD5lYi1i1lH3RFX7VVP-fTkr0E
+supabase secrets set BOT_TOKEN=ВАШ_BOT_TOKEN
 ```
 
 ### 2.5 Задеплоить функцию
@@ -85,7 +85,7 @@ curl -X POST https://kwjjwmpcnukfxmwhjwed.supabase.co/functions/v1/telegram-auth
 ```
 
 BotFather спросит:
-1. **Выбери бота** — выбери своего бота (созданного с токеном `8901424423:...`)
+1. **Выбери бота** — выбери своего бота (`@antigramapp_bot`)
 2. **Введи название приложения** — например: `Antigram`
 3. **Введи описание** — например: `Реальные моменты, настоящие эмоции`
 4. **Загрузи фото** — загрузи квадратное изображение 640×640px (иконка приложения)
