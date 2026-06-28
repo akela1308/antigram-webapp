@@ -13,6 +13,7 @@ import { SearchPage } from './pages/SearchPage'
 import { MomentFeedPage } from './pages/MomentFeedPage'
 import { AlbumDetailPage } from './pages/AlbumDetailPage'
 import { BottomNav } from './components/BottomNav'
+import { MiniPlayer } from './components/MiniPlayer'
 import { PrivacyPage } from './pages/PrivacyPage'
 import { trackSessionStart } from './lib/analytics'
 
@@ -42,6 +43,7 @@ export function App() {
   const hideNav = location.pathname === '/upload'
     || location.pathname === '/moment-feed'
     || location.pathname.startsWith('/album/')
+  const showMiniPlayer = !hideNav && location.pathname !== '/auth'
 
   return (
     <div
@@ -64,6 +66,7 @@ export function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       {!hideNav && <BottomNav />}
+      {showMiniPlayer && <MiniPlayer />}
     </div>
   )
 }

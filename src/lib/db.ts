@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import type { Profile, Moment, MomentWithProfile, ReactionType, CommentWithProfile, Album, AlbumWithMoments, HighlightWithMoment } from './types'
+import type { Profile, Moment, MomentWithProfile, ReactionType, CommentWithProfile, Album, AlbumWithMoments, HighlightWithMoment, NotificationItem } from './types'
 
 // ─── PROFILES ────────────────────────────────────────────────────────────────
 
@@ -288,6 +288,46 @@ export async function getComments(momentId: string): Promise<CommentWithProfile[
   }))
 }
 
+// ─── NOTIFICATIONS ────────────────────────────────────────────────────────────
+
+export async function getNotifications(userId: string): Promise<NotificationItem[]> {
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('*, profiles:profiles!notifications_actor_id_fkey(*), moments(photo_url)')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(50)
+
+  if (error) {
+    console.error('[Notifications] load failed:', error)
+    return []
+  }
+  return (data as NotificationItem[]) ?? []
+}
+
+export async function markNotificationsRead(userId: string): Promise<{ error: unknown }> {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ read: true })
+    .eq('user_id', userId)
+    .eq('read', false)
+  return { error }
+}
+
+export async function getUnreadNotificationsCount(userId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('notifications')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('read', false)
+
+  if (error) {
+    console.error('[Notifications] unread count failed:', error)
+    return 0
+  }
+  return count ?? 0
+}
+
 // ── Highlights ────────────────────────────────────────────────────────────────
 
 export async function getHighlights(userId: string): Promise<HighlightWithMoment[]> {
@@ -332,24 +372,35 @@ export async function getUserAlbums(userId: string): Promise<AlbumWithMoments[]>
     .order('created_at', { ascending: false })
   if (!albums || albums.length === 0) return []
 
-  const result: AlbumWithMoments[] = await Promise.all(
-    (albums as Album[]).map(async (album) => {
-      const { count } = await supabase
-        .from('album_moments')
-        .select('*', { count: 'exact', head: true })
-        .eq('album_id', album.id)
-      const { data: first } = await supabase
-        .from('album_moments')
-        .select('moments(photo_url)')
-        .eq('album_id', album.id)
-        .order('added_at', { ascending: false })
-        .limit(1)
-        .single()
-      const firstUrl = (first as any)?.moments?.photo_url ?? null
-      return { ...album, moments_count: count ?? 0, first_moment_url: firstUrl }
-    })
-  )
-  return result
+  const albumRows = albums as Album[]
+  const albumIds = albumRows.map(album => album.id)
+  const { data: albumMoments } = await supabase
+    .from('album_moments')
+    .select('album_id, moments(photo_url)')
+    .in('album_id', albumIds)
+    .order('added_at', { ascending: false })
+
+  const stats: Record<string, { count: number; first_moment_url: string | null }> = {}
+  for (const albumId of albumIds) {
+    stats[albumId] = { count: 0, first_moment_url: null }
+  }
+
+  for (const row of (albumMoments ?? []) as {
+    album_id: string
+    moments: { photo_url: string } | { photo_url: string }[] | null
+  }[]) {
+    const albumStats = stats[row.album_id]
+    if (!albumStats) continue
+    const moment = Array.isArray(row.moments) ? row.moments[0] : row.moments
+    albumStats.count += 1
+    albumStats.first_moment_url ??= moment?.photo_url ?? null
+  }
+
+  return albumRows.map(album => ({
+    ...album,
+    moments_count: stats[album.id]?.count ?? 0,
+    first_moment_url: stats[album.id]?.first_moment_url ?? null,
+  }))
 }
 
 export async function createAlbum(
@@ -408,6 +459,17 @@ export async function removeMomentFromAlbum(
 
 export async function deleteMoment(momentId: string): Promise<{ error: unknown }> {
   const { error } = await supabase.from('moments').delete().eq('id', momentId)
+  return { error }
+}
+
+export async function reportMoment(
+  momentId: string,
+  reporterId: string,
+  reason = 'reported',
+): Promise<{ error: unknown }> {
+  const { error } = await supabase
+    .from('reports')
+    .insert({ reporter_id: reporterId, reported_moment_id: momentId, reason })
   return { error }
 }
 

@@ -10,6 +10,7 @@ import {
   getUserAlbums,
   addMomentToAlbum,
   adminShadowBanUser,
+  reportMoment,
 } from '../lib/db'
 import { EMOTIONS } from '../lib/types'
 import type { Moment, ReactionType, AlbumWithMoments } from '../lib/types'
@@ -157,6 +158,24 @@ export function MomentFeedPage() {
     if (localMoments.length <= 1) navigate(-1)
   }
 
+  async function handleReport(momentId: string) {
+    if (!user) {
+      setMenuMomentId(null)
+      showToast('Войдите, чтобы пожаловаться')
+      return
+    }
+
+    const { error } = await reportMoment(momentId, user.id)
+    setMenuMomentId(null)
+    if (error) {
+      console.error('[Report] failed:', error)
+      showToast('Не удалось отправить жалобу')
+      return
+    }
+
+    showToast('Жалоба отправлена')
+  }
+
   async function handleAddToAlbum(momentId: string) {
     if (!user) return
     setMenuMomentId(null)
@@ -272,7 +291,7 @@ export function MomentFeedPage() {
                   label="Пожаловаться"
                   icon="⚑"
                   danger
-                  onClick={() => { setMenuMomentId(null); showToast('Жалоба отправлена') }}
+                  onClick={() => handleReport(menuMomentId)}
                 />
                 {isAdmin && (() => {
                   const menuMoment = localMoments.find(m => m.id === menuMomentId)

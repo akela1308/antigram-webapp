@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { FILM_PRESETS } from '../lib/filmPresets'
 import type { FilmPreset } from '../lib/filmPresets'
+import { getUnreadNotificationsCount } from '../lib/db'
 
 const ACTIVE = '#C9843E'
 const INACTIVE = '#8A6A50'
@@ -12,6 +13,37 @@ export function BottomNav() {
   const navigate = useNavigate()
   const [showPicker, setShowPicker] = useState(false)
   const [selected, setSelected] = useState<FilmPreset>(FILM_PRESETS[1])
+  const [unreadCount, setUnreadCount] = useState(0)
+
+  useEffect(() => {
+    let active = true
+
+    async function refreshUnreadCount() {
+      if (!user) {
+        setUnreadCount(0)
+        return
+      }
+
+      const count = await getUnreadNotificationsCount(user.id)
+      if (active) setUnreadCount(count)
+    }
+
+    refreshUnreadCount()
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') refreshUnreadCount()
+    }
+    const handleNotificationsRead = () => setUnreadCount(0)
+
+    document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('antigram:notifications-read', handleNotificationsRead)
+
+    return () => {
+      active = false
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('antigram:notifications-read', handleNotificationsRead)
+    }
+  }, [user])
 
   function openCamera() {
     if (!user) { navigate('/auth'); return }
@@ -76,7 +108,25 @@ export function BottomNav() {
         </button>
 
         <NavLink to="/notifications" className="flex flex-col items-center justify-end pb-1 px-4 transition-all">
-          {({ isActive }) => <BellIcon active={isActive} />}
+          {({ isActive }) => (
+            <div style={{ position: 'relative', width: 24, height: 24 }}>
+              <BellIcon active={isActive} />
+              {unreadCount > 0 && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: -2,
+                    right: -1,
+                    width: 9,
+                    height: 9,
+                    borderRadius: 5,
+                    background: '#E55445',
+                    border: '2px solid rgba(20,14,10,0.95)',
+                  }}
+                />
+              )}
+            </div>
+          )}
         </NavLink>
 
         <NavLink to="/me" className="flex flex-col items-center justify-end pb-1 px-4 transition-all">

@@ -83,3 +83,8 @@ button:active, a:active { opacity: 0.7; transition: opacity 0.1s; }
   animation: shimmer 1.5s infinite;
   border-radius: 4px;
 }
+
+@keyframes antigram-mini-player-marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(var(--antigram-mini-player-marquee-distance)); }
+}

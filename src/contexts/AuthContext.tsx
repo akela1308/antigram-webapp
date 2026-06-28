@@ -3,6 +3,7 @@ import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import type { Profile } from '../lib/types'
 import { getProfile } from '../lib/db'
+import { identify, reset } from '../lib/analytics'
 
 interface AuthContextValue {
   session: Session | null
@@ -65,6 +66,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loadProfile = useCallback(async (userId: string) => {
     const p = await getProfile(userId)
     setProfile(p)
+    identify(userId, {
+      username: p?.username,
+      display_name: p?.display_name,
+      is_telegram: isTelegramContext(),
+    })
   }, [])
 
   const refreshProfile = useCallback(async () => {
@@ -152,7 +158,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(s)
       setUser(s?.user ?? null)
       if (s?.user) loadProfile(s.user.id)
-      else setProfile(null)
+      else {
+        setProfile(null)
+        reset()
+      }
     })
 
     return () => {
@@ -179,6 +188,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut()
+    reset()
     setSession(null)
     setUser(null)
     setProfile(null)

@@ -4,6 +4,8 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 const BOT_TOKEN = Deno.env.get('BOT_TOKEN') ?? ''
+const INIT_DATA_MAX_AGE_SECONDS = 24 * 60 * 60
+const INIT_DATA_MAX_FUTURE_SKEW_SECONDS = 5 * 60
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -19,11 +21,41 @@ interface TelegramUser {
   language_code?: string
 }
 
-async function verifyTelegramInitData(initData: string, botToken: string): Promise<TelegramUser | null> {
+interface TelegramAuthResult {
+  user: TelegramUser | null
+  error?: string
+}
+
+function hexToBytes(hex: string): Uint8Array | null {
+  const normalized = hex.trim().toLowerCase()
+  if (normalized.length % 2 !== 0 || !/^[0-9a-f]+$/.test(normalized)) return null
+
+  const bytes = new Uint8Array(normalized.length / 2)
+  for (let i = 0; i < normalized.length; i += 2) {
+    bytes[i / 2] = Number.parseInt(normalized.slice(i, i + 2), 16)
+  }
+  return bytes
+}
+
+function timingSafeEqualHex(a: string, b: string): boolean {
+  const aBytes = hexToBytes(a)
+  const bBytes = hexToBytes(b)
+  if (!aBytes || !bBytes) return false
+
+  let diff = aBytes.length ^ bBytes.length
+  const length = Math.max(aBytes.length, bBytes.length)
+  for (let i = 0; i < length; i += 1) {
+    diff |= (aBytes[i] ?? 0) ^ (bBytes[i] ?? 0)
+  }
+
+  return diff === 0
+}
+
+async function verifyTelegramInitData(initData: string, botToken: string): Promise<TelegramAuthResult> {
   try {
     const params = new URLSearchParams(initData)
     const hash = params.get('hash')
-    if (!hash) return null
+    if (!hash) return { user: null, error: 'hash required' }
 
     params.delete('hash')
     const dataCheckString = [...params.entries()]
@@ -52,13 +84,29 @@ async function verifyTelegramInitData(initData: string, botToken: string): Promi
       .map(b => b.toString(16).padStart(2, '0'))
       .join('')
 
-    if (computedHash !== hash) return null
+    if (!timingSafeEqualHex(computedHash, hash)) {
+      return { user: null, error: 'Invalid initData signature' }
+    }
+
+    const authDateRaw = params.get('auth_date')
+    const authDate = Number(authDateRaw)
+    if (!authDateRaw || !Number.isFinite(authDate)) {
+      return { user: null, error: 'auth_date required' }
+    }
+
+    const now = Math.floor(Date.now() / 1000)
+    if (authDate > now + INIT_DATA_MAX_FUTURE_SKEW_SECONDS) {
+      return { user: null, error: 'auth_date is in the future' }
+    }
+    if (now - authDate > INIT_DATA_MAX_AGE_SECONDS) {
+      return { user: null, error: 'initData expired' }
+    }
 
     const userStr = params.get('user')
-    if (!userStr) return null
-    return JSON.parse(userStr) as TelegramUser
+    if (!userStr) return { user: null, error: 'user required' }
+    return { user: JSON.parse(userStr) as TelegramUser }
   } catch {
-    return null
+    return { user: null, error: 'Invalid initData' }
   }
 }
 
@@ -85,13 +133,14 @@ Deno.serve(async (req) => {
     }
 
     // Verify Telegram signature
-    const tgUser = await verifyTelegramInitData(initData, BOT_TOKEN)
-    if (!tgUser) {
-      return new Response(JSON.stringify({ error: 'Invalid initData signature' }), {
+    const tgAuth = await verifyTelegramInitData(initData, BOT_TOKEN)
+    if (!tgAuth.user) {
+      return new Response(JSON.stringify({ error: tgAuth.error ?? 'Invalid initData signature' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
+    const tgUser = tgAuth.user
 
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: { autoRefreshToken: false, persistSession: false },
