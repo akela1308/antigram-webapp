@@ -303,87 +303,92 @@ function PhotoOfDayCard({
       }}
       style={{ display: 'block', textDecoration: 'none', padding: '0 12px', cursor: 'pointer' }}
     >
-      <div style={{ borderRadius: 16, overflow: 'hidden', position: 'relative' }}>
-        <img
-          src={moment.photo_url}
-          alt={moment.caption ?? ''}
-          style={{ width: '100%', aspectRatio: '4/5', objectFit: 'cover', display: 'block' }}
-          loading="lazy"
-        />
-        {/* Gradient overlay bottom */}
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            background: 'linear-gradient(to top, rgba(20,14,10,0.85) 0%, transparent 45%)',
-          }}
-        />
-        {/* Author + reaction overlay */}
-        <div
-          style={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            padding: '12px 14px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Avatar url={profile?.avatar_url} name={displayName} size={28} />
-            <div>
-              <p style={{ color: '#fff', fontSize: 13, fontWeight: 600, margin: 0 }}>{displayName}</p>
-              <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, margin: 0 }}>
-                {formatTime(moment.created_at)}
-              </p>
+      {/* Outer card — clips everything to rounded corners */}
+      <div style={{ borderRadius: 16, overflow: 'hidden' }}>
+        {/* Photo section — own relative context so overlays position against the photo */}
+        <div style={{ position: 'relative' }}>
+          <img
+            src={moment.photo_url}
+            alt={moment.caption ?? ''}
+            style={{ width: '100%', aspectRatio: '4/5', objectFit: 'cover', display: 'block' }}
+            loading="lazy"
+          />
+          {/* Gradient overlay */}
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'linear-gradient(to top, rgba(20,14,10,0.85) 0%, transparent 45%)',
+            }}
+          />
+          {/* Author + reaction overlay — anchored to bottom of photo */}
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              padding: '12px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Avatar url={profile?.avatar_url} name={displayName} size={28} />
+              <div>
+                <p style={{ color: '#fff', fontSize: 13, fontWeight: 600, margin: 0 }}>{displayName}</p>
+                <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, margin: 0 }}>
+                  {formatTime(moment.created_at)}
+                </p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {topReaction && (
+                <div
+                  role="button"
+                  onClick={onReact ? (e) => { e.stopPropagation(); onReact(moment.id, topReaction.type) } : undefined}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    background: isReacted ? 'rgba(201,132,62,0.3)' : 'rgba(20,14,10,0.65)',
+                    borderRadius: 20,
+                    padding: '5px 10px',
+                    border: `1px solid ${isReacted ? 'var(--amber)' : 'rgba(201,132,62,0.6)'}`,
+                    cursor: onReact ? 'pointer' : 'default',
+                  }}
+                >
+                  <span style={{ fontSize: 14 }}>{topReaction.emoji}</span>
+                  <span style={{ color: isReacted ? 'var(--amber)' : 'rgba(255,255,255,0.8)', fontSize: 11 }}>{topReaction.label}</span>
+                  <span style={{ color: isReacted ? 'var(--amber)' : 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: 700 }}>{topReaction.count}</span>
+                </div>
+              )}
+              <StarSupportButton
+                momentId={moment.id}
+                initialTotal={starTotal}
+                variant="overlay"
+                onTotalChange={(total) => onStarTotalChange(moment.id, total)}
+              />
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {topReaction && (
-              <div
-                role="button"
-                onClick={onReact ? (e) => { e.stopPropagation(); onReact(moment.id, topReaction.type) } : undefined}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  background: isReacted ? 'rgba(201,132,62,0.3)' : 'rgba(20,14,10,0.65)',
-                  borderRadius: 20,
-                  padding: '5px 10px',
-                  border: `1px solid ${isReacted ? 'var(--amber)' : 'rgba(201,132,62,0.6)'}`,
-                  cursor: onReact ? 'pointer' : 'default',
-                }}
-              >
-                <span style={{ fontSize: 14 }}>{topReaction.emoji}</span>
-                <span style={{ color: isReacted ? 'var(--amber)' : 'rgba(255,255,255,0.8)', fontSize: 11 }}>{topReaction.label}</span>
-                <span style={{ color: isReacted ? 'var(--amber)' : 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: 700 }}>{topReaction.count}</span>
-              </div>
-            )}
-            <StarSupportButton
-              momentId={moment.id}
-              initialTotal={starTotal}
-              variant="overlay"
-              onTotalChange={(total) => onStarTotalChange(moment.id, total)}
-            />
-          </div>
         </div>
-        {/* Caption — inside card, below photo */}
+
+        {/* Caption — below photo, inside same rounded card */}
         {moment.caption && (
           <div
             style={{
-              background: 'rgba(20,14,10,0.92)',
+              background: '#110c08',
               borderTop: '1px solid rgba(255,255,255,0.06)',
-              padding: '9px 14px 12px',
+              padding: '10px 14px 12px',
             }}
           >
             <p
               style={{
-                color: 'var(--text-sec)',
+                color: 'rgba(255,255,255,0.65)',
                 fontSize: 13,
                 margin: 0,
-                lineHeight: 1.5,
+                lineHeight: 1.55,
                 overflow: 'hidden',
                 display: '-webkit-box',
                 WebkitLineClamp: 2,
