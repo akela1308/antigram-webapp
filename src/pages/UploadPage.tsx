@@ -835,22 +835,24 @@ export function UploadPage() {
                     border: active ? '2px solid var(--amber)' : '1px solid rgba(255,255,255,0.1)',
                   }}
                 >
-                  <div
-                    style={{
-                      width: 16, height: 16, borderRadius: 8,
-                      background: 'rgba(0,0,0,0.35)',
-                      border: '1px solid rgba(255,255,255,0.15)',
-                    }}
-                  />
-                  {p.id === 'none' && (
+                  {p.id === 'none' ? (
                     <span style={{
                       position: 'absolute',
-                      color: active ? 'var(--amber)' : '#555', fontSize: 16,
+                      top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+                      color: active ? 'var(--amber)' : '#555', fontSize: 18, lineHeight: 1,
                     }}>∅</span>
+                  ) : (
+                    <div
+                      style={{
+                        width: 16, height: 16, borderRadius: 8,
+                        background: 'rgba(0,0,0,0.35)',
+                        border: '1px solid rgba(255,255,255,0.15)',
+                      }}
+                    />
                   )}
                 </div>
                 <span style={{ color: active ? 'var(--amber)' : '#555', fontSize: 9, maxWidth: 52, textAlign: 'center', lineHeight: 1.2 }}>
-                  {p.name.split(' ')[0]}
+                  {p.id === 'none' ? 'Без' : p.name.split(' ')[0]}
                 </span>
               </button>
             )
