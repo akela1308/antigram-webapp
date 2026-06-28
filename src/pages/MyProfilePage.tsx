@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
 import { FilmStripHeader } from '../components/FilmStripHeader'
 import { ProfileSkeleton, MomentCardSkeleton } from '../components/Skeleton'
+import { StarCountPill } from '../components/StarSupportButton'
 import { useAuth } from '../contexts/AuthContext'
 import {
   getUserMoments,
@@ -15,6 +16,8 @@ import {
   createAlbum,
   deleteMoment,
   updateProfile,
+  getMomentStarTotals,
+  getProfileStarTotal,
 } from '../lib/db'
 import type { Moment, HighlightWithMoment, AlbumWithMoments } from '../lib/types'
 
@@ -50,6 +53,8 @@ export function MyProfilePage() {
   const [albums, setAlbums] = useState<AlbumWithMoments[]>([])
   const [followersCount, setFollowersCount] = useState(0)
   const [followingCount, setFollowingCount] = useState(0)
+  const [starTotal, setStarTotal] = useState(0)
+  const [momentStarTotals, setMomentStarTotals] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'film' | 'albums'>('film')
   const [pickerTarget, setPickerTarget] = useState<number | null>(null)
@@ -64,18 +69,21 @@ export function MyProfilePage() {
   const load = useCallback(async () => {
     if (!user) { setLoading(false); return }
     setLoading(true)
-    const [m, hl, al, fc, fgc] = await Promise.all([
+    const [m, hl, al, fc, fgc, stars] = await Promise.all([
       getUserMoments(user.id),
       getHighlights(user.id),
       getUserAlbums(user.id),
       getFollowersCount(user.id),
       getFollowingCount(user.id),
+      getProfileStarTotal(user.id),
     ])
     setMoments(m)
     setHighlights(hl)
     setAlbums(al)
     setFollowersCount(fc)
     setFollowingCount(fgc)
+    setStarTotal(stars)
+    setMomentStarTotals(m.length > 0 ? await getMomentStarTotals(m.map(moment => moment.id)) : {})
     setLoading(false)
   }, [user])
 
@@ -149,6 +157,7 @@ export function MyProfilePage() {
     setDeleteConfirmId(null)
     const m = await getUserMoments(user!.id)
     setMoments(m)
+    setMomentStarTotals(m.length > 0 ? await getMomentStarTotals(m.map(moment => moment.id)) : {})
     const hl = await getHighlights(user!.id)
     setHighlights(hl)
   }
@@ -298,6 +307,9 @@ export function MyProfilePage() {
               <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>Telegram</span>
             </div>
           )}
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: 8 }}>
+            <StarCountPill total={starTotal} />
+          </div>
         </div>
 
         {profile.bio && (
@@ -356,6 +368,7 @@ export function MyProfilePage() {
                     <PhotoTile
                       moment={row.item}
                       moments={moments}
+                      starTotal={momentStarTotals[row.item.id] ?? 0}
                       navigate={navigate}
                       onLongPress={() => setDeleteConfirmId(row.item.id)}
                       onLongPressEnd={cancelLongPress}
@@ -373,6 +386,7 @@ export function MyProfilePage() {
                   <PhotoTile
                     moment={row.left}
                     moments={moments}
+                    starTotal={momentStarTotals[row.left.id] ?? 0}
                     navigate={navigate}
                     onLongPress={() => setDeleteConfirmId(row.left.id)}
                     onLongPressEnd={cancelLongPress}
@@ -385,6 +399,7 @@ export function MyProfilePage() {
                     <PhotoTile
                       moment={row.right}
                       moments={moments}
+                      starTotal={momentStarTotals[row.right.id] ?? 0}
                       navigate={navigate}
                       onLongPress={() => setDeleteConfirmId(row.right!.id)}
                       onLongPressEnd={cancelLongPress}
@@ -536,6 +551,10 @@ export function MyProfilePage() {
           userId={user.id}
           isTelegram={isTelegram}
           onClose={() => setShowSettings(false)}
+          onNavigate={(path) => {
+            setShowSettings(false)
+            navigate(path)
+          }}
           onSignOut={handleSignOut}
           onSaved={async () => { await load(); showToast('Сохранено') }}
           showSignOutConfirm={showSignOutConfirm}
@@ -550,12 +569,13 @@ export function MyProfilePage() {
 // ── PhotoTile ─────────────────────────────────────────────────────────────────
 
 function PhotoTile({
-  moment, moments, navigate, full,
+  moment, moments, starTotal, navigate, full,
   onLongPressStart, onLongPressEnd,
   deleteConfirmId, onDeleteConfirm, onDeleteCancel,
 }: {
   moment: Moment
   moments: Moment[]
+  starTotal: number
   navigate: ReturnType<typeof useNavigate>
   full?: boolean
   onLongPress: () => void
@@ -597,6 +617,11 @@ function PhotoTile({
           transition: 'filter 0.15s',
         }}
         draggable={false}
+      />
+      <StarCountPill
+        total={starTotal}
+        compact
+        style={{ position: 'absolute', right: 7, bottom: 7 }}
       />
       {isDeleteTarget && (
         <div
@@ -729,13 +754,14 @@ function AlbumCard({ cover, placeholder, placeholderBg, title, subtitle, isPriva
 
 function SettingsSheet({
   profile, userId, isTelegram,
-  onClose, onSaved,
+  onClose, onNavigate, onSaved,
   showSignOutConfirm, setShowSignOutConfirm, handleSignOut,
 }: {
   profile: import('../lib/types').Profile
   userId: string
   isTelegram: boolean
   onClose: () => void
+  onNavigate: (path: string) => void
   onSignOut: () => void
   onSaved: () => void
   showSignOutConfirm: boolean
@@ -787,6 +813,13 @@ function SettingsSheet({
     color: 'var(--amber)', fontSize: 11, fontWeight: 700,
     letterSpacing: 1, textTransform: 'uppercase',
     margin: '18px 0 4px', borderBottom: '1px solid #2E1A0A', paddingBottom: 6,
+  }
+
+  const linkButtonStyle: React.CSSProperties = {
+    width: '100%', padding: '12px 14px', borderRadius: 12,
+    background: 'transparent', border: '1px solid #2E1A0A',
+    color: 'var(--text)', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+    textAlign: 'left', marginTop: 8,
   }
 
   return (
@@ -858,6 +891,22 @@ function SettingsSheet({
               </button>
             </>
           )}
+
+          <p style={sectionTitleStyle}>Правила и поддержка</p>
+          <button
+            type="button"
+            onClick={() => onNavigate('/terms')}
+            style={linkButtonStyle}
+          >
+            Условия и Stars
+          </button>
+          <button
+            type="button"
+            onClick={() => onNavigate('/privacy')}
+            style={{ ...linkButtonStyle, color: 'var(--text-muted)' }}
+          >
+            Политика конфиденциальности
+          </button>
 
           {/* Save */}
           <button

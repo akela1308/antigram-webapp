@@ -15,6 +15,7 @@ import { AlbumDetailPage } from './pages/AlbumDetailPage'
 import { BottomNav } from './components/BottomNav'
 import { MiniPlayer } from './components/MiniPlayer'
 import { PrivacyPage } from './pages/PrivacyPage'
+import { TermsPage } from './pages/TermsPage'
 import { trackSessionStart } from './lib/analytics'
 
 export function App() {
@@ -63,6 +64,7 @@ export function App() {
         <Route path="/album/:albumId" element={<AlbumDetailPage />} />
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/terms" element={<TermsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       {!hideNav && <BottomNav />}

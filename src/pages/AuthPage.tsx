@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
 export function AuthPage() {
@@ -184,6 +184,13 @@ export function AuthPage() {
           {mode === 'login' ? 'Нет аккаунта? Зарегистрироваться' : 'Уже есть аккаунт? Войти'}
         </button>
       </form>
+
+      <p className="text-xs text-center mt-8 max-w-xs" style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>
+        Продолжая, вы принимаете{' '}
+        <Link to="/terms" style={{ color: 'var(--amber)', textDecoration: 'none' }}>условия</Link>
+        {' '}и{' '}
+        <Link to="/privacy" style={{ color: 'var(--amber)', textDecoration: 'none' }}>политику конфиденциальности</Link>.
+      </p>
     </div>
   )
 }

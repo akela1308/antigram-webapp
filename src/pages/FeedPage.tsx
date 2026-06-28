@@ -1,11 +1,12 @@
 import { useEffect, useState, useCallback, Children } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { CategoryFilmStrip } from '../components/CategoryFilmStrip'
 import { MomentCard } from '../components/MomentCard'
+import { StarSupportButton } from '../components/StarSupportButton'
 import { MomentCardSkeleton } from '../components/Skeleton'
 import { Avatar } from '../components/Avatar'
 import { useAuth } from '../contexts/AuthContext'
-import { getFeed, getRandomMoments, getMomentsByEmotion, getFeedReactions } from '../lib/db'
+import { getFeed, getRandomMoments, getMomentsByEmotion, getFeedReactions, getMomentStarTotals } from '../lib/db'
 import { EMOTIONS } from '../lib/types'
 import type { MomentWithProfile, ReactionType } from '../lib/types'
 
@@ -32,6 +33,7 @@ export function FeedPage() {
   const [filter, setFilter] = useState<FilterValue>('for_you')
   const [moments, setMoments] = useState<MomentWithProfile[]>([])
   const [reactionsMap, setReactionsMap] = useState<ReactionsMap>({})
+  const [starTotals, setStarTotals] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
 
   const loadFeed = useCallback(async () => {
@@ -53,13 +55,20 @@ export function FeedPage() {
 
     if (data.length > 0) {
       const ids = data.map(m => m.id)
-      const reactions = await getFeedReactions(ids)
+      const [reactions, stars] = await Promise.all([
+        getFeedReactions(ids),
+        getMomentStarTotals(ids),
+      ])
       const map: ReactionsMap = {}
       for (const r of reactions) {
         if (!map[r.moment_id]) map[r.moment_id] = []
         map[r.moment_id].push({ type: r.type })
       }
       setReactionsMap(map)
+      setStarTotals(stars)
+    } else {
+      setReactionsMap({})
+      setStarTotals({})
     }
 
     setLoading(false)
@@ -204,6 +213,8 @@ export function FeedPage() {
             <PhotoOfDayCard
               moment={moments[0]}
               reactions={reactionsMap[moments[0].id] ?? []}
+              starTotal={starTotals[moments[0].id] ?? 0}
+              onStarTotalChange={(momentId, total) => setStarTotals(prev => ({ ...prev, [momentId]: total }))}
             />
 
             {/* Film strip divider */}
@@ -218,6 +229,8 @@ export function FeedPage() {
                       key={moment.id}
                       moment={moment}
                       reactions={reactionsMap[moment.id] ?? []}
+                      starTotal={starTotals[moment.id] ?? 0}
+                      onStarTotalChange={(momentId, total) => setStarTotals(prev => ({ ...prev, [momentId]: total }))}
                     />
                   ))}
                 </PhotoGrid>
@@ -230,13 +243,35 @@ export function FeedPage() {
   )
 }
 
-function PhotoOfDayCard({ moment, reactions }: { moment: MomentWithProfile; reactions: { type: ReactionType }[] }) {
+function PhotoOfDayCard({
+  moment,
+  reactions,
+  starTotal,
+  onStarTotalChange,
+}: {
+  moment: MomentWithProfile
+  reactions: { type: ReactionType }[]
+  starTotal: number
+  onStarTotalChange: (momentId: string, total: number) => void
+}) {
+  const navigate = useNavigate()
   const profile = moment.profiles
   const displayName = profile?.display_name ?? profile?.username ?? 'Аноним'
   const topReaction = getTopReaction(reactions)
 
   return (
-    <Link to={`/moment/${moment.id}`} style={{ display: 'block', textDecoration: 'none', padding: '0 12px' }}>
+    <div
+      role="link"
+      tabIndex={0}
+      onClick={() => navigate(`/moment/${moment.id}`)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          navigate(`/moment/${moment.id}`)
+        }
+      }}
+      style={{ display: 'block', textDecoration: 'none', padding: '0 12px', cursor: 'pointer' }}
+    >
       <div style={{ borderRadius: 16, overflow: 'hidden', position: 'relative' }}>
         <img
           src={moment.photo_url}
@@ -274,22 +309,30 @@ function PhotoOfDayCard({ moment, reactions }: { moment: MomentWithProfile; reac
               </p>
             </div>
           </div>
-          {topReaction && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-                background: 'rgba(20,14,10,0.65)',
-                borderRadius: 20,
-                padding: '5px 10px',
-                border: '1px solid var(--amber)',
-              }}
-            >
-              <span style={{ fontSize: 14 }}>{topReaction.emoji}</span>
-              <span style={{ color: 'var(--amber)', fontSize: 12, fontWeight: 700 }}>{topReaction.count}</span>
-            </div>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {topReaction && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  background: 'rgba(20,14,10,0.65)',
+                  borderRadius: 20,
+                  padding: '5px 10px',
+                  border: '1px solid var(--amber)',
+                }}
+              >
+                <span style={{ fontSize: 14 }}>{topReaction.emoji}</span>
+                <span style={{ color: 'var(--amber)', fontSize: 12, fontWeight: 700 }}>{topReaction.count}</span>
+              </div>
+            )}
+            <StarSupportButton
+              momentId={moment.id}
+              initialTotal={starTotal}
+              variant="overlay"
+              onTotalChange={(total) => onStarTotalChange(moment.id, total)}
+            />
+          </div>
         </div>
       </div>
       {/* Caption */}
@@ -309,7 +352,7 @@ function PhotoOfDayCard({ moment, reactions }: { moment: MomentWithProfile; reac
           {moment.caption}
         </p>
       )}
-    </Link>
+    </div>
   )
 }
 

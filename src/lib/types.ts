@@ -62,7 +62,7 @@ export interface SavedMoment {
 export interface NotificationItem {
   id: string
   user_id: string
-  type: 'follow' | 'reaction' | 'comment'
+  type: 'follow' | 'reaction' | 'comment' | 'star_support'
   actor_id: string | null
   moment_id: string | null
   payload: Record<string, unknown>
@@ -95,6 +95,23 @@ export interface Album {
 export interface AlbumWithMoments extends Album {
   moments_count: number
   first_moment_url: string | null
+}
+
+export interface MomentStarTotal {
+  moment_id: string
+  total_amount: number
+  payments_count?: number
+}
+
+export interface ProfileStarTotal {
+  profile_id: string
+  total_received: number
+  payments_count?: number
+}
+
+export interface StarInvoiceResponse {
+  invoiceLink: string
+  paymentId: string
 }
 
 export const EMOTIONS = [

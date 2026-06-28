@@ -1,5 +1,18 @@
 import { supabase } from './supabase'
-import type { Profile, Moment, MomentWithProfile, ReactionType, CommentWithProfile, Album, AlbumWithMoments, HighlightWithMoment, NotificationItem } from './types'
+import type {
+  Profile,
+  Moment,
+  MomentWithProfile,
+  ReactionType,
+  CommentWithProfile,
+  Album,
+  AlbumWithMoments,
+  HighlightWithMoment,
+  NotificationItem,
+  MomentStarTotal,
+  ProfileStarTotal,
+  StarInvoiceResponse,
+} from './types'
 
 // ─── PROFILES ────────────────────────────────────────────────────────────────
 
@@ -170,6 +183,83 @@ export async function removeReaction(
     .eq('moment_id', momentId)
     .eq('user_id', userId)
   return { error }
+}
+
+// ─── TELEGRAM STARS ──────────────────────────────────────────────────────────
+
+export const STAR_SUPPORT_AMOUNTS = [1, 5, 10, 50] as const
+export type StarSupportAmount = (typeof STAR_SUPPORT_AMOUNTS)[number]
+
+export function isStarSupportAmount(value: number): value is StarSupportAmount {
+  return (STAR_SUPPORT_AMOUNTS as readonly number[]).includes(value)
+}
+
+export async function getMomentStarTotals(momentIds: string[]): Promise<Record<string, number>> {
+  if (momentIds.length === 0) return {}
+
+  const uniqueIds = [...new Set(momentIds)]
+  const { data, error } = await supabase
+    .from('moment_star_totals')
+    .select('moment_id, total_amount')
+    .in('moment_id', uniqueIds)
+
+  if (error) {
+    console.error('[Stars] moment totals load failed:', error)
+    return {}
+  }
+
+  const totals: Record<string, number> = {}
+  for (const row of (data as MomentStarTotal[]) ?? []) {
+    totals[row.moment_id] = row.total_amount
+  }
+  return totals
+}
+
+export async function getMomentStarTotal(momentId: string): Promise<number> {
+  const totals = await getMomentStarTotals([momentId])
+  return totals[momentId] ?? 0
+}
+
+export async function getProfileStarTotal(profileId: string): Promise<number> {
+  const { data, error } = await supabase
+    .from('profile_star_totals')
+    .select('profile_id, total_received')
+    .eq('profile_id', profileId)
+    .maybeSingle()
+
+  if (error) {
+    console.error('[Stars] profile total load failed:', error)
+    return 0
+  }
+
+  return ((data as ProfileStarTotal | null)?.total_received) ?? 0
+}
+
+export async function createStarInvoice(
+  momentId: string,
+  amount: StarSupportAmount,
+): Promise<StarInvoiceResponse> {
+  const { data: sessionData } = await supabase.auth.getSession()
+  const token = sessionData.session?.access_token
+
+  if (!token) {
+    throw new Error('auth_required')
+  }
+
+  const { data, error } = await supabase.functions.invoke<StarInvoiceResponse>(
+    'create-star-invoice',
+    {
+      body: { momentId, amount },
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  )
+
+  if (error) throw error
+  if (!data?.invoiceLink || !data.paymentId) {
+    throw new Error('invoice_link_missing')
+  }
+
+  return data
 }
 
 // ─── FOLLOWS ─────────────────────────────────────────────────────────────────

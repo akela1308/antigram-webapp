@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { StarSupportButton } from '../components/StarSupportButton'
 import { useAuth } from '../contexts/AuthContext'
 import {
   getFeedReactions,
   getUserReactionsForMoments,
+  getMomentStarTotals,
   addReaction,
   removeReaction,
   deleteMoment,
@@ -77,6 +79,7 @@ export function MomentFeedPage() {
   const [localMoments, setLocalMoments] = useState<Moment[]>(moments)
   const [reactionCounts, setReactionCounts] = useState<Record<string, ReactionCounts>>({})
   const [myReactions, setMyReactions] = useState<Record<string, ReactionType | null>>({})
+  const [starTotals, setStarTotals] = useState<Record<string, number>>({})
   const [menuMomentId, setMenuMomentId] = useState<string | null>(null)
   const [albumPickerMomentId, setAlbumPickerMomentId] = useState<string | null>(null)
   const [albums, setAlbums] = useState<AlbumWithMoments[]>([])
@@ -101,6 +104,8 @@ export function MomentFeedPage() {
       }
       setReactionCounts(counts)
     })
+
+    getMomentStarTotals(ids).then(setStarTotals)
 
     if (user) {
       getUserReactionsForMoments(user.id, ids).then(data => {
@@ -225,6 +230,8 @@ export function MomentFeedPage() {
               cardRef={el => { itemRefs.current[i] = el }}
               reactionCounts={reactionCounts[m.id] ?? {}}
               myReaction={myReactions[m.id] ?? null}
+              starTotal={starTotals[m.id] ?? 0}
+              onStarTotalChange={(total) => setStarTotals(prev => ({ ...prev, [m.id]: total }))}
               onReaction={type => handleReaction(m.id, type)}
               onMenu={() => setMenuMomentId(m.id)}
             />
@@ -397,11 +404,13 @@ interface ShotCardProps {
   cardRef: (el: HTMLDivElement | null) => void
   reactionCounts: ReactionCounts
   myReaction: ReactionType | null
+  starTotal: number
+  onStarTotalChange: (total: number) => void
   onReaction: (type: ReactionType) => void
   onMenu: () => void
 }
 
-function ShotCard({ moment: m, cardRef, reactionCounts, myReaction, onReaction, onMenu }: ShotCardProps) {
+function ShotCard({ moment: m, cardRef, reactionCounts, myReaction, starTotal, onStarTotalChange, onReaction, onMenu }: ShotCardProps) {
   const [showAllReactions, setShowAllReactions] = useState(false)
 
   const totalReactions = Object.values(reactionCounts).reduce((a, b) => a + (b ?? 0), 0)
@@ -532,6 +541,12 @@ function ShotCard({ moment: m, cardRef, reactionCounts, myReaction, onReaction, 
               <span>{myReaction ? 'Ваша реакция' : 'Реакция'}</span>
             </button>
           )}
+          <StarSupportButton
+            momentId={m.id}
+            initialTotal={starTotal}
+            variant="soft"
+            onTotalChange={onStarTotalChange}
+          />
         </div>
 
         {/* Timestamp — right side */}
