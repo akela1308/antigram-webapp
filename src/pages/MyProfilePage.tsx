@@ -230,9 +230,8 @@ export function MyProfilePage() {
 
       {/* Sticky header */}
       <div
-        className="sticky z-40 flex items-center justify-between px-4 py-3"
+        className="flex items-center justify-between px-4 py-3"
         style={{
-          top: 'var(--tg-top, 56px)',
           background: 'rgba(20,14,10,0.95)',
           backdropFilter: 'blur(12px)',
           borderBottom: '1px solid var(--border)',
