@@ -16,6 +16,7 @@ import {
   unsaveMoment,
   deleteMoment,
 } from '../lib/db'
+import { EMOTIONS } from '../lib/types'
 import type { MomentWithProfile, ReactionType } from '../lib/types'
 
 export function MomentPage() {
@@ -107,6 +108,9 @@ export function MomentPage() {
 
   const profile = moment.profiles
   const displayName = profile?.display_name ?? profile?.username ?? 'Аноним'
+  const moodEmotion = EMOTIONS.find(e => e.type === moment.mood)
+  const moodLabel = moment.custom_mood_label ?? moodEmotion?.label ?? moment.mood
+  const moodEmoji = moment.custom_mood_emoji ?? moodEmotion?.emoji
   const dateStr = new Date(moment.created_at).toLocaleDateString('ru-RU', {
     day: 'numeric', month: 'long', year: 'numeric',
   })
@@ -154,7 +158,7 @@ export function MomentPage() {
       </div>
 
       {/* Content */}
-      <div className="flex flex-col gap-4 p-4 pb-28">
+      <div className="flex flex-col gap-3 p-4 pb-28">
         {/* Author */}
         <Link
           to={`/profile/${profile?.id}`}
@@ -176,61 +180,48 @@ export function MomentPage() {
           </p>
         )}
 
-        {/* Mood */}
-        {moment.mood && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 9, minWidth: 0 }}>
+          {moment.mood && (
+            <div
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm self-start"
+              style={{ background: 'rgba(201,132,62,0.1)', border: '1px solid var(--border)', color: 'var(--amber)' }}
+            >
+              {moodEmoji && <span>{moodEmoji}</span>}
+              <span>{moodLabel}</span>
+            </div>
+          )}
+
           <div
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm self-start"
-            style={{ background: 'rgba(201,132,62,0.1)', border: '1px solid var(--border)', color: 'var(--amber)' }}
+            className="no-scrollbar"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              overflowX: 'auto',
+              WebkitOverflowScrolling: 'touch',
+              marginLeft: -2,
+              padding: '1px 0 2px 2px',
+            }}
           >
-            {moment.custom_mood_emoji && <span>{moment.custom_mood_emoji}</span>}
-            <span>{moment.custom_mood_label ?? moment.mood}</span>
+            <StarSupportButton
+              momentId={moment.id}
+              initialTotal={starTotal}
+              variant="soft"
+              onTotalChange={setStarTotal}
+            />
+            <ReactionBar
+              reactions={reactions}
+              userReaction={user ? userReaction : null}
+              onReact={user ? handleReact : () => {}}
+              size="sm"
+              customMood={
+                moment.custom_mood_emoji && moment.custom_mood_label
+                  ? { emoji: moment.custom_mood_emoji, label: moment.custom_mood_label }
+                  : null
+              }
+            />
           </div>
-        )}
-
-        {/* Stars */}
-        <div>
-          <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>Поддержать Stars</p>
-          <StarSupportButton
-            momentId={moment.id}
-            initialTotal={starTotal}
-            variant="inline"
-            label="рейтинг кадра"
-            onTotalChange={setStarTotal}
-          />
         </div>
-
-        {/* Reactions */}
-        {user ? (
-          <div>
-            <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>Откликнуться</p>
-            <ReactionBar
-              reactions={reactions}
-              userReaction={userReaction}
-              onReact={handleReact}
-              size="md"
-              customMood={
-                moment.custom_mood_emoji && moment.custom_mood_label
-                  ? { emoji: moment.custom_mood_emoji, label: moment.custom_mood_label }
-                  : null
-              }
-            />
-          </div>
-        ) : (
-          <div>
-            <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>Реакции</p>
-            <ReactionBar
-              reactions={reactions}
-              userReaction={null}
-              onReact={() => {}}
-              size="md"
-              customMood={
-                moment.custom_mood_emoji && moment.custom_mood_label
-                  ? { emoji: moment.custom_mood_emoji, label: moment.custom_mood_label }
-                  : null
-              }
-            />
-          </div>
-        )}
 
         {/* Date */}
         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{dateStr}</p>

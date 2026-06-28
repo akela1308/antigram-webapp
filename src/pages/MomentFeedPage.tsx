@@ -413,6 +413,7 @@ interface ShotCardProps {
 function ShotCard({ moment: m, cardRef, reactionCounts, myReaction, starTotal, onStarTotalChange, onReaction, onMenu }: ShotCardProps) {
   const [showAllReactions, setShowAllReactions] = useState(false)
 
+  const myReactionEmotion = myReaction ? EMOTIONS.find(e => e.type === myReaction) : null
   const totalReactions = Object.values(reactionCounts).reduce((a, b) => a + (b ?? 0), 0)
   const hasAnyReaction = totalReactions > 0
 
@@ -537,8 +538,8 @@ function ShotCard({ moment: m, cardRef, reactionCounts, myReaction, starTotal, o
                 fontSize: 13, cursor: 'pointer',
               }}
             >
-              <span style={{ fontSize: 15 }}>{myReaction ? (EMOTIONS.find(e => e.type === myReaction)?.emoji ?? '❤️') : '+'}</span>
-              <span>{myReaction ? 'Ваша реакция' : 'Реакция'}</span>
+              <span style={{ fontSize: 15 }}>{myReaction ? (myReactionEmotion?.emoji ?? '❤️') : '+'}</span>
+              <span>{myReaction ? (myReactionEmotion?.label ?? 'Реакция') : 'Реакция'}</span>
             </button>
           )}
           <StarSupportButton

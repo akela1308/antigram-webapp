@@ -37,6 +37,8 @@ export function ReactionBar({ reactions, userReaction, onReact, size = 'sm', cus
         style={{
           padding: pad,
           fontSize: fs,
+          flexShrink: 0,
+          whiteSpace: 'nowrap',
           background: isActive ? 'rgba(201,132,62,0.25)' : isCustom ? 'rgba(196,168,130,0.08)' : 'rgba(255,255,255,0.05)',
           border: isActive ? '1px solid var(--amber)' : isCustom ? '1px solid rgba(196,168,130,0.4)' : '1px solid var(--border)',
           color: isActive ? 'var(--amber)' : 'var(--text-muted)',
@@ -50,7 +52,17 @@ export function ReactionBar({ reactions, userReaction, onReact, size = 'sm', cus
   }
 
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <div
+      className="no-scrollbar"
+      style={{
+        display: 'flex',
+        gap: 6,
+        overflowX: 'auto',
+        flexWrap: 'nowrap',
+        WebkitOverflowScrolling: 'touch',
+        paddingBottom: 1,
+      }}
+    >
       {EMOTIONS.map(e => reactionBtn(e.type, e.type, e.emoji, e.label))}
       {customMood && customMood.emoji && customMood.label &&
         reactionBtn('custom', 'custom', customMood.emoji, customMood.label, true)
