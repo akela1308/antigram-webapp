@@ -158,11 +158,15 @@ Deno.serve(async (req) => {
     })
 
     if (!signInError && signInData.session) {
-      // Returning user — update profile and return session
-      await supabaseAdmin.from('profiles').update({
+      // Returning user — update profile (including avatar_url so it stays fresh)
+      const profileUpdate: Record<string, string | null> = {
         display_name: displayName,
         username: tgUser.username ?? null,
-      }).eq('id', signInData.session.user.id)
+      }
+      if (tgUser.photo_url) {
+        profileUpdate.avatar_url = tgUser.photo_url
+      }
+      await supabaseAdmin.from('profiles').update(profileUpdate).eq('id', signInData.session.user.id)
 
       return new Response(
         JSON.stringify({

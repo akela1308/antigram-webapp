@@ -251,6 +251,7 @@ export function FeedPage() {
             {/* Single-column large photos for the rest */}
             {moments.length > 1 && moments.slice(1).map(moment => (
               <div key={moment.id}>
+                <FrameDivider />
                 <PhotoOfDayCard
                   moment={moment}
                   reactions={reactionsMap[moment.id] ?? []}
@@ -259,7 +260,6 @@ export function FeedPage() {
                   userReaction={userReactionsMap[moment.id] ?? null}
                   onReact={handleReact}
                 />
-                <div style={{ height: 12 }} />
               </div>
             ))}
           </>
@@ -369,24 +369,47 @@ function PhotoOfDayCard({
             />
           </div>
         </div>
+        {/* Caption — inside card, below photo */}
+        {moment.caption && (
+          <div
+            style={{
+              background: 'rgba(20,14,10,0.92)',
+              borderTop: '1px solid rgba(255,255,255,0.06)',
+              padding: '9px 14px 12px',
+            }}
+          >
+            <p
+              style={{
+                color: 'var(--text-sec)',
+                fontSize: 13,
+                margin: 0,
+                lineHeight: 1.5,
+                overflow: 'hidden',
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+              }}
+            >
+              {moment.caption}
+            </p>
+          </div>
+        )}
       </div>
-      {/* Caption */}
-      {moment.caption && (
-        <p
-          style={{
-            color: 'var(--text-sec)',
-            fontSize: 13,
-            margin: '8px 2px 0',
-            lineHeight: 1.5,
-            overflow: 'hidden',
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
-          }}
-        >
-          {moment.caption}
-        </p>
-      )}
+    </div>
+  )
+}
+
+// Thin divider between feed cards (not the full film strip)
+function FrameDivider() {
+  return (
+    <div style={{ margin: '16px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+      <div style={{ display: 'flex', gap: 4 }}>
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} style={{ width: 8, height: 6, borderRadius: 1, border: '1px solid var(--film-amber-dark)', background: 'var(--film-hole)' }} />
+        ))}
+      </div>
+      <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
     </div>
   )
 }
