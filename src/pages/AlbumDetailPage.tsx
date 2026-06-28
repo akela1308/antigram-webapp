@@ -1,9 +1,11 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { StarCountPill } from '../components/StarSupportButton'
 import { useAuth } from '../contexts/AuthContext'
 import {
   getAlbumMoments,
   getUserMoments,
+  getMomentStarTotals,
   addMomentToAlbum,
   removeMomentFromAlbum,
   deleteAlbum,
@@ -21,6 +23,7 @@ export function AlbumDetailPage() {
   const [albumMoments, setAlbumMoments] = useState<Moment[]>([])
   const [allMoments, setAllMoments] = useState<Moment[]>([])
   const [albumTitle, setAlbumTitle] = useState(state?.albumTitle ?? 'Альбом')
+  const [momentStarTotals, setMomentStarTotals] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [showMenu, setShowMenu] = useState(false)
   const [showRename, setShowRename] = useState(false)
@@ -38,6 +41,7 @@ export function AlbumDetailPage() {
     ])
     setAlbumMoments(am)
     setAllMoments(um)
+    setMomentStarTotals(am.length > 0 ? await getMomentStarTotals(am.map(moment => moment.id)) : {})
     setLoading(false)
   }, [albumId, user])
 
@@ -63,6 +67,7 @@ export function AlbumDetailPage() {
     setShowAddPicker(false)
     const am = await getAlbumMoments(albumId)
     setAlbumMoments(am)
+    setMomentStarTotals(am.length > 0 ? await getMomentStarTotals(am.map(moment => moment.id)) : {})
   }
 
   const handleRemoveMoment = async (momentId: string) => {
@@ -71,6 +76,7 @@ export function AlbumDetailPage() {
     setRemoveConfirmId(null)
     const am = await getAlbumMoments(albumId)
     setAlbumMoments(am)
+    setMomentStarTotals(am.length > 0 ? await getMomentStarTotals(am.map(moment => moment.id)) : {})
   }
 
   const albumMomentIds = new Set(albumMoments.map(m => m.id))
@@ -170,6 +176,11 @@ export function AlbumDetailPage() {
                   transition: 'filter 0.15s',
                 }}
                 draggable={false}
+              />
+              <StarCountPill
+                total={momentStarTotals[m.id] ?? 0}
+                compact
+                style={{ position: 'absolute', right: 5, bottom: 5 }}
               />
               {removeConfirmId === m.id && (
                 <div style={{

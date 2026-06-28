@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
 import { FilmStripHeader } from '../components/FilmStripHeader'
 import { ProfileSkeleton, MomentCardSkeleton } from '../components/Skeleton'
+import { StarCountPill } from '../components/StarSupportButton'
 import { useAuth } from '../contexts/AuthContext'
 import {
   getProfile,
@@ -13,6 +14,8 @@ import {
   getFollowersCount,
   getFollowingCount,
   getHighlights,
+  getMomentStarTotals,
+  getProfileStarTotal,
 } from '../lib/db'
 import type { Profile, Moment, HighlightWithMoment } from '../lib/types'
 
@@ -27,6 +30,8 @@ export function ProfilePage() {
   const [following, setFollowing] = useState(false)
   const [followersCount, setFollowersCount] = useState(0)
   const [followingCount, setFollowingCount] = useState(0)
+  const [starTotal, setStarTotal] = useState(0)
+  const [momentStarTotals, setMomentStarTotals] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [followLoading, setFollowLoading] = useState(false)
 
@@ -36,18 +41,21 @@ export function ProfilePage() {
   const load = useCallback(async () => {
     if (!targetId) return
     setLoading(true)
-    const [p, m, fc, fgc, hl] = await Promise.all([
+    const [p, m, fc, fgc, hl, stars] = await Promise.all([
       getProfile(targetId),
       getUserMoments(targetId),
       getFollowersCount(targetId),
       getFollowingCount(targetId),
       getHighlights(targetId),
+      getProfileStarTotal(targetId),
     ])
     setProfile(p)
     setMoments(m)
     setFollowersCount(fc)
     setFollowingCount(fgc)
     setHighlights(hl)
+    setStarTotal(stars)
+    setMomentStarTotals(m.length > 0 ? await getMomentStarTotals(m.map(moment => moment.id)) : {})
 
     if (user && !isOwnProfile) {
       const f = await isFollowing(user.id, targetId)
@@ -138,6 +146,9 @@ export function ProfilePage() {
           {profile.username && (
             <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>@{profile.username}</p>
           )}
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: 8 }}>
+            <StarCountPill total={starTotal} />
+          </div>
         </div>
 
         {profile.bio && (
@@ -204,6 +215,11 @@ export function ProfilePage() {
                   alt=""
                   className="absolute inset-0 w-full h-full object-cover"
                   loading="lazy"
+                />
+                <StarCountPill
+                  total={momentStarTotals[m.id] ?? 0}
+                  compact
+                  style={{ position: 'absolute', right: 7, bottom: 7 }}
                 />
               </div>
             </div>

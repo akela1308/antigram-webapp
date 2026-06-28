@@ -2,11 +2,13 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
 import { ReactionBar } from '../components/ReactionBar'
+import { StarSupportButton } from '../components/StarSupportButton'
 import { Skeleton } from '../components/Skeleton'
 import { useAuth } from '../contexts/AuthContext'
 import {
   getMoment,
   getReactions,
+  getMomentStarTotal,
   addReaction,
   removeReaction,
   isMomentSaved,
@@ -24,6 +26,7 @@ export function MomentPage() {
   const [moment, setMoment] = useState<MomentWithProfile | null>(null)
   const [reactions, setReactions] = useState<{ moment_id: string; user_id: string; type: ReactionType }[]>([])
   const [userReaction, setUserReaction] = useState<ReactionType | null>(null)
+  const [starTotal, setStarTotal] = useState(0)
   const [saved, setSaved] = useState(false)
   const [loading, setLoading] = useState(true)
   const [imgLoaded, setImgLoaded] = useState(false)
@@ -32,9 +35,10 @@ export function MomentPage() {
   const load = useCallback(async () => {
     if (!id) return
     setLoading(true)
-    const [m, r] = await Promise.all([getMoment(id), getReactions(id)])
+    const [m, r, stars] = await Promise.all([getMoment(id), getReactions(id), getMomentStarTotal(id)])
     setMoment(m)
     setReactions(r)
+    setStarTotal(stars)
 
     if (user) {
       const myReaction = r.find(rx => rx.user_id === user.id)
@@ -182,6 +186,18 @@ export function MomentPage() {
             <span>{moment.custom_mood_label ?? moment.mood}</span>
           </div>
         )}
+
+        {/* Stars */}
+        <div>
+          <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>Поддержать Stars</p>
+          <StarSupportButton
+            momentId={moment.id}
+            initialTotal={starTotal}
+            variant="inline"
+            label="рейтинг кадра"
+            onTotalChange={setStarTotal}
+          />
+        </div>
 
         {/* Reactions */}
         {user ? (
