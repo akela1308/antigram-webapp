@@ -85,20 +85,20 @@ export function BottomNav() {
         <button
           onClick={openCamera}
           className="flex flex-col items-center justify-end pb-1 transition-transform active:scale-90"
-          style={{ marginBottom: 4 }}
+          style={{ marginBottom: 1 }}
         >
           <div
             className="flex items-center justify-center rounded-full shadow-lg"
-            style={{ width: 56, height: 56, background: '#2E1A0A', marginTop: -20 }}
+            style={{ width: 64, height: 64, background: '#2E1A0A', marginTop: -26 }}
           >
             <div
               className="flex items-center justify-center rounded-full"
-              style={{ width: 44, height: 44, background: '#C4A882' }}
+              style={{ width: 50, height: 50, background: '#C4A882' }}
             >
               <span
                 style={{
                   fontFamily: "'JetBrains Mono', 'Courier New', monospace",
-                  fontSize: 15, fontWeight: 700, color: '#1A0F05', letterSpacing: -0.5, lineHeight: 1,
+                  fontSize: 18, fontWeight: 800, color: '#1A0F05', letterSpacing: 0, lineHeight: 1,
                 }}
               >
                 [A]

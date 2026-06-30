@@ -840,18 +840,45 @@ export function UploadPage() {
           paddingTop: 'var(--tg-top, 56px)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: cameraUi.topBarPadding }}>
-          {/* Active film indicator */}
-          {preset.id !== 'none' ? (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              background: 'rgba(0,0,0,0.55)', borderRadius: 20, padding: '5px 12px',
-              border: '1px solid rgba(255,255,255,0.12)',
-            }}>
-              <div style={{ width: 10, height: 10, borderRadius: 5, background: preset.color }} />
-              <span style={{ color: '#fff', fontSize: 12, fontWeight: 600 }}>{preset.name}</span>
-            </div>
-          ) : <div />}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: cameraUi.topBarPadding, gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+            <button
+              onClick={() => navigate(-1)}
+              disabled={isCapturing}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                flexShrink: 0,
+                height: cameraUi.backButtonHeight,
+                padding: '0 11px',
+                borderRadius: 999,
+                background: 'rgba(0,0,0,0.55)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                color: '#fff',
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: isCapturing ? 'default' : 'pointer',
+                opacity: isCapturing ? 0.45 : 1,
+              }}
+            >
+              <span style={{ fontSize: 17, lineHeight: 1 }}>‹</span>
+              Назад
+            </button>
+
+            {/* Active film indicator */}
+            {preset.id !== 'none' ? (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                minWidth: 0,
+                background: 'rgba(0,0,0,0.55)', borderRadius: 20, padding: '5px 12px',
+                border: '1px solid rgba(255,255,255,0.12)',
+              }}>
+                <div style={{ width: 10, height: 10, borderRadius: 5, background: preset.color, flexShrink: 0 }} />
+                <span style={{ color: '#fff', fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{preset.name}</span>
+              </div>
+            ) : null}
+          </div>
 
           <button
             onClick={() => setFlash(f => !f)}
@@ -1076,6 +1103,18 @@ export function UploadPage() {
                 height: cameraUi.shutterGlowSize,
                 borderRadius: cameraUi.shutterGlowSize / 2,
               }} />
+              <span style={{
+                position: 'relative',
+                zIndex: 1,
+                fontFamily: "'JetBrains Mono', 'Courier New', monospace",
+                color: '#1A0F05',
+                fontSize: isTinyCamera ? 18 : isCompactCamera ? 20 : 22,
+                fontWeight: 800,
+                letterSpacing: 0,
+                lineHeight: 1,
+              }}>
+                [A]
+              </span>
             </div>
           </button>
 
@@ -1410,6 +1449,7 @@ function getCameraUi(isCompact: boolean, isTiny: boolean) {
     flareButtonSize: isTiny ? 30 : isCompact ? 32 : 36,
     filmGap: isTiny ? 7 : isCompact ? 8 : 10,
     filmIconSize: isTiny ? 36 : isCompact ? 42 : 48,
+    backButtonHeight: isTiny ? 31 : isCompact ? 34 : 36,
     shutterSize,
     shutterInnerSize,
     shutterGlowSize: isTiny ? 34 : isCompact ? 38 : 44,
