@@ -7,7 +7,7 @@ import { FILM_PRESETS } from '../lib/filmPresets'
 import type { FilmPreset, AlgoType, GrainConfig, FlareType } from '../lib/filmPresets'
 import type { ReactionType } from '../lib/types'
 import { trackPhotoPosted, trackFilterApplied } from '../lib/analytics'
-import { getTodaysMomentCount, DAILY_FRAME_LIMIT } from '../lib/db'
+import { addReaction, getTodaysMomentCount, DAILY_FRAME_LIMIT } from '../lib/db'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -464,6 +464,10 @@ export function UploadPage() {
 
   async function publish() {
     if (!photoBlob || !user) return
+    if (!mood) {
+      setError('Выбери эмоцию кадра')
+      return
+    }
     setPhase('uploading')
     setError(null)
     try {
@@ -482,7 +486,7 @@ export function UploadPage() {
       if (upErr) throw new Error(upErr.message)
 
       const { data: { publicUrl } } = supabase.storage.from('moments').getPublicUrl(fileName)
-      const { error: insErr } = await supabase.from('moments').insert({
+      const { data: insertedMoment, error: insErr } = await supabase.from('moments').insert({
         user_id:          user.id,
         photo_url:        publicUrl,
         caption:          caption.trim() || null,
@@ -493,7 +497,13 @@ export function UploadPage() {
         is_public:        true,
         visibility:       'public',
       })
+        .select('id')
+        .single()
       if (insErr) throw new Error(insErr.message)
+      if (insertedMoment?.id) {
+        const { error: reactionErr } = await addReaction(insertedMoment.id, user.id, mood)
+        if (reactionErr) console.error('[Upload] initial reaction failed:', reactionErr)
+      }
 
       trackPhotoPosted(preset.id)
       setTodayCount(prev => (prev ?? 0) + 1)

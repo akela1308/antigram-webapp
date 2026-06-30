@@ -413,11 +413,9 @@ interface ShotCardProps {
 function ShotCard({ moment: m, cardRef, reactionCounts, myReaction, starTotal, onStarTotalChange, onReaction, onMenu }: ShotCardProps) {
   const [showAllReactions, setShowAllReactions] = useState(false)
 
-  const moodMeta = getReactionMeta(m.mood as ReactionType | null, m)
   const myReactionMeta = getReactionMeta(myReaction, m)
   const customMoodMeta = getCustomMoodMeta(m)
-  const totalReactions = Object.values(reactionCounts).reduce((a, b) => a + (b ?? 0), 0)
-  const hasAnyReaction = totalReactions > 0
+  const reactionEntries = getReactionEntries(reactionCounts, m)
 
   return (
     <div ref={cardRef} style={{ marginBottom: 8, borderBottom: '8px solid #080503' }}>
@@ -447,145 +445,98 @@ function ShotCard({ moment: m, cardRef, reactionCounts, myReaction, starTotal, o
         </button>
       </div>
 
-      {/* Caption + mood tag */}
-      <div style={{ padding: '10px 14px 4px' }}>
-        {moodMeta && (
-          <span style={{
-            display: 'inline-block', padding: '3px 10px', borderRadius: 12, marginBottom: 6,
-            background: 'rgba(196,168,130,0.12)', color: 'var(--amber)', fontSize: 12,
-          }}>
-            {moodMeta.emoji} {moodMeta.label}
-          </span>
-        )}
+      <div style={{ padding: '10px 14px 14px' }}>
         {m.caption && (
-          <p style={{ color: 'var(--text)', fontSize: 14, lineHeight: 1.5, margin: 0 }}>
+          <p style={{ color: 'var(--text)', fontSize: 14, lineHeight: 1.5, margin: '0 0 10px' }}>
             {m.caption}
           </p>
         )}
-      </div>
 
-      {/* Existing reactions summary (pills) */}
-      {hasAnyReaction && (
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: '6px 14px 2px' }}>
-          {(Object.entries(reactionCounts) as [ReactionType, number][])
-            .filter(([, c]) => c > 0)
-            .sort(([, a], [, b]) => b - a)
-            .map(([type, count]) => {
-              const reactionMeta = getReactionMeta(type, m)
-              if (!reactionMeta) return null
-              const active = myReaction === type
-              return (
-                <button
-                  key={type}
-                  onClick={() => onReaction(type)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 4,
-                    padding: '5px 10px', borderRadius: 16,
-                    background: active ? 'rgba(196,168,130,0.2)' : 'rgba(255,255,255,0.05)',
-                    border: active ? '1px solid var(--amber)' : '1px solid #2E2218',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <span style={{ fontSize: 14 }}>{reactionMeta.emoji}</span>
-                  <span style={{ color: active ? 'var(--amber)' : 'var(--text-muted)', fontSize: 12, fontWeight: active ? 700 : 400 }}>{reactionMeta.label}</span>
-                  <span style={{ color: active ? 'var(--amber)' : 'var(--text-muted)', fontSize: 12, fontWeight: 700 }}>{count}</span>
-                </button>
-              )
-            })}
-        </div>
-      )}
-
-      {/* Reaction picker row — time on the right */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 14px 14px' }}>
-        {/* Reaction toggle */}
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          {showAllReactions ? (
-            <div
-              className="no-scrollbar"
-              style={{
-                display: 'flex',
-                gap: 6,
-                alignItems: 'center',
-                maxWidth: 'calc(100vw - 118px)',
-                overflowX: 'auto',
-                WebkitOverflowScrolling: 'touch',
-              }}
-            >
-              {EMOTIONS.map(e => {
-                const active = myReaction === e.type
-                return (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+          <div
+            className="no-scrollbar"
+            style={{
+              display: 'flex',
+              gap: 6,
+              alignItems: 'center',
+              minWidth: 0,
+              flex: 1,
+              overflowX: 'auto',
+              WebkitOverflowScrolling: 'touch',
+            }}
+          >
+            {showAllReactions ? (
+              <>
+                {EMOTIONS.map(e => {
+                  const active = myReaction === e.type
+                  return (
+                    <button
+                      key={e.type}
+                      onClick={() => { onReaction(e.type); setShowAllReactions(false) }}
+                      style={reactionPillStyle(active)}
+                    >
+                      <span style={{ fontSize: 15 }}>{e.emoji}</span>
+                      <span>{e.label}</span>
+                    </button>
+                  )
+                })}
+                {customMoodMeta && (
                   <button
-                    key={e.type}
-                    onClick={() => { onReaction(e.type); setShowAllReactions(false) }}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 5,
-                      height: 38, padding: '0 11px', borderRadius: 19,
-                      background: active ? 'rgba(196,168,130,0.2)' : 'rgba(255,255,255,0.05)',
-                      border: active ? '1px solid var(--amber)' : '1px solid #2E2218',
-                      color: active ? 'var(--amber)' : 'var(--text-muted)',
-                      fontSize: 12, cursor: 'pointer', flexShrink: 0,
-                    }}
+                    onClick={() => { onReaction('custom'); setShowAllReactions(false) }}
+                    style={reactionPillStyle(myReaction === 'custom', true)}
                   >
-                    <span style={{ fontSize: 15 }}>{e.emoji}</span>
-                    <span>{e.label}</span>
+                    <span style={{ fontSize: 15 }}>{customMoodMeta.emoji}</span>
+                    <span>{customMoodMeta.label}</span>
                   </button>
-                )
-              })}
-              {customMoodMeta && (
+                )}
                 <button
-                  onClick={() => { onReaction('custom'); setShowAllReactions(false) }}
+                  onClick={() => setShowAllReactions(false)}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 5,
-                    height: 38, padding: '0 11px', borderRadius: 19,
-                    background: myReaction === 'custom' ? 'rgba(196,168,130,0.2)' : 'rgba(196,168,130,0.08)',
-                    border: myReaction === 'custom' ? '1px solid var(--amber)' : '1px solid rgba(196,168,130,0.4)',
-                    color: myReaction === 'custom' ? 'var(--amber)' : 'var(--text-muted)',
-                    fontSize: 12, cursor: 'pointer', flexShrink: 0,
+                    width: 32, height: 32, borderRadius: 16,
+                    background: 'none', border: 'none',
+                    color: 'var(--text-muted)', fontSize: 18, cursor: 'pointer', flexShrink: 0,
                   }}
                 >
-                  <span style={{ fontSize: 15 }}>{customMoodMeta.emoji}</span>
-                  <span>{customMoodMeta.label}</span>
+                  ✕
                 </button>
-              )}
-              <button
-                onClick={() => setShowAllReactions(false)}
-                style={{
-                  width: 32, height: 32, borderRadius: 16,
-                  background: 'none', border: 'none',
-                  color: 'var(--text-muted)', fontSize: 18, cursor: 'pointer', flexShrink: 0,
-                }}
-              >
-                ✕
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setShowAllReactions(true)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 5,
-                padding: '6px 12px', borderRadius: 16,
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid #2E2218',
-                color: myReaction ? 'var(--amber)' : 'var(--text-muted)',
-                fontSize: 13, cursor: 'pointer',
-              }}
-            >
-              <span style={{ fontSize: 15 }}>{myReactionMeta ? myReactionMeta.emoji : '+'}</span>
-              <span>{myReactionMeta ? myReactionMeta.label : 'Реакция'}</span>
-            </button>
-          )}
-          <StarSupportButton
-            momentId={m.id}
-            initialTotal={starTotal}
-            variant="soft"
-            onTotalChange={onStarTotalChange}
-          />
-        </div>
+              </>
+            ) : (
+              <>
+                {reactionEntries.map(entry => {
+                  const active = myReaction === entry.type
+                  return (
+                    <button
+                      key={entry.type}
+                      onClick={() => onReaction(entry.type)}
+                      style={reactionPillStyle(active, entry.synthetic)}
+                    >
+                      <span style={{ fontSize: 14 }}>{entry.emoji}</span>
+                      <span>{entry.label}</span>
+                      <span style={{ fontWeight: 800 }}>{entry.count}</span>
+                    </button>
+                  )
+                })}
+                <button
+                  onClick={() => setShowAllReactions(true)}
+                  style={reactionPillStyle(!!myReactionMeta)}
+                >
+                  <span style={{ fontSize: 15 }}>{myReactionMeta ? myReactionMeta.emoji : '+'}</span>
+                  <span>{myReactionMeta ? myReactionMeta.label : 'Реакция'}</span>
+                </button>
+              </>
+            )}
+            <StarSupportButton
+              momentId={m.id}
+              initialTotal={starTotal}
+              variant="soft"
+              onTotalChange={onStarTotalChange}
+            />
+          </div>
 
-        {/* Timestamp — right side */}
-        <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>
-          {formatTime(m.created_at)}
-        </span>
+          <span style={{ color: 'var(--text-muted)', fontSize: 11, flexShrink: 0 }}>
+            {formatTime(m.created_at)}
+          </span>
+        </div>
       </div>
     </div>
   )
@@ -623,4 +574,56 @@ function getReactionMeta(type: ReactionType | null | undefined, moment: Moment):
   if (type === 'custom') return getCustomMoodMeta(moment)
   const emotion = EMOTIONS.find(e => e.type === type)
   return emotion ? { emoji: emotion.emoji, label: emotion.label } : null
+}
+
+function getReactionEntries(reactionCounts: ReactionCounts, moment: Moment): Array<{
+  type: ReactionType
+  emoji: string
+  label: string
+  count: number
+  synthetic?: boolean
+}> {
+  type ReactionEntry = {
+    type: ReactionType
+    emoji: string
+    label: string
+    count: number
+    synthetic?: boolean
+  }
+
+  const entries = (Object.entries(reactionCounts) as [ReactionType, number][])
+    .filter(([, count]) => count > 0)
+    .map(([type, count]) => {
+      const meta = getReactionMeta(type, moment)
+      return meta ? { type, ...meta, count } : null
+    })
+    .filter(Boolean) as ReactionEntry[]
+
+  const moodType = moment.mood as ReactionType | null
+  if (moodType && !entries.some(entry => entry.type === moodType)) {
+    const moodMeta = getReactionMeta(moodType, moment)
+    if (moodMeta) {
+      entries.unshift({ type: moodType, ...moodMeta, count: 1, synthetic: true })
+    }
+  }
+
+  return entries.sort((a, b) => b.count - a.count)
+}
+
+function reactionPillStyle(active: boolean, custom = false): React.CSSProperties {
+  return {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 5,
+    height: 36,
+    padding: '0 11px',
+    borderRadius: 18,
+    background: active ? 'rgba(196,168,130,0.2)' : custom ? 'rgba(196,168,130,0.08)' : 'rgba(255,255,255,0.05)',
+    border: active ? '1px solid var(--amber)' : custom ? '1px solid rgba(196,168,130,0.4)' : '1px solid #2E2218',
+    color: active ? 'var(--amber)' : 'var(--text-muted)',
+    fontSize: 12,
+    cursor: 'pointer',
+    flexShrink: 0,
+    whiteSpace: 'nowrap',
+  }
 }
