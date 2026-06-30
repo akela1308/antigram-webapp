@@ -20,10 +20,17 @@ import {
   getProfileStarTotal,
   getFeedReactions,
 } from '../lib/db'
+import { sendSupportRequest, SUPPORT_ATTACHMENT_MAX_BYTES } from '../lib/support'
 import { EMOTIONS } from '../lib/types'
 import type { Moment, HighlightWithMoment, AlbumWithMoments, ReactionType } from '../lib/types'
 
 type ReactionPreview = { type: ReactionType }
+type TelegramUserInfo = {
+  id: number
+  first_name: string
+  last_name?: string
+  username?: string
+}
 
 // ── Grid layout ───────────────────────────────────────────────────────────────
 
@@ -68,6 +75,7 @@ export function MyProfilePage() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showSupport, setShowSupport] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const longPressTimer = { current: null as ReturnType<typeof setTimeout> | null }
 
@@ -585,11 +593,22 @@ export function MyProfilePage() {
             setShowSettings(false)
             navigate(path)
           }}
+          onSupportPress={() => setShowSupport(true)}
           onSignOut={handleSignOut}
           onSaved={async () => { await load(); showToast('Сохранено') }}
           showSignOutConfirm={showSignOutConfirm}
           setShowSignOutConfirm={setShowSignOutConfirm}
           handleSignOut={handleSignOut}
+        />
+      )}
+
+      {showSupport && (
+        <SupportSheet
+          profile={profile}
+          userId={user.id}
+          telegramUser={telegramUser}
+          onClose={() => setShowSupport(false)}
+          onSent={() => showToast('Отправлено')}
         />
       )}
     </div>
@@ -832,7 +851,7 @@ function AlbumCard({ cover, placeholder, placeholderBg, title, subtitle, isPriva
 
 function SettingsSheet({
   profile, userId, isTelegram,
-  onClose, onNavigate, onSaved,
+  onClose, onNavigate, onSupportPress, onSaved,
   showSignOutConfirm, setShowSignOutConfirm, handleSignOut,
 }: {
   profile: import('../lib/types').Profile
@@ -840,6 +859,7 @@ function SettingsSheet({
   isTelegram: boolean
   onClose: () => void
   onNavigate: (path: string) => void
+  onSupportPress: () => void
   onSignOut: () => void
   onSaved: () => void
   showSignOutConfirm: boolean
@@ -973,6 +993,13 @@ function SettingsSheet({
           <p style={sectionTitleStyle}>Правила и поддержка</p>
           <button
             type="button"
+            onClick={onSupportPress}
+            style={linkButtonStyle}
+          >
+            Помощь
+          </button>
+          <button
+            type="button"
             onClick={() => onNavigate('/terms')}
             style={linkButtonStyle}
           >
@@ -1032,6 +1059,197 @@ function SettingsSheet({
           </div>
         </>
       )}
+    </>
+  )
+}
+
+// ── SupportSheet ─────────────────────────────────────────────────────────────
+
+function SupportSheet({
+  profile, userId, telegramUser, onClose, onSent,
+}: {
+  profile: import('../lib/types').Profile
+  userId: string
+  telegramUser: TelegramUserInfo | null
+  onClose: () => void
+  onSent: () => void
+}) {
+  const [message, setMessage] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '13px 14px',
+    borderRadius: 12,
+    background: '#1A1208',
+    color: '#fff',
+    border: '1px solid #2E1A0A',
+    fontSize: 15,
+    outline: 'none',
+    boxSizing: 'border-box',
+    fontFamily: 'inherit',
+  }
+
+  const handleFileChange = (nextFile: File | null) => {
+    setError(null)
+    if (!nextFile) {
+      setFile(null)
+      return
+    }
+    if (nextFile.size > SUPPORT_ATTACHMENT_MAX_BYTES) {
+      setFile(null)
+      setError('Файл больше 8 МБ')
+      return
+    }
+    setFile(nextFile)
+  }
+
+  const handleSubmit = async () => {
+    const trimmed = message.trim()
+    if (!trimmed && !file) {
+      setError('Опиши проблему или прикрепи файл')
+      return
+    }
+
+    setSending(true)
+    setError(null)
+
+    const formData = new FormData()
+    formData.append('message', trimmed)
+    formData.append('displayName', profile.display_name ?? '')
+    formData.append('username', profile.username ?? '')
+    formData.append('userId', userId)
+    formData.append('telegramUsername', telegramUser?.username ?? '')
+    formData.append('telegramId', telegramUser?.id ? String(telegramUser.id) : '')
+    formData.append('pageUrl', window.location.href)
+    if (file) formData.append('file', file)
+
+    try {
+      await sendSupportRequest(formData)
+      setSending(false)
+      onSent()
+      onClose()
+    } catch (err) {
+      setSending(false)
+      setError(err instanceof Error ? err.message : 'Не удалось отправить обращение')
+    }
+  }
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 299, background: 'rgba(0,0,0,0.74)', backdropFilter: 'blur(4px)' }} />
+      <div style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 300,
+        background: '#110C08',
+        borderRadius: '24px 24px 0 0',
+        borderTop: '1px solid #2E2218',
+        padding: '12px 20px',
+        paddingBottom: 'max(30px, env(safe-area-inset-bottom, 20px))',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: 8 }}>
+          <div style={{ width: 36, height: 4, borderRadius: 2, background: '#333' }} />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
+          <div>
+            <p style={{ color: '#fff', fontSize: 18, fontWeight: 700, margin: 0 }}>Помощь</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: 12, margin: '4px 0 0' }}>Опиши проблему, идею или приложи скриншот</p>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#555', fontSize: 22, cursor: 'pointer' }}>✕</button>
+        </div>
+
+        <textarea
+          value={message}
+          onChange={e => setMessage(e.target.value)}
+          placeholder="Что случилось?"
+          maxLength={1200}
+          style={{ ...inputStyle, minHeight: 130, resize: 'none', lineHeight: 1.45 }}
+        />
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
+          <label style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            padding: '12px 14px',
+            borderRadius: 12,
+            border: '1px solid #2E1A0A',
+            color: 'var(--text)',
+            background: 'rgba(255,255,255,0.02)',
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}>
+            <span>Прикрепить файл</span>
+            <input
+              type="file"
+              accept="image/*,.pdf,.txt,.log,.heic,.heif"
+              onChange={e => handleFileChange(e.target.files?.[0] ?? null)}
+              style={{ display: 'none' }}
+            />
+          </label>
+          {file && (
+            <button
+              onClick={() => handleFileChange(null)}
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 12,
+                border: '1px solid #2E1A0A',
+                background: 'transparent',
+                color: 'var(--text-muted)',
+                fontSize: 18,
+                cursor: 'pointer',
+              }}
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
+        {file && (
+          <p style={{
+            color: 'var(--amber)',
+            fontSize: 12,
+            margin: '8px 0 0',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}>
+            {file.name}
+          </p>
+        )}
+
+        {error && (
+          <p style={{ color: '#e05a5a', fontSize: 13, margin: '10px 0 0' }}>{error}</p>
+        )}
+
+        <button
+          onClick={handleSubmit}
+          disabled={sending || (!message.trim() && !file)}
+          style={{
+            width: '100%',
+            padding: '14px 0',
+            borderRadius: 30,
+            marginTop: 14,
+            background: sending || (!message.trim() && !file) ? '#2E1A0A' : 'var(--amber)',
+            color: sending || (!message.trim() && !file) ? '#555' : '#140E0A',
+            fontSize: 15,
+            fontWeight: 700,
+            border: 'none',
+            cursor: sending || (!message.trim() && !file) ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {sending ? 'Отправляем...' : 'Отправить'}
+        </button>
+      </div>
     </>
   )
 }
