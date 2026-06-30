@@ -12,6 +12,7 @@ import type {
   MomentStarTotal,
   ProfileStarTotal,
   StarInvoiceResponse,
+  FollowProfile,
 } from './types'
 
 // ─── PROFILES ────────────────────────────────────────────────────────────────
@@ -409,6 +410,56 @@ export async function getFollowingCount(userId: string): Promise<number> {
     .select('*', { count: 'exact', head: true })
     .eq('follower_id', userId)
   return count ?? 0
+}
+
+export async function getFollowers(userId: string): Promise<FollowProfile[]> {
+  const { data: follows } = await supabase
+    .from('follows')
+    .select('follower_id, created_at')
+    .eq('following_id', userId)
+    .order('created_at', { ascending: false })
+
+  const rows = (follows as { follower_id: string; created_at: string }[] | null) ?? []
+  if (rows.length === 0) return []
+
+  const ids = rows.map(row => row.follower_id)
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('*')
+    .in('id', ids)
+
+  const profileMap = new Map(((profiles as Profile[] | null) ?? []).map(profile => [profile.id, profile]))
+  return rows
+    .map(row => {
+      const profile = profileMap.get(row.follower_id)
+      return profile ? { profile, followed_at: row.created_at } : null
+    })
+    .filter(Boolean) as FollowProfile[]
+}
+
+export async function getFollowing(userId: string): Promise<FollowProfile[]> {
+  const { data: follows } = await supabase
+    .from('follows')
+    .select('following_id, created_at')
+    .eq('follower_id', userId)
+    .order('created_at', { ascending: false })
+
+  const rows = (follows as { following_id: string; created_at: string }[] | null) ?? []
+  if (rows.length === 0) return []
+
+  const ids = rows.map(row => row.following_id)
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('*')
+    .in('id', ids)
+
+  const profileMap = new Map(((profiles as Profile[] | null) ?? []).map(profile => [profile.id, profile]))
+  return rows
+    .map(row => {
+      const profile = profileMap.get(row.following_id)
+      return profile ? { profile, followed_at: row.created_at } : null
+    })
+    .filter(Boolean) as FollowProfile[]
 }
 
 // ─── SAVED MOMENTS ───────────────────────────────────────────────────────────

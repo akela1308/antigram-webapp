@@ -43,6 +43,11 @@ export interface Follow {
   created_at: string
 }
 
+export interface FollowProfile {
+  profile: Profile
+  followed_at: string
+}
+
 export interface CommentWithProfile {
   id: string
   moment_id: string

@@ -322,9 +322,9 @@ export function MyProfilePage() {
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '10px 24px', width: '100%' }}>
           <Stat label="кадры" value={moments.length} />
           <div style={{ width: 1, height: 28, background: 'var(--divider)', margin: '0 20px' }} />
-          <Stat label="подписчики" value={followersCount} />
+          <Stat label="подписчики" value={followersCount} onClick={() => navigate('/me/followers')} />
           <div style={{ width: 1, height: 28, background: 'var(--divider)', margin: '0 20px' }} />
-          <Stat label="подписки" value={followingCount} />
+          <Stat label="подписки" value={followingCount} onClick={() => navigate('/me/following')} />
         </div>
       </div>
 
@@ -965,11 +965,26 @@ function fmt(n: number): string {
   return String(n)
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
+function Stat({ label, value, onClick }: { label: string; value: number; onClick?: () => void }) {
+  const Component = onClick ? 'button' : 'div'
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+    <Component
+      onClick={onClick}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 2,
+        minWidth: 54,
+        padding: 0,
+        background: 'none',
+        border: 'none',
+        cursor: onClick ? 'pointer' : 'default',
+        fontFamily: 'inherit',
+      }}
+    >
       <span style={{ color: 'var(--text)', fontSize: 20, fontWeight: 700 }}>{fmt(value)}</span>
       <span style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 1 }}>{label}</span>
-    </div>
+    </Component>
   )
 }

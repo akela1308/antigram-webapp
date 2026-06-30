@@ -12,6 +12,7 @@ import { NotificationsPage } from './pages/NotificationsPage'
 import { SearchPage } from './pages/SearchPage'
 import { MomentFeedPage } from './pages/MomentFeedPage'
 import { AlbumDetailPage } from './pages/AlbumDetailPage'
+import { FollowListPage } from './pages/FollowListPage'
 import { BottomNav } from './components/BottomNav'
 import { MiniPlayer } from './components/MiniPlayer'
 import { PrivacyPage } from './pages/PrivacyPage'
@@ -60,6 +61,7 @@ export function App() {
         <Route path="/moment/:id" element={<MomentPage />} />
         <Route path="/profile/:userId" element={<ProfilePage />} />
         <Route path="/me" element={<MyProfilePage />} />
+        <Route path="/me/:kind" element={<FollowListPage />} />
         <Route path="/moment-feed" element={<MomentFeedPage />} />
         <Route path="/album/:albumId" element={<AlbumDetailPage />} />
         <Route path="/auth" element={<AuthPage />} />
