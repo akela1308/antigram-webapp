@@ -16,8 +16,12 @@ import {
   getHighlights,
   getMomentStarTotals,
   getProfileStarTotal,
+  getFeedReactions,
 } from '../lib/db'
-import type { Profile, Moment, HighlightWithMoment } from '../lib/types'
+import { EMOTIONS } from '../lib/types'
+import type { Profile, Moment, HighlightWithMoment, ReactionType } from '../lib/types'
+
+type ReactionPreview = { type: ReactionType }
 
 export function ProfilePage() {
   const { userId } = useParams<{ userId: string }>()
@@ -32,6 +36,7 @@ export function ProfilePage() {
   const [followingCount, setFollowingCount] = useState(0)
   const [starTotal, setStarTotal] = useState(0)
   const [momentStarTotals, setMomentStarTotals] = useState<Record<string, number>>({})
+  const [momentReactions, setMomentReactions] = useState<Record<string, ReactionPreview[]>>({})
   const [loading, setLoading] = useState(true)
   const [followLoading, setFollowLoading] = useState(false)
 
@@ -56,6 +61,17 @@ export function ProfilePage() {
     setHighlights(hl)
     setStarTotal(stars)
     setMomentStarTotals(m.length > 0 ? await getMomentStarTotals(m.map(moment => moment.id)) : {})
+    if (m.length > 0) {
+      const reactions = await getFeedReactions(m.map(moment => moment.id))
+      const reactionMap: Record<string, ReactionPreview[]> = {}
+      for (const reaction of reactions) {
+        if (!reactionMap[reaction.moment_id]) reactionMap[reaction.moment_id] = []
+        reactionMap[reaction.moment_id].push({ type: reaction.type })
+      }
+      setMomentReactions(reactionMap)
+    } else {
+      setMomentReactions({})
+    }
 
     if (user && !isOwnProfile) {
       const f = await isFollowing(user.id, targetId)
@@ -216,6 +232,10 @@ export function ProfilePage() {
                   className="absolute inset-0 w-full h-full object-cover"
                   loading="lazy"
                 />
+                <ReactionPreviewPill
+                  moment={m}
+                  reactions={momentReactions[m.id] ?? []}
+                />
                 <StarCountPill
                   total={momentStarTotals[m.id] ?? 0}
                   compact
@@ -228,6 +248,58 @@ export function ProfilePage() {
       </div>
     </div>
   )
+}
+
+function ReactionPreviewPill({ moment, reactions }: { moment: Moment; reactions: ReactionPreview[] }) {
+  const topReaction = getTopReaction(moment, reactions)
+  if (!topReaction) return null
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: 7,
+        bottom: 7,
+        maxWidth: 'calc(100% - 64px)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 4,
+        padding: '4px 8px',
+        borderRadius: 999,
+        background: 'rgba(20,14,10,0.72)',
+        border: '1px solid rgba(201,132,62,0.42)',
+        backdropFilter: 'blur(8px)',
+      }}
+    >
+      <span style={{ fontSize: 12 }}>{topReaction.emoji}</span>
+      <span style={{ color: 'rgba(255,255,255,0.82)', fontSize: 10, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {topReaction.label}
+      </span>
+      <span style={{ color: 'rgba(255,255,255,0.82)', fontSize: 10, fontWeight: 800 }}>{topReaction.count}</span>
+    </div>
+  )
+}
+
+function getTopReaction(moment: Moment, reactions: ReactionPreview[]) {
+  if (reactions.length === 0) return null
+
+  const counts: Record<string, number> = {}
+  for (const reaction of reactions) {
+    counts[reaction.type] = (counts[reaction.type] ?? 0) + 1
+  }
+
+  const [topType, count] = Object.entries(counts).sort(([, a], [, b]) => b - a)[0]
+  if (topType === 'custom') {
+    if (!moment.custom_mood_emoji || !moment.custom_mood_label) return null
+    return {
+      emoji: moment.custom_mood_emoji,
+      label: moment.custom_mood_label,
+      count,
+    }
+  }
+
+  const emotion = EMOTIONS.find(e => e.type === topType)
+  return emotion ? { emoji: emotion.emoji, label: emotion.label, count } : null
 }
 
 function Stat({ label, value }: { label: string; value: number }) {
