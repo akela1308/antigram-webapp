@@ -24,6 +24,7 @@ import {
   sendSupportRequest,
   SUPPORT_ATTACHMENT_MAX_BYTES,
   getSupportRequests,
+  getOpenSupportRequestCount,
   getSupportAttachmentUrl,
   updateSupportRequestStatus,
 } from '../lib/support'
@@ -84,6 +85,7 @@ export function MyProfilePage() {
   const [showSettings, setShowSettings] = useState(false)
   const [showSupport, setShowSupport] = useState(false)
   const [showSupportInbox, setShowSupportInbox] = useState(false)
+  const [supportInboxCount, setSupportInboxCount] = useState(0)
   const [toast, setToast] = useState<string | null>(null)
   const longPressTimer = { current: null as ReturnType<typeof setTimeout> | null }
 
@@ -118,6 +120,22 @@ export function MyProfilePage() {
     }
     setLoading(false)
   }, [user])
+
+  const loadSupportInboxCount = useCallback(async () => {
+    if (!profile?.is_admin) {
+      setSupportInboxCount(0)
+      return
+    }
+    try {
+      setSupportInboxCount(await getOpenSupportRequestCount())
+    } catch {
+      setSupportInboxCount(0)
+    }
+  }, [profile?.is_admin])
+
+  useEffect(() => {
+    loadSupportInboxCount()
+  }, [loadSupportInboxCount])
 
   useEffect(() => {
     if (!authLoading) load()
@@ -603,6 +621,7 @@ export function MyProfilePage() {
           }}
           onSupportPress={() => setShowSupport(true)}
           onSupportInboxPress={() => setShowSupportInbox(true)}
+          supportInboxCount={supportInboxCount}
           onSignOut={handleSignOut}
           onSaved={async () => { await load(); showToast('Сохранено') }}
           showSignOutConfirm={showSignOutConfirm}
@@ -622,7 +641,10 @@ export function MyProfilePage() {
       )}
 
       {showSupportInbox && (
-        <SupportInboxSheet onClose={() => setShowSupportInbox(false)} />
+        <SupportInboxSheet
+          onClose={() => setShowSupportInbox(false)}
+          onChanged={loadSupportInboxCount}
+        />
       )}
     </div>
   )
@@ -864,7 +886,7 @@ function AlbumCard({ cover, placeholder, placeholderBg, title, subtitle, isPriva
 
 function SettingsSheet({
   profile, userId, isTelegram,
-  onClose, onNavigate, onSupportPress, onSupportInboxPress, onSaved,
+  onClose, onNavigate, onSupportPress, onSupportInboxPress, supportInboxCount, onSaved,
   showSignOutConfirm, setShowSignOutConfirm, handleSignOut,
 }: {
   profile: Profile
@@ -874,6 +896,7 @@ function SettingsSheet({
   onNavigate: (path: string) => void
   onSupportPress: () => void
   onSupportInboxPress: () => void
+  supportInboxCount: number
   onSignOut: () => void
   onSaved: () => void
   showSignOutConfirm: boolean
@@ -1016,9 +1039,24 @@ function SettingsSheet({
             <button
               type="button"
               onClick={onSupportInboxPress}
-              style={{ ...linkButtonStyle, color: 'var(--amber)' }}
+              style={{ ...linkButtonStyle, color: 'var(--amber)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}
             >
-              Чат поддержки
+              <span>Чат поддержки</span>
+              <span style={{
+                minWidth: 26,
+                height: 22,
+                padding: '0 8px',
+                borderRadius: 999,
+                background: supportInboxCount > 0 ? 'var(--amber)' : '#2E1A0A',
+                color: supportInboxCount > 0 ? '#140E0A' : 'var(--text-muted)',
+                fontSize: 12,
+                fontWeight: 800,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                {supportInboxCount}
+              </span>
             </button>
           )}
           <button
@@ -1181,7 +1219,9 @@ function SupportSheet({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
           <div>
             <p style={{ color: '#fff', fontSize: 18, fontWeight: 700, margin: 0 }}>Помощь</p>
-            <p style={{ color: 'var(--text-muted)', fontSize: 12, margin: '4px 0 0' }}>Опиши проблему, идею или приложи скриншот</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: 12, margin: '4px 0 0', lineHeight: 1.4 }}>
+              Пожалуйста, опишите максимально подробно Вашу ситуацию и оставьте контакты для связи
+            </p>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#555', fontSize: 22, cursor: 'pointer' }}>✕</button>
         </div>
@@ -1279,7 +1319,7 @@ function SupportSheet({
 
 // ── SupportInboxSheet ────────────────────────────────────────────────────────
 
-function SupportInboxSheet({ onClose }: { onClose: () => void }) {
+function SupportInboxSheet({ onClose, onChanged }: { onClose: () => void; onChanged: () => void }) {
   const [items, setItems] = useState<SupportRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -1317,6 +1357,7 @@ function SupportInboxSheet({ onClose }: { onClose: () => void }) {
       setItems(current => current.map(entry => (
         entry.id === item.id ? { ...entry, status: nextStatus } : entry
       )))
+      onChanged()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось обновить статус')
     }

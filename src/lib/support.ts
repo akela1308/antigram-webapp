@@ -54,6 +54,16 @@ export async function getSupportRequests(): Promise<SupportRequest[]> {
   return (data as SupportRequest[] | null) ?? []
 }
 
+export async function getOpenSupportRequestCount(): Promise<number> {
+  const { count, error } = await supabase
+    .from('support_requests')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'open')
+
+  if (error) throw error
+  return count ?? 0
+}
+
 export async function updateSupportRequestStatus(
   id: string,
   status: 'open' | 'closed',
