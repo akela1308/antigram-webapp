@@ -80,17 +80,30 @@ export async function getMomentsByEmotion(
   emotion: ReactionType,
   limit = 30,
 ): Promise<MomentWithProfile[]> {
-  const { data: reactionData } = await supabase
-    .from('reactions')
-    .select('moment_id')
-    .eq('type', emotion)
-
-  if (!reactionData || reactionData.length === 0) return []
+  const [{ data: reactionData }, { data: moodData }] = await Promise.all([
+    supabase
+      .from('reactions')
+      .select('moment_id')
+      .eq('type', emotion),
+    supabase
+      .from('moments')
+      .select('id')
+      .eq('is_public', true)
+      .eq('mood', emotion)
+      .order('created_at', { ascending: false })
+      .limit(limit * 3),
+  ])
 
   const countMap: Record<string, number> = {}
-  for (const r of reactionData as { moment_id: string }[]) {
+  for (const m of (moodData ?? []) as { id: string }[]) {
+    countMap[m.id] = (countMap[m.id] ?? 0) + 1
+  }
+  for (const r of (reactionData ?? []) as { moment_id: string }[]) {
     countMap[r.moment_id] = (countMap[r.moment_id] ?? 0) + 1
   }
+
+  if (Object.keys(countMap).length === 0) return []
+
   const sortedIds = Object.entries(countMap)
     .sort(([, a], [, b]) => b - a)
     .slice(0, limit)
@@ -106,6 +119,70 @@ export async function getMomentsByEmotion(
 
   const momentMap = new Map((data as MomentWithProfile[]).map(m => [m.id, m]))
   return sortedIds.map(id => momentMap.get(id)).filter(Boolean) as MomentWithProfile[]
+}
+
+export type CategoryFilterValue = 'for_you' | ReactionType
+export type CategoryThumbnailMap = Partial<Record<CategoryFilterValue, string | null>>
+
+const CATEGORY_REACTION_TYPES: ReactionType[] = ['warm', 'nostalgic', 'calm', 'wow', 'relatable']
+
+function pickRandom<T>(items: T[]): T | null {
+  if (items.length === 0) return null
+  return items[Math.floor(Math.random() * items.length)]
+}
+
+export async function getGlobalCategoryThumbnails(): Promise<CategoryThumbnailMap> {
+  const [randomMoments, ...emotionMoments] = await Promise.all([
+    getRandomMoments(24),
+    ...CATEGORY_REACTION_TYPES.map(type => getMomentsByEmotion(type, 24)),
+  ])
+
+  const thumbnails: CategoryThumbnailMap = {
+    for_you: pickRandom(randomMoments)?.photo_url ?? null,
+  }
+
+  CATEGORY_REACTION_TYPES.forEach((type, index) => {
+    thumbnails[type] = pickRandom(emotionMoments[index] ?? [])?.photo_url ?? null
+  })
+
+  return thumbnails
+}
+
+export async function getFollowingCategoryThumbnails(userId: string): Promise<CategoryThumbnailMap> {
+  const [globalThumbnails, feedMoments] = await Promise.all([
+    getGlobalCategoryThumbnails(),
+    getFeed(userId, 80),
+  ])
+
+  if (feedMoments.length === 0) return globalThumbnails
+
+  const thumbnails: CategoryThumbnailMap = {
+    ...globalThumbnails,
+    for_you: pickRandom(feedMoments)?.photo_url ?? globalThumbnails.for_you ?? null,
+  }
+
+  const ids = feedMoments.map(moment => moment.id)
+  const reactions = await getFeedReactions(ids)
+  const momentsById = new Map(feedMoments.map(moment => [moment.id, moment]))
+
+  for (const type of CATEGORY_REACTION_TYPES) {
+    const matchingIds = [...new Set(
+      reactions
+        .filter(reaction => reaction.type === type)
+        .map(reaction => reaction.moment_id),
+    )]
+    const matchingMomentsByReaction = matchingIds
+      .map(momentId => momentsById.get(momentId))
+      .filter(Boolean) as MomentWithProfile[]
+    const matchingMomentsByMood = feedMoments.filter(moment => moment.mood === type)
+    const uniqueMatchingMoments = [...new Map(
+      [...matchingMomentsByMood, ...matchingMomentsByReaction].map(moment => [moment.id, moment]),
+    ).values()]
+
+    thumbnails[type] = pickRandom(uniqueMatchingMoments)?.photo_url ?? globalThumbnails[type] ?? null
+  }
+
+  return thumbnails
 }
 
 export async function getUserMoments(userId: string): Promise<Moment[]> {

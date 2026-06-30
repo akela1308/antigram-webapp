@@ -1,5 +1,5 @@
-import { useEffect, useState, useRef } from 'react'
-import { getMomentsByEmotion } from '../lib/db'
+import { useEffect, useState } from 'react'
+import { getFollowingCategoryThumbnails, getGlobalCategoryThumbnails } from '../lib/db'
 import { EMOTIONS } from '../lib/types'
 import type { ReactionType } from '../lib/types'
 
@@ -22,29 +22,38 @@ const FRAME_H = 60
 interface Props {
   active: FilterValue
   onChange: (value: FilterValue) => void
+  thumbnailScope?: 'global' | 'following'
+  userId?: string | null
 }
 
-export function CategoryFilmStrip({ active, onChange }: Props) {
+export function CategoryFilmStrip({
+  active,
+  onChange,
+  thumbnailScope = 'global',
+  userId = null,
+}: Props) {
   const [categories, setCategories] = useState<CategoryItem[]>(BASE_CATEGORIES)
-  const loadedRef = useRef(false)
 
   useEffect(() => {
-    if (loadedRef.current) return
-    loadedRef.current = true
+    let cancelled = false
+    setCategories(BASE_CATEGORIES)
+
     async function loadThumbs() {
-      const emotions = EMOTIONS.map(e => e.type)
-      const results = await Promise.all(emotions.map(e => getMomentsByEmotion(e, 1)))
+      const thumbnails = thumbnailScope === 'following' && userId
+        ? await getFollowingCategoryThumbnails(userId)
+        : await getGlobalCategoryThumbnails()
+
+      if (cancelled) return
+
       setCategories(prev =>
-        prev.map(cat => {
-          const idx = emotions.indexOf(cat.id as ReactionType)
-          if (idx === -1) return cat
-          const top = results[idx]?.[0]
-          return top ? { ...cat, photoUrl: top.photo_url } : cat
-        })
+        prev.map(cat => ({ ...cat, photoUrl: thumbnails[cat.id] ?? null }))
       )
     }
+
     loadThumbs()
-  }, [])
+
+    return () => { cancelled = true }
+  }, [thumbnailScope, userId])
 
   return (
     <div style={{ background: 'var(--film-track)', borderBottom: '1px solid var(--film-amber-dark)' }}>

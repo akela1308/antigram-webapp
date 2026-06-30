@@ -206,7 +206,12 @@ export function FeedPage() {
         </div>
 
         {/* Category film strip */}
-        <CategoryFilmStrip active={filter} onChange={setFilter} />
+        <CategoryFilmStrip
+          active={filter}
+          onChange={setFilter}
+          thumbnailScope={user ? 'following' : 'global'}
+          userId={user?.id ?? null}
+        />
       </div>
 
       {/* ── Feed ── */}
