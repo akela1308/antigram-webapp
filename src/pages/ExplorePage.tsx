@@ -124,6 +124,7 @@ export function ExplorePage() {
                 onStarTotalChange={(momentId, total) => setStarTotals(prev => ({ ...prev, [momentId]: total }))}
                 userReaction={userReactionsMap[moment.id] ?? null}
                 onReact={user ? handleReact : undefined}
+                directTopReaction
               />
             ))}
           </PhotoGrid>

@@ -15,9 +15,18 @@ interface MomentCardProps {
   onStarTotalChange?: (momentId: string, total: number) => void
   userReaction?: ReactionType | null
   onReact?: (momentId: string, type: ReactionType) => void
+  directTopReaction?: boolean
 }
 
-export function MomentCard({ moment, reactions, starTotal = 0, onStarTotalChange, userReaction, onReact }: MomentCardProps) {
+export function MomentCard({
+  moment,
+  reactions,
+  starTotal = 0,
+  onStarTotalChange,
+  userReaction,
+  onReact,
+  directTopReaction = false,
+}: MomentCardProps) {
   const navigate = useNavigate()
   const [showReactionPicker, setShowReactionPicker] = useState(false)
   const profile = moment.profiles
@@ -27,7 +36,12 @@ export function MomentCard({ moment, reactions, starTotal = 0, onStarTotalChange
 
   function handleReactionClick(e: React.MouseEvent) {
     e.stopPropagation()
-    if (!onReact) return
+    if (!onReact || !topReaction) return
+    if (directTopReaction) {
+      onReact(moment.id, topReaction.type)
+      setShowReactionPicker(false)
+      return
+    }
     setShowReactionPicker(open => !open)
   }
 
