@@ -442,7 +442,7 @@ export function UploadPage() {
       trackPhotoPosted(preset.id)
       setTodayCount(prev => (prev ?? 0) + 1)
       setPhase('success')
-      setTimeout(() => navigate('/'), 1800)
+      setTimeout(() => navigate('/'), 2600)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       if (msg.includes('daily_frame_limit_exceeded')) {
@@ -481,13 +481,7 @@ export function UploadPage() {
   }
 
   if (phase === 'success') {
-    return (
-      <div style={{ ...S.root, ...S.centered }}>
-        <span style={{ fontSize: 56 }}>🎞</span>
-        <p style={{ color: '#fff', fontSize: 22, fontWeight: 700, margin: 0 }}>Опубликовано!</p>
-        <p style={{ color: '#666', fontSize: 14, margin: 0 }}>Момент появится в ленте</p>
-      </div>
-    )
+    return <DevelopingScreen previewUrl={previewUrl} preset={preset} />
   }
 
   // ── PREVIEW phase ─────────────────────────────────────────────────────────
@@ -1007,6 +1001,175 @@ export function UploadPage() {
 }
 
 // ── Decorative film strip bar ────────────────────────────────────────────────
+
+function DevelopingScreen({ previewUrl, preset }: { previewUrl: string | null; preset: FilmPreset }) {
+  return (
+    <div style={{ ...S.root, background: '#0B0704', paddingTop: 'var(--tg-top, 56px)' }}>
+      <style>
+        {`
+          @keyframes antigram-develop-scan {
+            0% { transform: translateY(-120%); opacity: 0; }
+            16% { opacity: 1; }
+            84% { opacity: 1; }
+            100% { transform: translateY(120%); opacity: 0; }
+          }
+          @keyframes antigram-develop-photo {
+            0% { filter: sepia(1) contrast(0.72) brightness(0.48); opacity: 0.34; transform: scale(0.985); }
+            55% { filter: sepia(0.62) contrast(0.9) brightness(0.78); opacity: 0.78; }
+            100% { filter: sepia(0.18) contrast(1.05) brightness(1); opacity: 1; transform: scale(1); }
+          }
+          @keyframes antigram-develop-pulse {
+            0%, 100% { opacity: 0.44; transform: scaleX(0.66); }
+            50% { opacity: 1; transform: scaleX(1); }
+          }
+          @keyframes antigram-develop-grain {
+            0% { transform: translate3d(0, 0, 0); }
+            25% { transform: translate3d(-1.5%, 1%, 0); }
+            50% { transform: translate3d(1%, -1.5%, 0); }
+            75% { transform: translate3d(-0.5%, -1%, 0); }
+            100% { transform: translate3d(0, 0, 0); }
+          }
+        `}
+      </style>
+
+      <FilmStripBar />
+
+      <div
+        style={{
+          position: 'relative',
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 24,
+          padding: '24px 20px max(32px, calc(var(--tg-bottom, 0px) + 24px))',
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'radial-gradient(circle at 50% 26%, rgba(201,132,62,0.18), transparent 34%), linear-gradient(180deg, rgba(20,14,10,0.2), rgba(11,7,4,0.92))',
+            pointerEvents: 'none',
+          }}
+        />
+        <div
+          aria-hidden
+          style={{
+            position: 'absolute',
+            inset: '-20%',
+            opacity: 0.12,
+            backgroundImage: 'repeating-radial-gradient(circle at 18% 22%, rgba(255,255,255,0.8) 0 0.7px, transparent 0.7px 3.2px)',
+            animation: 'antigram-develop-grain 0.55s steps(2, end) infinite',
+            pointerEvents: 'none',
+          }}
+        />
+
+        <div
+          style={{
+            position: 'relative',
+            width: 'min(72vw, 300px)',
+            aspectRatio: '1',
+            borderRadius: 18,
+            padding: 10,
+            background: '#120C07',
+            border: '1px solid rgba(201,132,62,0.28)',
+            boxShadow: '0 28px 80px rgba(0,0,0,0.55), 0 0 36px rgba(201,132,62,0.12)',
+            overflow: 'hidden',
+          }}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              inset: 7,
+              borderRadius: 13,
+              border: '1px solid rgba(255,221,170,0.08)',
+              pointerEvents: 'none',
+              zIndex: 3,
+            }}
+          />
+          {previewUrl ? (
+            <img
+              src={previewUrl}
+              alt=""
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                display: 'block',
+                borderRadius: 12,
+                animation: 'antigram-develop-photo 2.4s ease-out forwards',
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                width: '100%',
+                height: '100%',
+                borderRadius: 12,
+                background: 'linear-gradient(135deg, #1A1208, #2E1A0A 48%, #0B0704)',
+              }}
+            />
+          )}
+          <div
+            aria-hidden
+            style={{
+              position: 'absolute',
+              left: 10,
+              right: 10,
+              top: 0,
+              height: '72%',
+              background: 'linear-gradient(180deg, transparent, rgba(255,201,118,0.20) 44%, rgba(255,241,210,0.32) 50%, rgba(255,201,118,0.16) 56%, transparent)',
+              mixBlendMode: 'screen',
+              animation: 'antigram-develop-scan 2.45s ease-in-out forwards',
+              zIndex: 2,
+            }}
+          />
+        </div>
+
+        <div style={{ position: 'relative', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 9 }}>
+          <div
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '7px 12px',
+              borderRadius: 999,
+              background: 'rgba(201,132,62,0.10)',
+              border: '1px solid rgba(201,132,62,0.20)',
+            }}
+          >
+            {preset.id !== 'none' && (
+              <span style={{ width: 9, height: 9, borderRadius: 5, background: preset.color, boxShadow: `0 0 12px ${preset.color}` }} />
+            )}
+            <span style={{ color: 'rgba(232,196,144,0.78)', fontSize: 11, letterSpacing: 1.1, textTransform: 'uppercase', fontWeight: 800 }}>
+              {preset.id !== 'none' ? preset.name : 'Antigram film'}
+            </span>
+          </div>
+          <h1 style={{ color: '#F3E0C1', fontSize: 24, lineHeight: 1.1, fontWeight: 800, margin: '4px 0 0', fontFamily: 'Georgia, serif' }}>
+            Плёнка проявляется
+          </h1>
+          <p style={{ color: 'rgba(232,196,144,0.58)', fontSize: 14, lineHeight: 1.5, margin: 0, maxWidth: 280 }}>
+            Кадр сохранился. Через мгновение он появится в ленте.
+          </p>
+          <div
+            style={{
+              width: 108,
+              height: 3,
+              borderRadius: 3,
+              marginTop: 8,
+              background: 'linear-gradient(90deg, transparent, rgba(201,132,62,0.95), transparent)',
+              transformOrigin: 'center',
+              animation: 'antigram-develop-pulse 1.15s ease-in-out infinite',
+            }}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function FilmStripBar() {
   return (
