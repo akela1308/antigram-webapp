@@ -4,7 +4,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? ''
-const SUPPORT_EMAIL_TO = Deno.env.get('SUPPORT_EMAIL_TO') ?? 'akeva1308@gmail.com'
+const SUPPORT_EMAIL_TO = Deno.env.get('SUPPORT_EMAIL_TO') ?? 'akela1308@gmail.com'
 const SUPPORT_EMAIL_FROM = Deno.env.get('SUPPORT_EMAIL_FROM') ?? 'Antigram <support@antigram.app>'
 
 const MAX_FILE_BYTES = 8 * 1024 * 1024
