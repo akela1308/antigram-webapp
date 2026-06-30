@@ -246,6 +246,7 @@ export function UploadPage() {
   const videoRef   = useRef<HTMLVideoElement>(null)
   const canvasRef  = useRef<HTMLCanvasElement>(null)
   const streamRef  = useRef<MediaStream | null>(null)
+  const captureLockRef = useRef(false)
 
   // Read film preset from router state (set by FilmPicker sheet in BottomNav)
   const initialPreset = (() => {
@@ -260,6 +261,7 @@ export function UploadPage() {
   const [selectedFlare, setSelectedFlare] = useState<FlareType>('none')
   const [previewUrl, setPreviewUrl]     = useState<string | null>(null)
   const [photoBlob, setPhotoBlob]       = useState<Blob | null>(null)
+  const [isCapturing, setIsCapturing]   = useState(false)
   const [caption, setCaption]           = useState('')
   const [mood, setMood]                 = useState<ReactionType | null>(null)
   const [customMoodEmoji, setCustomMoodEmoji] = useState('')
@@ -331,6 +333,7 @@ export function UploadPage() {
   // ── Capture ─────────────────────────────────────────────────────────────────
 
   const capture = useCallback(async () => {
+    if (captureLockRef.current) return
     const video  = videoRef.current
     const canvas = canvasRef.current
     if (!video || !canvas) return
@@ -338,50 +341,65 @@ export function UploadPage() {
     const size = Math.min(video.videoWidth, video.videoHeight)
     if (!size) return
 
-    canvas.width  = size
-    canvas.height = size
-    const ctx = canvas.getContext('2d', { willReadFrequently: true })!
+    captureLockRef.current = true
+    setIsCapturing(true)
 
-    // Draw raw frame — no ctx.filter (unreliable in Telegram WebView)
-    const ox = (video.videoWidth  - size) / 2
-    const oy = (video.videoHeight - size) / 2
-    ctx.drawImage(video, ox, oy, size, size, 0, 0, size, size)
+    // Let Telegram WebView paint the shutter feedback before canvas processing blocks the main thread.
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
 
-    // Pixel-level processing (order: algo → filter → grain → flare)
-    if (preset.algoType) {
-      applyAlgo(ctx, canvas, preset.algoType)
+    try {
+      canvas.width  = size
+      canvas.height = size
+      const ctx = canvas.getContext('2d', { willReadFrequently: true })!
+
+      // Draw raw frame — no ctx.filter (unreliable in Telegram WebView)
+      const ox = (video.videoWidth  - size) / 2
+      const oy = (video.videoHeight - size) / 2
+      ctx.drawImage(video, ox, oy, size, size, 0, 0, size, size)
+
+      // Pixel-level processing (order: algo → filter → grain → flare)
+      if (preset.algoType) {
+        applyAlgo(ctx, canvas, preset.algoType)
+      }
+
+      applyFilter(ctx, canvas, preset.filter)
+
+      applyGrain(ctx, canvas, preset.grain)
+
+      // Auto-flare: 30% chance when using a film preset
+      const AUTO_FLARES: FlareType[] = ['leak_warm', 'streak', 'leak_warm', 'leak_cool']
+      const autoFlare: FlareType =
+        preset.id !== 'none' && Math.random() < 0.30
+          ? AUTO_FLARES[Math.floor(Math.random() * AUTO_FLARES.length)]
+          : 'none'
+
+      const effectiveFlare = selectedFlare !== 'none' ? selectedFlare : autoFlare
+
+      if (effectiveFlare !== 'none') {
+        applyFlare(ctx, canvas, effectiveFlare)
+      }
+
+      canvas.toBlob(blob => {
+        captureLockRef.current = false
+        setIsCapturing(false)
+        if (!blob) return
+        setPhotoBlob(blob)
+        setPreviewUrl(URL.createObjectURL(blob))
+        streamRef.current?.getTracks().forEach(t => t.stop())
+        setPhase('preview')
+      }, 'image/jpeg', 0.92)
+    } catch (err) {
+      console.error('[Camera] capture failed:', err)
+      captureLockRef.current = false
+      setIsCapturing(false)
+      setCamError('Не удалось снять кадр')
     }
-
-    applyFilter(ctx, canvas, preset.filter)
-
-    applyGrain(ctx, canvas, preset.grain)
-
-    // Auto-flare: 30% chance when using a film preset
-    const AUTO_FLARES: FlareType[] = ['leak_warm', 'streak', 'leak_warm', 'leak_cool']
-    const autoFlare: FlareType =
-      preset.id !== 'none' && Math.random() < 0.30
-        ? AUTO_FLARES[Math.floor(Math.random() * AUTO_FLARES.length)]
-        : 'none'
-
-    const effectiveFlare = selectedFlare !== 'none' ? selectedFlare : autoFlare
-
-    if (effectiveFlare !== 'none') {
-      applyFlare(ctx, canvas, effectiveFlare)
-    }
-
-    canvas.toBlob(blob => {
-      if (!blob) return
-      setPhotoBlob(blob)
-      setPreviewUrl(URL.createObjectURL(blob))
-      streamRef.current?.getTracks().forEach(t => t.stop())
-      setPhase('preview')
-    }, 'image/jpeg', 0.92)
   }, [preset, selectedFlare])
 
   // ── Hardware volume buttons → shutter ────────────────────────────────────────
 
   useEffect(() => {
-    if (phase !== 'viewfinder' || limitReached) return
+    if (phase !== 'viewfinder' || limitReached || isCapturing) return
 
     const handleKey = (e: KeyboardEvent) => {
       // Volume Up (24) / Volume Down (25) on Android WebView
@@ -402,7 +420,7 @@ export function UploadPage() {
 
     document.addEventListener('keydown', handleKey)
     return () => document.removeEventListener('keydown', handleKey)
-  }, [phase, limitReached, capture])
+  }, [phase, limitReached, isCapturing, capture])
 
   // ── Publish ──────────────────────────────────────────────────────────────────
 
@@ -463,6 +481,8 @@ export function UploadPage() {
     setMood(null)
     setCustomMoodEmoji('')
     setCustomMoodLabel('')
+    captureLockRef.current = false
+    setIsCapturing(false)
     setPhase('viewfinder')
   }
 
@@ -765,7 +785,8 @@ export function UploadPage() {
 
           <button
             onClick={() => setFlash(f => !f)}
-            style={{ ...S.topBtn, color: flash ? '#E8B84B' : '#fff' }}
+            disabled={isCapturing}
+            style={{ ...S.topBtn, color: flash ? '#E8B84B' : '#fff', opacity: isCapturing ? 0.45 : 1 }}
           >
             ⚡
           </button>
@@ -800,6 +821,7 @@ export function UploadPage() {
               border: '1px solid rgba(255,255,255,0.07)',
               pointerEvents: 'none',
             }} />
+            {isCapturing && <CaptureFeedback />}
           </div>
         )}
       </div>
@@ -815,6 +837,7 @@ export function UploadPage() {
               <button
                 key={f}
                 onClick={() => setSelectedFlare(f)}
+                disabled={isCapturing}
                 style={{
                   width: cameraUi.flareButtonSize,
                   height: cameraUi.flareButtonSize,
@@ -822,7 +845,8 @@ export function UploadPage() {
                   border: `${active ? 2 : 1}px solid ${active ? 'var(--amber)' : '#333'}`,
                   background: active ? 'rgba(196,168,130,0.15)' : 'transparent',
                   color: active ? 'var(--amber)' : '#555',
-                  fontSize: isTinyCamera ? 14 : 16, cursor: 'pointer',
+                  fontSize: isTinyCamera ? 14 : 16, cursor: isCapturing ? 'default' : 'pointer',
+                  opacity: isCapturing ? 0.45 : 1,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}
               >
@@ -846,12 +870,14 @@ export function UploadPage() {
               <button
                 key={p.id}
                 onClick={() => { setPreset(p); if (p.id !== 'none') trackFilterApplied(p.id) }}
+                disabled={isCapturing}
                 style={{
                   flexShrink: 0,
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: isTinyCamera ? 2 : 5,
                   padding: isTinyCamera ? 2 : 4, borderRadius: 12,
                   border: `${active ? 2 : 1.5}px solid ${active ? 'var(--amber)' : 'transparent'}`,
-                  background: 'none', cursor: 'pointer',
+                  background: 'none', cursor: isCapturing ? 'default' : 'pointer',
+                  opacity: isCapturing ? 0.45 : 1,
                 }}
               >
                 <div
@@ -948,6 +974,7 @@ export function UploadPage() {
 
           <button
             onClick={() => {
+              if (isCapturing) return
               if (limitReached) {
                 setLimitMsg(true)
                 setTimeout(() => setLimitMsg(false), 2000)
@@ -955,14 +982,16 @@ export function UploadPage() {
               }
               void capture()
             }}
+            disabled={isCapturing}
             style={{
               ...S.shutter,
               width: cameraUi.shutterSize,
               height: cameraUi.shutterSize,
               borderRadius: cameraUi.shutterSize / 2,
-              opacity: limitReached ? 0.35 : 1,
-              cursor: limitReached ? 'default' : 'pointer',
-              transition: 'opacity 0.3s',
+              opacity: limitReached ? 0.35 : isCapturing ? 0.78 : 1,
+              cursor: limitReached || isCapturing ? 'default' : 'pointer',
+              transform: isCapturing ? 'scale(0.94)' : 'scale(1)',
+              transition: 'opacity 0.3s, transform 0.18s',
             }}
           >
             <div style={{
@@ -982,13 +1011,15 @@ export function UploadPage() {
 
           <button
             onClick={() => setFacing(f => f === 'environment' ? 'user' : 'environment')}
+            disabled={isCapturing}
             style={{
               width: cameraUi.flipButtonSize,
               height: cameraUi.flipButtonSize,
               borderRadius: cameraUi.flipButtonSize / 2,
               background: 'rgba(255,255,255,0.07)',
               border: '1px solid rgba(255,255,255,0.1)',
-              color: '#fff', fontSize: isTinyCamera ? 18 : 22, cursor: 'pointer',
+              color: '#fff', fontSize: isTinyCamera ? 18 : 22, cursor: isCapturing ? 'default' : 'pointer',
+              opacity: isCapturing ? 0.45 : 1,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
           >
@@ -1001,6 +1032,101 @@ export function UploadPage() {
 }
 
 // ── Decorative film strip bar ────────────────────────────────────────────────
+
+function CaptureFeedback() {
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        zIndex: 6,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 14,
+        background: 'radial-gradient(circle at 50% 45%, rgba(255,238,205,0.20), rgba(20,14,10,0.54) 52%, rgba(20,14,10,0.72))',
+        pointerEvents: 'none',
+      }}
+    >
+      <style>
+        {`
+          @keyframes antigram-capture-flash {
+            0% { opacity: 0; }
+            10% { opacity: 0.9; }
+            100% { opacity: 0; }
+          }
+          @keyframes antigram-capture-frame {
+            0% { transform: scale(1.04); opacity: 0; }
+            26% { opacity: 1; }
+            100% { transform: scale(1); opacity: 0.92; }
+          }
+          @keyframes antigram-capture-run {
+            0% { transform: translateX(-34px); opacity: 0.25; }
+            50% { opacity: 1; }
+            100% { transform: translateX(34px); opacity: 0.25; }
+          }
+        `}
+      </style>
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: '#fff',
+          animation: 'antigram-capture-flash 520ms ease-out forwards',
+        }}
+      />
+      <div
+        style={{
+          width: 96,
+          height: 72,
+          borderRadius: 10,
+          border: '1px solid rgba(243,224,193,0.38)',
+          background: 'rgba(20,14,10,0.34)',
+          boxShadow: '0 0 0 8px rgba(20,14,10,0.18), 0 18px 48px rgba(0,0,0,0.34)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          position: 'relative',
+          overflow: 'hidden',
+          animation: 'antigram-capture-frame 720ms ease-out forwards',
+        }}
+      >
+        <div
+          style={{
+            width: 68,
+            height: 2,
+            borderRadius: 2,
+            background: 'linear-gradient(90deg, transparent, rgba(243,224,193,0.95), transparent)',
+            animation: 'antigram-capture-run 780ms ease-in-out infinite alternate',
+          }}
+        />
+        <div style={{ position: 'absolute', inset: 7, border: '1px solid rgba(243,224,193,0.16)', borderRadius: 6 }} />
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 4,
+          padding: '8px 13px',
+          borderRadius: 18,
+          background: 'rgba(20,14,10,0.66)',
+          border: '1px solid rgba(201,132,62,0.28)',
+          backdropFilter: 'blur(10px)',
+        }}
+      >
+        <span style={{ color: '#F3E0C1', fontSize: 13, fontWeight: 800, letterSpacing: 0.2 }}>
+          Снимаем кадр
+        </span>
+        <span style={{ color: 'rgba(243,224,193,0.58)', fontSize: 11 }}>
+          держим момент на плёнке
+        </span>
+      </div>
+    </div>
+  )
+}
 
 function DevelopingScreen({ previewUrl, preset }: { previewUrl: string | null; preset: FilmPreset }) {
   return (
