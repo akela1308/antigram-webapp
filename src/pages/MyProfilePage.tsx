@@ -20,9 +20,16 @@ import {
   getProfileStarTotal,
   getFeedReactions,
 } from '../lib/db'
-import { sendSupportRequest, SUPPORT_ATTACHMENT_MAX_BYTES } from '../lib/support'
+import {
+  sendSupportRequest,
+  SUPPORT_ATTACHMENT_MAX_BYTES,
+  getSupportRequests,
+  getSupportAttachmentUrl,
+  updateSupportRequestStatus,
+} from '../lib/support'
 import { EMOTIONS } from '../lib/types'
-import type { Moment, HighlightWithMoment, AlbumWithMoments, ReactionType } from '../lib/types'
+import type { Moment, HighlightWithMoment, AlbumWithMoments, ReactionType, Profile } from '../lib/types'
+import type { SupportRequest } from '../lib/support'
 
 type ReactionPreview = { type: ReactionType }
 type TelegramUserInfo = {
@@ -76,6 +83,7 @@ export function MyProfilePage() {
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showSupport, setShowSupport] = useState(false)
+  const [showSupportInbox, setShowSupportInbox] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const longPressTimer = { current: null as ReturnType<typeof setTimeout> | null }
 
@@ -594,6 +602,7 @@ export function MyProfilePage() {
             navigate(path)
           }}
           onSupportPress={() => setShowSupport(true)}
+          onSupportInboxPress={() => setShowSupportInbox(true)}
           onSignOut={handleSignOut}
           onSaved={async () => { await load(); showToast('Сохранено') }}
           showSignOutConfirm={showSignOutConfirm}
@@ -610,6 +619,10 @@ export function MyProfilePage() {
           onClose={() => setShowSupport(false)}
           onSent={() => showToast('Отправлено')}
         />
+      )}
+
+      {showSupportInbox && (
+        <SupportInboxSheet onClose={() => setShowSupportInbox(false)} />
       )}
     </div>
   )
@@ -851,15 +864,16 @@ function AlbumCard({ cover, placeholder, placeholderBg, title, subtitle, isPriva
 
 function SettingsSheet({
   profile, userId, isTelegram,
-  onClose, onNavigate, onSupportPress, onSaved,
+  onClose, onNavigate, onSupportPress, onSupportInboxPress, onSaved,
   showSignOutConfirm, setShowSignOutConfirm, handleSignOut,
 }: {
-  profile: import('../lib/types').Profile
+  profile: Profile
   userId: string
   isTelegram: boolean
   onClose: () => void
   onNavigate: (path: string) => void
   onSupportPress: () => void
+  onSupportInboxPress: () => void
   onSignOut: () => void
   onSaved: () => void
   showSignOutConfirm: boolean
@@ -998,6 +1012,15 @@ function SettingsSheet({
           >
             Помощь
           </button>
+          {profile.is_admin && (
+            <button
+              type="button"
+              onClick={onSupportInboxPress}
+              style={{ ...linkButtonStyle, color: 'var(--amber)' }}
+            >
+              Чат поддержки
+            </button>
+          )}
           <button
             type="button"
             onClick={() => onNavigate('/terms')}
@@ -1068,7 +1091,7 @@ function SettingsSheet({
 function SupportSheet({
   profile, userId, telegramUser, onClose, onSent,
 }: {
-  profile: import('../lib/types').Profile
+  profile: Profile
   userId: string
   telegramUser: TelegramUserInfo | null
   onClose: () => void
@@ -1249,6 +1272,186 @@ function SupportSheet({
         >
           {sending ? 'Отправляем...' : 'Отправить'}
         </button>
+      </div>
+    </>
+  )
+}
+
+// ── SupportInboxSheet ────────────────────────────────────────────────────────
+
+function SupportInboxSheet({ onClose }: { onClose: () => void }) {
+  const [items, setItems] = useState<SupportRequest[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const loadItems = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      setItems(await getSupportRequests())
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось загрузить обращения')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadItems()
+  }, [loadItems])
+
+  const openAttachment = async (item: SupportRequest) => {
+    if (!item.attachment_path) return
+    try {
+      const url = await getSupportAttachmentUrl(item.attachment_path)
+      window.open(url, '_blank', 'noopener,noreferrer')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось открыть вложение')
+    }
+  }
+
+  const toggleStatus = async (item: SupportRequest) => {
+    const nextStatus = item.status === 'open' ? 'closed' : 'open'
+    try {
+      await updateSupportRequestStatus(item.id, nextStatus)
+      setItems(current => current.map(entry => (
+        entry.id === item.id ? { ...entry, status: nextStatus } : entry
+      )))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось обновить статус')
+    }
+  }
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 319, background: 'rgba(0,0,0,0.74)', backdropFilter: 'blur(4px)' }} />
+      <div style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 320,
+        background: '#110C08',
+        borderRadius: '24px 24px 0 0',
+        borderTop: '1px solid #2E2218',
+        maxHeight: '88vh',
+        display: 'flex',
+        flexDirection: 'column',
+        paddingBottom: 'max(24px, env(safe-area-inset-bottom, 20px))',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 12, paddingBottom: 4 }}>
+          <div style={{ width: 36, height: 4, borderRadius: 2, background: '#333' }} />
+        </div>
+        <div style={{ padding: '8px 20px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div>
+            <p style={{ color: '#fff', fontSize: 18, fontWeight: 700, margin: 0 }}>Чат поддержки</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: 12, margin: '4px 0 0' }}>Обращения пользователей</p>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#555', fontSize: 22, cursor: 'pointer' }}>✕</button>
+        </div>
+
+        <div style={{ overflowY: 'auto', padding: '0 20px 8px' }}>
+          {loading && (
+            <p style={{ color: 'var(--text-muted)', fontSize: 14, margin: '20px 0', textAlign: 'center' }}>Загружаем...</p>
+          )}
+
+          {error && (
+            <p style={{ color: '#e05a5a', fontSize: 13, margin: '0 0 12px' }}>{error}</p>
+          )}
+
+          {!loading && items.length === 0 && (
+            <p style={{ color: 'var(--text-muted)', fontSize: 14, margin: '20px 0', textAlign: 'center' }}>Пока нет обращений</p>
+          )}
+
+          {items.map(item => {
+            const name = item.profiles?.display_name || item.profiles?.username || 'Пользователь'
+            const metadata = item.metadata ?? {}
+            const telegram = typeof metadata.telegramUsername === 'string' && metadata.telegramUsername
+              ? `@${metadata.telegramUsername}`
+              : ''
+            return (
+              <div
+                key={item.id}
+                style={{
+                  padding: '14px',
+                  borderRadius: 14,
+                  border: '1px solid #2E1A0A',
+                  background: item.status === 'open' ? 'rgba(201,146,42,0.08)' : 'rgba(255,255,255,0.025)',
+                  marginBottom: 10,
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <p style={{ color: '#fff', fontSize: 14, fontWeight: 700, margin: 0 }}>{name}</p>
+                    <p style={{ color: 'var(--text-muted)', fontSize: 11, margin: '3px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {telegram || item.profiles?.username ? telegram || `@${item.profiles?.username}` : item.reporter_id}
+                    </p>
+                  </div>
+                  <span style={{
+                    flex: '0 0 auto',
+                    color: item.status === 'open' ? 'var(--amber)' : 'var(--text-muted)',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    padding: '4px 8px',
+                    borderRadius: 999,
+                    border: '1px solid #2E1A0A',
+                  }}>
+                    {item.status === 'open' ? 'новое' : 'закрыто'}
+                  </span>
+                </div>
+
+                <p style={{ color: 'var(--text)', fontSize: 14, lineHeight: 1.45, whiteSpace: 'pre-wrap', margin: '12px 0 0' }}>
+                  {item.message || '(без текста)'}
+                </p>
+
+                {item.attachment_path && (
+                  <button
+                    onClick={() => openAttachment(item)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: 12,
+                      marginTop: 12,
+                      background: 'rgba(255,255,255,0.03)',
+                      border: '1px solid #2E1A0A',
+                      color: 'var(--amber)',
+                      fontSize: 13,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    Вложение: {item.attachment_name || 'файл'}
+                  </button>
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 12 }}>
+                  <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+                    {new Date(item.created_at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  <button
+                    onClick={() => toggleStatus(item)}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: 999,
+                      border: '1px solid #2E1A0A',
+                      background: 'transparent',
+                      color: item.status === 'open' ? 'var(--amber)' : 'var(--text-muted)',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {item.status === 'open' ? 'Закрыть' : 'Открыть'}
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
       </div>
     </>
   )
