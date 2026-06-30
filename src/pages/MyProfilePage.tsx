@@ -5,6 +5,7 @@ import { FilmStripHeader } from '../components/FilmStripHeader'
 import { ProfileSkeleton, MomentCardSkeleton } from '../components/Skeleton'
 import { StarCountPill } from '../components/StarSupportButton'
 import { useAuth } from '../contexts/AuthContext'
+import { useLanguage } from '../contexts/LanguageContext'
 import {
   getUserMoments,
   getFollowersCount,
@@ -903,11 +904,11 @@ function SettingsSheet({
   setShowSignOutConfirm: (v: boolean) => void
   handleSignOut: () => void
 }) {
+  const { language, detectedLanguage, setLanguage } = useLanguage()
   const [displayName, setDisplayName] = useState(profile.display_name ?? '')
   const [username, setUsername]       = useState(profile.username ?? '')
   const [website, setWebsite]         = useState(profile.website ?? '')
   const [bio, setBio]                 = useState(profile.bio ?? '')
-  const [lang, setLang]               = useState<'ru' | 'en'>('ru')
   const [saving, setSaving]           = useState(false)
 
   const handleSave = async () => {
@@ -992,16 +993,19 @@ function SettingsSheet({
 
           {/* Language */}
           <p style={sectionTitleStyle}>Язык / Language</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.4, margin: '0 0 8px' }}>
+            По умолчанию: {detectedLanguage === 'ru' ? 'русский' : 'English'} по языку Telegram/устройства.
+          </p>
           <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
             {(['ru', 'en'] as const).map(l => (
               <button
                 key={l}
-                onClick={() => setLang(l)}
+                onClick={() => setLanguage(l)}
                 style={{
                   flex: 1, padding: '11px 0', borderRadius: 12, fontSize: 14, fontWeight: 600,
-                  border: `1px solid ${lang === l ? 'var(--amber)' : '#2E1A0A'}`,
-                  background: lang === l ? 'rgba(201,146,42,0.1)' : 'transparent',
-                  color: lang === l ? 'var(--amber)' : 'var(--text-muted)',
+                  border: `1px solid ${language === l ? 'var(--amber)' : '#2E1A0A'}`,
+                  background: language === l ? 'rgba(201,146,42,0.1)' : 'transparent',
+                  color: language === l ? 'var(--amber)' : 'var(--text-muted)',
                   cursor: 'pointer',
                 }}
               >
