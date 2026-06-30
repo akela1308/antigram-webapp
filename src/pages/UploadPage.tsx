@@ -271,10 +271,27 @@ export function UploadPage() {
   const [error, setError]               = useState<string | null>(null)
   const [todayCount, setTodayCount]     = useState<number | null>(null)
   const [limitMsg, setLimitMsg]         = useState(false)
+  const [viewportHeight, setViewportHeight] = useState(() =>
+    typeof window === 'undefined' ? 720 : window.innerHeight,
+  )
 
   const framesUsed      = todayCount ?? 0
   const framesRemaining = Math.max(0, DAILY_FRAME_LIMIT - framesUsed)
   const limitReached    = todayCount !== null && framesRemaining === 0
+  const isCompactCamera = viewportHeight <= 700
+  const isTinyCamera    = viewportHeight <= 600
+  const cameraUi        = getCameraUi(isCompactCamera, isTinyCamera)
+
+  useEffect(() => {
+    const updateViewportHeight = () => setViewportHeight(window.innerHeight)
+    updateViewportHeight()
+    window.addEventListener('resize', updateViewportHeight)
+    window.visualViewport?.addEventListener('resize', updateViewportHeight)
+    return () => {
+      window.removeEventListener('resize', updateViewportHeight)
+      window.visualViewport?.removeEventListener('resize', updateViewportHeight)
+    }
+  }, [])
 
   useEffect(() => {
     if (user) {
@@ -739,7 +756,7 @@ export function UploadPage() {
           paddingTop: 'var(--tg-top, 56px)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: cameraUi.topBarPadding }}>
           {/* Active film indicator */}
           {preset.id !== 'none' ? (
             <div style={{
@@ -762,7 +779,7 @@ export function UploadPage() {
       </div>
 
       {/* Viewfinder */}
-      <div style={S.viewfinderArea}>
+      <div style={{ ...S.viewfinderArea, ...cameraUi.viewfinderArea }}>
         {camError ? (
           <div style={{ ...S.viewfinderBox, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
             <span style={{ fontSize: 40 }}>📷</span>
@@ -794,10 +811,10 @@ export function UploadPage() {
       </div>
 
       {/* Bottom panel */}
-      <div style={S.bottomPanel}>
+      <div style={{ ...S.bottomPanel, ...cameraUi.bottomPanel }}>
         {/* Light leak selector */}
-        <div style={{ display: 'flex', gap: 8, padding: '0 16px', alignItems: 'center' }}>
-          <span style={{ color: '#555', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, flexShrink: 0 }}>СВЕТ</span>
+        <div style={{ display: 'flex', gap: cameraUi.controlGap, padding: '0 16px', alignItems: 'center' }}>
+          {!isTinyCamera && <span style={{ color: '#555', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, flexShrink: 0 }}>СВЕТ</span>}
           {(['none', 'leak_warm', 'leak_cool', 'edge_burn', 'streak'] as FlareType[]).map(f => {
             const active = selectedFlare === f
             return (
@@ -805,11 +822,13 @@ export function UploadPage() {
                 key={f}
                 onClick={() => setSelectedFlare(f)}
                 style={{
-                  width: 36, height: 36, borderRadius: 18,
+                  width: cameraUi.flareButtonSize,
+                  height: cameraUi.flareButtonSize,
+                  borderRadius: cameraUi.flareButtonSize / 2,
                   border: `${active ? 2 : 1}px solid ${active ? 'var(--amber)' : '#333'}`,
                   background: active ? 'rgba(196,168,130,0.15)' : 'transparent',
                   color: active ? 'var(--amber)' : '#555',
-                  fontSize: 16, cursor: 'pointer',
+                  fontSize: isTinyCamera ? 14 : 16, cursor: 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}
               >
@@ -823,7 +842,7 @@ export function UploadPage() {
         <div
           className="no-scrollbar"
           style={{
-            display: 'flex', gap: 10, overflowX: 'auto',
+            display: 'flex', gap: cameraUi.filmGap, overflowX: 'auto',
             padding: '0 16px', alignItems: 'center',
           }}
         >
@@ -835,15 +854,17 @@ export function UploadPage() {
                 onClick={() => { setPreset(p); if (p.id !== 'none') trackFilterApplied(p.id) }}
                 style={{
                   flexShrink: 0,
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
-                  padding: 4, borderRadius: 12,
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: isTinyCamera ? 2 : 5,
+                  padding: isTinyCamera ? 2 : 4, borderRadius: 12,
                   border: `${active ? 2 : 1.5}px solid ${active ? 'var(--amber)' : 'transparent'}`,
                   background: 'none', cursor: 'pointer',
                 }}
               >
                 <div
                   style={{
-                    width: 48, height: 48, borderRadius: 24,
+                    width: cameraUi.filmIconSize,
+                    height: cameraUi.filmIconSize,
+                    borderRadius: cameraUi.filmIconSize / 2,
                     background: p.id === 'none' ? '#1A1A1A' : p.color,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     position: 'relative', overflow: 'hidden',
@@ -859,16 +880,20 @@ export function UploadPage() {
                   ) : (
                     <div
                       style={{
-                        width: 16, height: 16, borderRadius: 8,
+                        width: isTinyCamera ? 12 : 16,
+                        height: isTinyCamera ? 12 : 16,
+                        borderRadius: isTinyCamera ? 6 : 8,
                         background: 'rgba(0,0,0,0.35)',
                         border: '1px solid rgba(255,255,255,0.15)',
                       }}
                     />
                   )}
                 </div>
-                <span style={{ color: active ? 'var(--amber)' : '#555', fontSize: 9, maxWidth: 52, textAlign: 'center', lineHeight: 1.2 }}>
-                  {p.id === 'none' ? 'Без' : p.name.split(' ')[0]}
-                </span>
+                {!isTinyCamera && (
+                  <span style={{ color: active ? 'var(--amber)' : '#555', fontSize: 9, maxWidth: 52, textAlign: 'center', lineHeight: 1.2 }}>
+                    {p.id === 'none' ? 'Без' : p.name.split(' ')[0]}
+                  </span>
+                )}
               </button>
             )
           })}
@@ -923,9 +948,9 @@ export function UploadPage() {
         </div>
 
         {/* Shutter + flip */}
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 32, paddingBottom: 'max(36px, calc(var(--tg-bottom,0px) + 24px))' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: cameraUi.shutterGap, paddingBottom: cameraUi.shutterPaddingBottom }}>
           {/* spacer left */}
-          <div style={{ width: 52 }} />
+          <div style={{ width: cameraUi.flipButtonSize }} />
 
           <button
             onClick={() => {
@@ -938,23 +963,38 @@ export function UploadPage() {
             }}
             style={{
               ...S.shutter,
+              width: cameraUi.shutterSize,
+              height: cameraUi.shutterSize,
+              borderRadius: cameraUi.shutterSize / 2,
               opacity: limitReached ? 0.35 : 1,
               cursor: limitReached ? 'default' : 'pointer',
               transition: 'opacity 0.3s',
             }}
           >
-            <div style={S.shutterInner}>
-              <div style={S.shutterGlow} />
+            <div style={{
+              ...S.shutterInner,
+              width: cameraUi.shutterInnerSize,
+              height: cameraUi.shutterInnerSize,
+              borderRadius: cameraUi.shutterInnerSize / 2,
+            }}>
+              <div style={{
+                ...S.shutterGlow,
+                width: cameraUi.shutterGlowSize,
+                height: cameraUi.shutterGlowSize,
+                borderRadius: cameraUi.shutterGlowSize / 2,
+              }} />
             </div>
           </button>
 
           <button
             onClick={() => setFacing(f => f === 'environment' ? 'user' : 'environment')}
             style={{
-              width: 52, height: 52, borderRadius: 26,
+              width: cameraUi.flipButtonSize,
+              height: cameraUi.flipButtonSize,
+              borderRadius: cameraUi.flipButtonSize / 2,
               background: 'rgba(255,255,255,0.07)',
               border: '1px solid rgba(255,255,255,0.1)',
-              color: '#fff', fontSize: 22, cursor: 'pointer',
+              color: '#fff', fontSize: isTinyCamera ? 18 : 22, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
           >
@@ -982,6 +1022,46 @@ function FilmStripBar() {
       </div>
     </div>
   )
+}
+
+function getCameraUi(isCompact: boolean, isTiny: boolean) {
+  const shutterSize = isTiny ? 64 : isCompact ? 72 : 84
+  const shutterInnerSize = isTiny ? 56 : isCompact ? 62 : 74
+  const flipButtonSize = isTiny ? 40 : isCompact ? 46 : 52
+
+  return {
+    topBarPadding: isTiny ? '6px 14px' : isCompact ? '8px 16px' : '12px 16px',
+    viewfinderArea: {
+      paddingTop: isTiny
+        ? 'calc(var(--tg-top, 56px) + 52px)'
+        : isCompact
+          ? 'calc(var(--tg-top, 56px) + 62px)'
+          : 'calc(var(--tg-top, 56px) + 80px)',
+      paddingLeft: isTiny ? 12 : 16,
+      paddingRight: isTiny ? 12 : 16,
+      paddingBottom: isTiny ? 3 : isCompact ? 4 : 8,
+      minHeight: 0,
+    } satisfies React.CSSProperties,
+    bottomPanel: {
+      gap: isTiny ? 8 : isCompact ? 10 : 16,
+      paddingTop: isTiny ? 6 : isCompact ? 8 : 12,
+      flexShrink: 0,
+    } satisfies React.CSSProperties,
+    controlGap: isTiny ? 6 : 8,
+    flareButtonSize: isTiny ? 30 : isCompact ? 32 : 36,
+    filmGap: isTiny ? 7 : isCompact ? 8 : 10,
+    filmIconSize: isTiny ? 36 : isCompact ? 42 : 48,
+    shutterSize,
+    shutterInnerSize,
+    shutterGlowSize: isTiny ? 34 : isCompact ? 38 : 44,
+    shutterGap: isTiny ? 20 : isCompact ? 26 : 32,
+    shutterPaddingBottom: isTiny
+      ? 'max(14px, calc(var(--tg-bottom,0px) + 10px))'
+      : isCompact
+        ? 'max(22px, calc(var(--tg-bottom,0px) + 14px))'
+        : 'max(36px, calc(var(--tg-bottom,0px) + 24px))',
+    flipButtonSize,
+  }
 }
 
 // ── Styles ───────────────────────────────────────────────────────────────────
