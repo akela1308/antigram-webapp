@@ -237,6 +237,24 @@ function applyFlare(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, fl
 // ── Main component ────────────────────────────────────────────────────────────
 
 type Phase = 'viewfinder' | 'preview' | 'uploading' | 'success'
+type TelegramBackButton = {
+  show?: () => void
+  hide?: () => void
+  onClick?: (handler: () => void) => void
+  offClick?: (handler: () => void) => void
+}
+type TelegramWebApp = {
+  BackButton?: TelegramBackButton
+  HapticFeedback?: { impactOccurred?: (style: 'light' | 'medium' | 'heavy') => void }
+}
+
+function getTelegramWebApp(): TelegramWebApp | null {
+  try {
+    return ((window as unknown as { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp) ?? null
+  } catch {
+    return null
+  }
+}
 
 export function UploadPage() {
   const { user } = useAuth()
@@ -300,6 +318,26 @@ export function UploadPage() {
       getTodaysMomentCount(user.id).then(setTodayCount)
     }
   }, [user])
+
+  useEffect(() => {
+    if (!showCustomMoodSheet) return
+
+    const tg = getTelegramWebApp()
+    const closeSheet = () => setShowCustomMoodSheet(false)
+
+    tg?.BackButton?.show?.()
+    tg?.BackButton?.onClick?.(closeSheet)
+
+    return () => {
+      tg?.BackButton?.offClick?.(closeSheet)
+      tg?.BackButton?.hide?.()
+    }
+  }, [showCustomMoodSheet])
+
+  function closeCustomMoodSheet() {
+    setShowCustomMoodSheet(false)
+    getTelegramWebApp()?.HapticFeedback?.impactOccurred?.('light')
+  }
 
   // ── Camera lifecycle ────────────────────────────────────────────────────────
 
@@ -626,7 +664,7 @@ export function UploadPage() {
         {showCustomMoodSheet && (
           <>
             <div
-              onClick={() => setShowCustomMoodSheet(false)}
+              onClick={closeCustomMoodSheet}
               style={{ position: 'fixed', inset: 0, zIndex: 99, background: 'rgba(0,0,0,0.55)' }}
             />
             <div style={{
@@ -639,8 +677,30 @@ export function UploadPage() {
               <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: 10 }}>
                 <div style={{ width: 36, height: 4, borderRadius: 2, background: '#333' }} />
               </div>
-              <p style={{ color: '#fff', fontSize: 17, fontWeight: 700, margin: '0 0 4px' }}>Своя эмоция</p>
-              <p style={{ color: '#555', fontSize: 13, margin: '0 0 12px' }}>Выбери эмодзи и назови её</p>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
+                <div>
+                  <p style={{ color: '#fff', fontSize: 17, fontWeight: 700, margin: '0 0 4px' }}>Своя эмоция</p>
+                  <p style={{ color: '#555', fontSize: 13, margin: 0 }}>Выбери эмодзи и назови её</p>
+                </div>
+                <button
+                  onClick={closeCustomMoodSheet}
+                  aria-label="Закрыть"
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 17,
+                    border: '1px solid #2E2218',
+                    background: 'rgba(255,255,255,0.05)',
+                    color: 'var(--text-muted)',
+                    fontSize: 18,
+                    lineHeight: 1,
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                  }}
+                >
+                  ×
+                </button>
+              </div>
 
               {/* Emoji grid — no keyboard needed */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
