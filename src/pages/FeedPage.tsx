@@ -10,6 +10,7 @@ import { EMOTIONS } from '../lib/types'
 import type { MomentWithProfile, ReactionType } from '../lib/types'
 
 type FilterValue = 'for_you' | ReactionType
+type CustomMood = { emoji: string; label: string } | null
 
 interface ReactionsMap {
   [momentId: string]: { type: ReactionType }[]
@@ -290,10 +291,23 @@ function PhotoOfDayCard({
   onReact?: (momentId: string, type: ReactionType) => void
 }) {
   const navigate = useNavigate()
+  const [showReactionPicker, setShowReactionPicker] = useState(false)
   const profile = moment.profiles
   const displayName = profile?.display_name ?? profile?.username ?? 'Аноним'
-  const topReaction = getTopReaction(reactions)
+  const customMood = getCustomMood(moment)
+  const topReaction = getTopReaction(reactions, customMood)
   const isReacted = topReaction ? userReaction === topReaction.type : false
+
+  function handleReactionClick(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (!onReact) return
+    setShowReactionPicker(open => !open)
+  }
+
+  function handleReact(type: ReactionType) {
+    onReact?.(moment.id, type)
+    setShowReactionPicker(false)
+  }
 
   return (
     <div
@@ -352,7 +366,7 @@ function PhotoOfDayCard({
               {topReaction && (
                 <div
                   role="button"
-                  onClick={onReact ? (e) => { e.stopPropagation(); onReact(moment.id, topReaction.type) } : undefined}
+                  onClick={handleReactionClick}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -377,6 +391,52 @@ function PhotoOfDayCard({
               />
             </div>
           </div>
+          {showReactionPicker && onReact && (
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{
+                position: 'absolute',
+                right: 14,
+                bottom: 62,
+                maxWidth: 'calc(100% - 28px)',
+                display: 'flex',
+                gap: 6,
+                overflowX: 'auto',
+                padding: '6px 8px',
+                borderRadius: 22,
+                background: 'rgba(20,14,10,0.88)',
+                border: '1px solid rgba(201,132,62,0.35)',
+                backdropFilter: 'blur(10px)',
+                zIndex: 5,
+              }}
+            >
+              {EMOTIONS.map(e => (
+                <button
+                  key={e.type}
+                  onClick={() => handleReact(e.type)}
+                  style={quickReactionStyle(userReaction === e.type)}
+                  aria-label={e.label}
+                >
+                  {e.emoji}
+                </button>
+              ))}
+              {customMood && (
+                <button
+                  onClick={() => handleReact('custom')}
+                  style={{
+                    ...quickReactionStyle(userReaction === 'custom'),
+                    width: 'auto',
+                    padding: '0 8px',
+                    gap: 4,
+                  }}
+                  aria-label={customMood.label}
+                >
+                  <span>{customMood.emoji}</span>
+                  <span style={{ fontSize: 10, maxWidth: 74, overflow: 'hidden', textOverflow: 'ellipsis' }}>{customMood.label}</span>
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Caption — below photo, inside same rounded card */}
@@ -463,7 +523,12 @@ function EmptyState({ filter }: { filter: FilterValue }) {
   )
 }
 
-function getTopReaction(reactions: { type: ReactionType }[]) {
+function getCustomMood(moment: MomentWithProfile): CustomMood {
+  if (!moment.custom_mood_emoji || !moment.custom_mood_label) return null
+  return { emoji: moment.custom_mood_emoji, label: moment.custom_mood_label }
+}
+
+function getTopReaction(reactions: { type: ReactionType }[], customMood: CustomMood) {
   if (reactions.length === 0) return null
   const counts: Record<string, number> = {}
   for (const r of reactions) {
@@ -471,5 +536,25 @@ function getTopReaction(reactions: { type: ReactionType }[]) {
   }
   const [topType, count] = Object.entries(counts).sort(([, a], [, b]) => b - a)[0]
   const emotion = EMOTIONS.find(e => e.type === topType)
+  if (topType === 'custom' && customMood) {
+    return { emoji: customMood.emoji, label: customMood.label, type: 'custom' as ReactionType, count }
+  }
   return emotion ? { emoji: emotion.emoji, label: emotion.label, type: emotion.type, count } : null
+}
+
+function quickReactionStyle(active: boolean): React.CSSProperties {
+  return {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    border: active ? '1px solid var(--amber)' : '1px solid rgba(255,255,255,0.12)',
+    background: active ? 'rgba(201,132,62,0.26)' : 'rgba(255,255,255,0.06)',
+    color: active ? 'var(--amber)' : 'rgba(255,255,255,0.86)',
+    fontSize: 15,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    cursor: 'pointer',
+  }
 }
