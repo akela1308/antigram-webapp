@@ -413,7 +413,9 @@ interface ShotCardProps {
 function ShotCard({ moment: m, cardRef, reactionCounts, myReaction, starTotal, onStarTotalChange, onReaction, onMenu }: ShotCardProps) {
   const [showAllReactions, setShowAllReactions] = useState(false)
 
-  const myReactionEmotion = myReaction ? EMOTIONS.find(e => e.type === myReaction) : null
+  const moodMeta = getReactionMeta(m.mood as ReactionType | null, m)
+  const myReactionMeta = getReactionMeta(myReaction, m)
+  const customMoodMeta = getCustomMoodMeta(m)
   const totalReactions = Object.values(reactionCounts).reduce((a, b) => a + (b ?? 0), 0)
   const hasAnyReaction = totalReactions > 0
 
@@ -447,12 +449,12 @@ function ShotCard({ moment: m, cardRef, reactionCounts, myReaction, starTotal, o
 
       {/* Caption + mood tag */}
       <div style={{ padding: '10px 14px 4px' }}>
-        {m.mood && (
+        {moodMeta && (
           <span style={{
             display: 'inline-block', padding: '3px 10px', borderRadius: 12, marginBottom: 6,
             background: 'rgba(196,168,130,0.12)', color: 'var(--amber)', fontSize: 12,
           }}>
-            {EMOTIONS.find(e => e.type === m.mood)?.emoji ?? ''} {m.mood}
+            {moodMeta.emoji} {moodMeta.label}
           </span>
         )}
         {m.caption && (
@@ -469,7 +471,8 @@ function ShotCard({ moment: m, cardRef, reactionCounts, myReaction, starTotal, o
             .filter(([, c]) => c > 0)
             .sort(([, a], [, b]) => b - a)
             .map(([type, count]) => {
-              const e = EMOTIONS.find(x => x.type === type)
+              const reactionMeta = getReactionMeta(type, m)
+              if (!reactionMeta) return null
               const active = myReaction === type
               return (
                 <button
@@ -483,8 +486,9 @@ function ShotCard({ moment: m, cardRef, reactionCounts, myReaction, starTotal, o
                     cursor: 'pointer',
                   }}
                 >
-                  <span style={{ fontSize: 14 }}>{e?.emoji ?? '❤️'}</span>
-                  <span style={{ color: active ? 'var(--amber)' : 'var(--text-muted)', fontSize: 12, fontWeight: active ? 700 : 400 }}>{count}</span>
+                  <span style={{ fontSize: 14 }}>{reactionMeta.emoji}</span>
+                  <span style={{ color: active ? 'var(--amber)' : 'var(--text-muted)', fontSize: 12, fontWeight: active ? 700 : 400 }}>{reactionMeta.label}</span>
+                  <span style={{ color: active ? 'var(--amber)' : 'var(--text-muted)', fontSize: 12, fontWeight: 700 }}>{count}</span>
                 </button>
               )
             })}
@@ -496,7 +500,17 @@ function ShotCard({ moment: m, cardRef, reactionCounts, myReaction, starTotal, o
         {/* Reaction toggle */}
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           {showAllReactions ? (
-            <>
+            <div
+              className="no-scrollbar"
+              style={{
+                display: 'flex',
+                gap: 6,
+                alignItems: 'center',
+                maxWidth: 'calc(100vw - 118px)',
+                overflowX: 'auto',
+                WebkitOverflowScrolling: 'touch',
+              }}
+            >
               {EMOTIONS.map(e => {
                 const active = myReaction === e.type
                 return (
@@ -504,28 +518,46 @@ function ShotCard({ moment: m, cardRef, reactionCounts, myReaction, starTotal, o
                     key={e.type}
                     onClick={() => { onReaction(e.type); setShowAllReactions(false) }}
                     style={{
-                      width: 36, height: 36, borderRadius: 18,
+                      display: 'flex', alignItems: 'center', gap: 5,
+                      height: 38, padding: '0 11px', borderRadius: 19,
                       background: active ? 'rgba(196,168,130,0.2)' : 'rgba(255,255,255,0.05)',
                       border: active ? '1px solid var(--amber)' : '1px solid #2E2218',
-                      fontSize: 16, cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: active ? 'var(--amber)' : 'var(--text-muted)',
+                      fontSize: 12, cursor: 'pointer', flexShrink: 0,
                     }}
                   >
-                    {e.emoji}
+                    <span style={{ fontSize: 15 }}>{e.emoji}</span>
+                    <span>{e.label}</span>
                   </button>
                 )
               })}
+              {customMoodMeta && (
+                <button
+                  onClick={() => { onReaction('custom'); setShowAllReactions(false) }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 5,
+                    height: 38, padding: '0 11px', borderRadius: 19,
+                    background: myReaction === 'custom' ? 'rgba(196,168,130,0.2)' : 'rgba(196,168,130,0.08)',
+                    border: myReaction === 'custom' ? '1px solid var(--amber)' : '1px solid rgba(196,168,130,0.4)',
+                    color: myReaction === 'custom' ? 'var(--amber)' : 'var(--text-muted)',
+                    fontSize: 12, cursor: 'pointer', flexShrink: 0,
+                  }}
+                >
+                  <span style={{ fontSize: 15 }}>{customMoodMeta.emoji}</span>
+                  <span>{customMoodMeta.label}</span>
+                </button>
+              )}
               <button
                 onClick={() => setShowAllReactions(false)}
                 style={{
-                  width: 30, height: 30, borderRadius: 15,
+                  width: 32, height: 32, borderRadius: 16,
                   background: 'none', border: 'none',
-                  color: 'var(--text-muted)', fontSize: 18, cursor: 'pointer',
+                  color: 'var(--text-muted)', fontSize: 18, cursor: 'pointer', flexShrink: 0,
                 }}
               >
                 ✕
               </button>
-            </>
+            </div>
           ) : (
             <button
               onClick={() => setShowAllReactions(true)}
@@ -538,8 +570,8 @@ function ShotCard({ moment: m, cardRef, reactionCounts, myReaction, starTotal, o
                 fontSize: 13, cursor: 'pointer',
               }}
             >
-              <span style={{ fontSize: 15 }}>{myReaction ? (myReactionEmotion?.emoji ?? '❤️') : '+'}</span>
-              <span>{myReaction ? (myReactionEmotion?.label ?? 'Реакция') : 'Реакция'}</span>
+              <span style={{ fontSize: 15 }}>{myReactionMeta ? myReactionMeta.emoji : '+'}</span>
+              <span>{myReactionMeta ? myReactionMeta.label : 'Реакция'}</span>
             </button>
           )}
           <StarSupportButton
@@ -579,4 +611,16 @@ function MenuBtn({ label, icon, danger, muted, onClick }: {
       {label}
     </button>
   )
+}
+
+function getCustomMoodMeta(moment: Moment): { emoji: string; label: string } | null {
+  if (!moment.custom_mood_emoji || !moment.custom_mood_label) return null
+  return { emoji: moment.custom_mood_emoji, label: moment.custom_mood_label }
+}
+
+function getReactionMeta(type: ReactionType | null | undefined, moment: Moment): { emoji: string; label: string } | null {
+  if (!type) return null
+  if (type === 'custom') return getCustomMoodMeta(moment)
+  const emotion = EMOTIONS.find(e => e.type === type)
+  return emotion ? { emoji: emotion.emoji, label: emotion.label } : null
 }
