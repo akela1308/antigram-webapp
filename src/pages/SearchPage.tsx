@@ -2,11 +2,12 @@ import { useState, useEffect, useCallback, Children } from 'react'
 import { CategoryFilmStrip } from '../components/CategoryFilmStrip'
 import { MomentCard } from '../components/MomentCard'
 import { MomentCardSkeleton } from '../components/Skeleton'
-import { searchUsers, getRandomMoments, getMomentsByEmotion, getFeedReactions, getMomentStarTotals } from '../lib/db'
+import { searchUsers, getRandomMoments, getMomentsByEmotion, getFeedReactions, getMomentStarTotals, getUserReactionsForMoments, addReaction } from '../lib/db'
 import type { MomentWithProfile, ReactionType } from '../lib/types'
 import type { Profile } from '../lib/types'
 import { useNavigate } from 'react-router-dom'
 import { useLanguage } from '../contexts/LanguageContext'
+import { useAuth } from '../contexts/AuthContext'
 
 type FilterValue = 'for_you' | ReactionType
 
@@ -15,6 +16,7 @@ interface ReactionsMap {
 }
 
 export function SearchPage() {
+  const { user } = useAuth()
   const { t } = useLanguage()
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
@@ -24,6 +26,7 @@ export function SearchPage() {
   const [filter, setFilter] = useState<FilterValue>('for_you')
   const [moments, setMoments] = useState<MomentWithProfile[]>([])
   const [reactionsMap, setReactionsMap] = useState<ReactionsMap>({})
+  const [userReactionsMap, setUserReactionsMap] = useState<Record<string, ReactionType | null>>({})
   const [starTotals, setStarTotals] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
 
@@ -44,9 +47,10 @@ export function SearchPage() {
 
     if (data.length > 0) {
       const ids = data.map(m => m.id)
-      const [reactions, stars] = await Promise.all([
+      const [reactions, stars, userRxs] = await Promise.all([
         getFeedReactions(ids),
         getMomentStarTotals(ids),
+        user ? getUserReactionsForMoments(user.id, ids) : Promise.resolve([]),
       ])
       const map: ReactionsMap = {}
       for (const r of reactions) {
@@ -55,13 +59,44 @@ export function SearchPage() {
       }
       setReactionsMap(map)
       setStarTotals(stars)
+      const userMap: Record<string, ReactionType | null> = {}
+      for (const r of userRxs) { userMap[r.moment_id] = r.type }
+      setUserReactionsMap(userMap)
     } else {
       setReactionsMap({})
       setStarTotals({})
+      setUserReactionsMap({})
     }
 
     setLoading(false)
-  }, [filter])
+  }, [filter, user])
+
+  const handleReact = useCallback(async (momentId: string, type: ReactionType) => {
+    if (!user) return
+    const current = userReactionsMap[momentId] ?? null
+    if (current === type) return
+
+    setUserReactionsMap(prev => ({ ...prev, [momentId]: type }))
+    setReactionsMap(prev => {
+      const existing = prev[momentId] ?? []
+      let removedOld = false
+      const filtered = current
+        ? existing.filter(r => { if (!removedOld && r.type === current) { removedOld = true; return false } return true })
+        : existing
+      return { ...prev, [momentId]: [...filtered, { type }] }
+    })
+
+    const { error } = await addReaction(momentId, user.id, type)
+    if (error) {
+      setUserReactionsMap(prev => ({ ...prev, [momentId]: current }))
+      setReactionsMap(prev => {
+        const existing = prev[momentId] ?? []
+        let removedNew = false
+        const withoutNew = existing.filter(r => { if (!removedNew && r.type === type) { removedNew = true; return false } return true })
+        return { ...prev, [momentId]: current ? [...withoutNew, { type: current }] : withoutNew }
+      })
+    }
+  }, [user, userReactionsMap])
 
   useEffect(() => {
     if (!isSearching) loadFeed()
@@ -181,6 +216,9 @@ export function SearchPage() {
                   reactions={reactionsMap[moment.id] ?? []}
                   starTotal={starTotals[moment.id] ?? 0}
                   onStarTotalChange={(momentId, total) => setStarTotals(prev => ({ ...prev, [momentId]: total }))}
+                  userReaction={userReactionsMap[moment.id] ?? null}
+                  onReact={user ? handleReact : undefined}
+                  directTopReaction
                 />
               ))}
             </PhotoGrid>
