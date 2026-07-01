@@ -62,6 +62,10 @@ export function BottomNav() {
     navigate('/upload', { state: { filmId: 'none' } })
   }
 
+  function getFilmName(preset: FilmPreset): string {
+    return preset.id === 'none' ? t('common.noFilter') : preset.name
+  }
+
   return (
     <>
       <nav
@@ -210,7 +214,7 @@ export function BottomNav() {
                       {preset.iconUrl ? (
                         <img
                           src={preset.iconUrl}
-                          alt={preset.name}
+                          alt={getFilmName(preset)}
                           style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 32 }}
                         />
                       ) : (
@@ -236,7 +240,7 @@ export function BottomNav() {
                         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                       }}
                     >
-                      {preset.name.split(' ')[0]}
+                      {preset.id === 'none' ? t('common.none') : preset.name.split(' ')[0]}
                     </span>
                   </button>
                 )
@@ -246,7 +250,7 @@ export function BottomNav() {
             {/* Selected film name */}
             <div style={{ padding: '0 20px 16px', textAlign: 'center' }}>
               <p style={{ color: '#fff', fontSize: 16, fontWeight: 600, margin: 0 }}>
-                {selected.name}
+                {getFilmName(selected)}
               </p>
             </div>
 

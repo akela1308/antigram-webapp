@@ -1200,9 +1200,9 @@ function SupportSheet({
       setSending(false)
       onSent()
       onClose()
-    } catch (err) {
+    } catch {
       setSending(false)
-      setError(err instanceof Error ? err.message : t('support.sendFailed'))
+      setError(t('support.sendFailed'))
     }
   }
 
@@ -1338,8 +1338,8 @@ function SupportInboxSheet({ onClose, onChanged }: { onClose: () => void; onChan
     setError(null)
     try {
       setItems(await getSupportRequests())
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t('support.loadFailed'))
+    } catch {
+      setError(t('support.loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -1354,8 +1354,8 @@ function SupportInboxSheet({ onClose, onChanged }: { onClose: () => void; onChan
     try {
       const url = await getSupportAttachmentUrl(item.attachment_path)
       window.open(url, '_blank', 'noopener,noreferrer')
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t('support.openAttachmentFailed'))
+    } catch {
+      setError(t('support.openAttachmentFailed'))
     }
   }
 
@@ -1367,8 +1367,8 @@ function SupportInboxSheet({ onClose, onChanged }: { onClose: () => void; onChan
         entry.id === item.id ? { ...entry, status: nextStatus } : entry
       )))
       onChanged()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t('support.updateFailed'))
+    } catch {
+      setError(t('support.updateFailed'))
     }
   }
 

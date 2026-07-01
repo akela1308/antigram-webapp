@@ -94,7 +94,7 @@ export function MomentCard({
                 key={e.type}
                 onClick={() => handleReact(e.type)}
                 style={quickReactionStyle(userReaction === e.type)}
-                aria-label={e.label}
+                aria-label={t(`emotion.${e.type}`)}
               >
                 {e.emoji}
               </button>

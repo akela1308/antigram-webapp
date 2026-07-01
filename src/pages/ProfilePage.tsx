@@ -253,7 +253,8 @@ export function ProfilePage() {
 }
 
 function ReactionPreviewPill({ moment, reactions }: { moment: Moment; reactions: ReactionPreview[] }) {
-  const topReaction = getTopReaction(moment, reactions)
+  const { t } = useLanguage()
+  const topReaction = getTopReaction(moment, reactions, t)
   if (!topReaction) return null
 
   return (
@@ -282,7 +283,7 @@ function ReactionPreviewPill({ moment, reactions }: { moment: Moment; reactions:
   )
 }
 
-function getTopReaction(moment: Moment, reactions: ReactionPreview[]) {
+function getTopReaction(moment: Moment, reactions: ReactionPreview[], t: (key: string) => string) {
   if (reactions.length === 0) return null
 
   const counts: Record<string, number> = {}
@@ -301,7 +302,7 @@ function getTopReaction(moment: Moment, reactions: ReactionPreview[]) {
   }
 
   const emotion = EMOTIONS.find(e => e.type === topType)
-  return emotion ? { emoji: emotion.emoji, label: emotion.label, count } : null
+  return emotion ? { emoji: emotion.emoji, label: t(`emotion.${emotion.type}`), count } : null
 }
 
 function Stat({ label, value }: { label: string; value: number }) {
