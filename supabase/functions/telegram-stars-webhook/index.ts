@@ -18,6 +18,7 @@ interface TelegramUser {
   first_name?: string
   last_name?: string
   username?: string
+  language_code?: string
 }
 
 interface TelegramUpdate {
@@ -65,6 +66,62 @@ interface CompletePaymentResult {
   author_id: string
   amount: number
   already_paid: boolean
+}
+
+type BotLanguage = 'ru' | 'en'
+type BotTextKey = 'fallback' | 'what' | 'upload' | 'support' | 'welcome'
+
+const BOT_TEXT: Record<BotLanguage, Record<BotTextKey, string>> = {
+  ru: {
+    fallback:
+      'Я бот Antigram. Пока главный путь здесь простой: открыть приложение и публиковать моменты.\n\n' +
+      'Нажми кнопку ниже или отправь /start, чтобы увидеть меню.',
+    what:
+      'Что можно делать в Antigram:\n\n' +
+      '• публиковать моменты как кадры на плёнке;\n' +
+      '• выбирать настроение кадра;\n' +
+      '• собирать альбомы;\n' +
+      '• находить людей через поиск и подборки;\n' +
+      '• ставить реакции и поддерживать авторов Stars.',
+    upload:
+      'Как загрузить кадр:\n\n' +
+      '1. Нажми “Открыть Antigram”.\n' +
+      '2. Перейди на камеру/загрузку.\n' +
+      '3. Выбери фото, плёнку и настроение.\n' +
+      '4. Опубликуй момент — он появится в ленте и профиле.',
+    support:
+      'Если что-то не работает или есть идея — напиши в поддержку внутри профиля Antigram.\n\n' +
+      'Можно также описать проблему прямо здесь, а мы позже подключим полноценные ответы бота.',
+    welcome:
+      'Это Antigram.\n\n' +
+      'Здесь сохраняют моменты как кадры на плёнке: фото, настроение, альбомы, реакции и люди, которых хочется найти по вайбу.\n\n' +
+      'Начни с приложения — там уже можно смотреть ленту, загружать кадры и собирать профиль.',
+  },
+  en: {
+    fallback:
+      'I am the Antigram bot. For now, the main path is simple: open the app and publish moments.\n\n' +
+      'Tap the button below or send /start to see the menu.',
+    what:
+      'What you can do in Antigram:\n\n' +
+      '• publish moments as film-like frames;\n' +
+      '• choose a mood for each photo;\n' +
+      '• collect albums;\n' +
+      '• discover people through search and collections;\n' +
+      '• react to photos and support authors with Stars.',
+    upload:
+      'How to upload a frame:\n\n' +
+      '1. Tap “Open Antigram”.\n' +
+      '2. Go to camera/upload.\n' +
+      '3. Choose a photo, film look, and mood.\n' +
+      '4. Publish the moment — it will appear in the feed and on your profile.',
+    support:
+      'If something does not work or you have an idea, write to support from your Antigram profile.\n\n' +
+      'You can also describe the issue here; later we will connect full bot replies.',
+    welcome:
+      'This is Antigram.\n\n' +
+      'Save moments as film-like frames: photos, moods, albums, reactions, and people you discover by the feeling of a shot.\n\n' +
+      'Start with the app — you can already browse the feed, upload frames, and build your profile there.',
+  },
 }
 
 Deno.serve(async (req) => {
@@ -156,18 +213,17 @@ async function handleBotMessage(message: NonNullable<TelegramUpdate['message']>)
   if (!chatId) return
 
   const text = message.text?.trim().toLowerCase() ?? ''
+  const language = getUserLanguage(message.from)
 
   if (text.startsWith('/start') || text.startsWith('/help') || text === 'start') {
-    await sendWelcome(chatId, message.from)
+    await sendWelcome(chatId, message.from, language)
     return
   }
 
   await telegramApi('sendMessage', {
     chat_id: chatId,
-    text:
-      'Я бот Antigram. Пока главный путь здесь простой: открыть приложение и публиковать моменты.\n\n' +
-      'Нажми кнопку ниже или отправь /start, чтобы увидеть меню.',
-    reply_markup: mainKeyboard(),
+    text: BOT_TEXT[language].fallback,
+    reply_markup: mainKeyboard(language),
   })
 }
 
@@ -177,79 +233,72 @@ async function handleCallbackQuery(query: NonNullable<TelegramUpdate['callback_q
   const chatId = query.message?.chat?.id
   if (!chatId) return
 
-  if (query.data === 'what') {
+  const { action, language } = parseCallbackData(query.data, query.from)
+
+  if (action === 'lang') {
+    await sendWelcome(chatId, query.from, language)
+    return
+  }
+
+  if (action === 'what' || action === 'upload' || action === 'support') {
     await telegramApi('sendMessage', {
       chat_id: chatId,
-      text:
-        'Что можно делать в Antigram:\n\n' +
-        '• публиковать моменты как кадры на плёнке;\n' +
-        '• выбирать настроение кадра;\n' +
-        '• собирать альбомы;\n' +
-        '• находить людей через поиск и подборки;\n' +
-        '• ставить реакции и поддерживать авторов Stars.',
-      reply_markup: mainKeyboard(),
+      text: BOT_TEXT[language][action],
+      reply_markup: mainKeyboard(language),
     })
     return
   }
 
-  if (query.data === 'upload') {
-    await telegramApi('sendMessage', {
-      chat_id: chatId,
-      text:
-        'Как загрузить кадр:\n\n' +
-        '1. Нажми “Открыть Antigram”.\n' +
-        '2. Перейди на камеру/загрузку.\n' +
-        '3. Выбери фото, плёнку и настроение.\n' +
-        '4. Опубликуй момент — он появится в ленте и профиле.',
-      reply_markup: mainKeyboard(),
-    })
-    return
-  }
-
-  if (query.data === 'support') {
-    await telegramApi('sendMessage', {
-      chat_id: chatId,
-      text:
-        'Если что-то не работает или есть идея — напиши в поддержку внутри профиля Antigram.\n\n' +
-        'Можно также описать проблему прямо здесь, а мы позже подключим полноценные ответы бота.',
-      reply_markup: mainKeyboard(),
-    })
-    return
-  }
-
-  await sendWelcome(chatId, query.from)
+  await sendWelcome(chatId, query.from, language)
 }
 
-async function sendWelcome(chatId: number | string, user?: TelegramUser) {
+async function sendWelcome(chatId: number | string, user?: TelegramUser, language = getUserLanguage(user)) {
   const name = user?.first_name ? `, ${user.first_name}` : ''
+  const greeting = language === 'ru' ? `Привет${name}. ` : `Hi${name}. `
 
   await telegramApi('sendMessage', {
     chat_id: chatId,
-    text:
-      `Привет${name}. Это Antigram.\n\n` +
-      'Здесь сохраняют моменты как кадры на плёнке: фото, настроение, альбомы, реакции и люди, которых хочется найти по вайбу.\n\n' +
-      'Начни с приложения — там уже можно смотреть ленту, загружать кадры и собирать профиль.',
-    reply_markup: mainKeyboard(),
+    text: greeting + BOT_TEXT[language].welcome,
+    reply_markup: mainKeyboard(language),
   })
 }
 
-function mainKeyboard() {
+function mainKeyboard(language: BotLanguage) {
+  const nextLanguage: BotLanguage = language === 'ru' ? 'en' : 'ru'
+
   return {
     inline_keyboard: [
       [
         {
-          text: 'Открыть Antigram',
+          text: language === 'ru' ? 'Открыть Antigram' : 'Open Antigram',
           web_app: { url: WEBAPP_URL },
         },
       ],
       [
-        { text: 'Что здесь делать?', callback_data: 'what' },
-        { text: 'Как загрузить кадр?', callback_data: 'upload' },
+        { text: language === 'ru' ? 'Что здесь делать?' : 'What can I do here?', callback_data: `what:${language}` },
+        { text: language === 'ru' ? 'Как загрузить кадр?' : 'How do I upload?', callback_data: `upload:${language}` },
       ],
       [
-        { text: 'Поддержка', callback_data: 'support' },
+        { text: language === 'ru' ? 'Поддержка' : 'Support', callback_data: `support:${language}` },
+        { text: language === 'ru' ? 'English' : 'Русский', callback_data: `lang:${nextLanguage}` },
       ],
     ],
+  }
+}
+
+function getUserLanguage(user?: TelegramUser): BotLanguage {
+  return user?.language_code?.toLowerCase().startsWith('ru') ? 'ru' : 'en'
+}
+
+function parseCallbackData(data: string | undefined, user?: TelegramUser): {
+  action: string
+  language: BotLanguage
+} {
+  const fallback = getUserLanguage(user)
+  const [action = 'start', rawLanguage] = (data ?? '').split(':')
+  return {
+    action,
+    language: rawLanguage === 'ru' || rawLanguage === 'en' ? rawLanguage : fallback,
   }
 }
 
