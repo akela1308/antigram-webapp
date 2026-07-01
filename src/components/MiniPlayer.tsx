@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useLanguage } from '../contexts/LanguageContext'
 import { usePlayer } from '../contexts/PlayerContext'
@@ -13,6 +13,65 @@ const PLAYER_ASSETS = {
 
 const fixedRight = 'max(14px, calc((100vw - 480px) / 2 + 14px))'
 const fixedBottom = 'calc(max(20px, env(safe-area-inset-bottom, 20px)) + 75px)'
+const PLAYER_POSITION_KEY = 'antigram-mini-player-position'
+const PLAYER_VIEWPORT_MARGIN = 8
+const DRAG_THRESHOLD = 6
+
+type PlayerPosition = { x: number; y: number }
+
+function getStoredPosition(): PlayerPosition | null {
+  if (typeof window === 'undefined') return null
+
+  try {
+    const raw = window.localStorage.getItem(PLAYER_POSITION_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<PlayerPosition>
+    if (typeof parsed.x !== 'number' || typeof parsed.y !== 'number') return null
+    return parsed as PlayerPosition
+  } catch {
+    return null
+  }
+}
+
+function storePosition(position: PlayerPosition) {
+  try {
+    window.localStorage.setItem(PLAYER_POSITION_KEY, JSON.stringify(position))
+  } catch {
+    // Position persistence is a comfort feature; dragging should keep working without it.
+  }
+}
+
+function getViewportSize() {
+  const viewport = window.visualViewport
+  return {
+    width: viewport?.width ?? window.innerWidth,
+    height: viewport?.height ?? window.innerHeight,
+  }
+}
+
+function getDefaultPosition(element: HTMLElement): PlayerPosition {
+  const rect = element.getBoundingClientRect()
+  const viewport = getViewportSize()
+  const rightMargin = Math.max(14, (viewport.width - 480) / 2 + 14)
+  const bottomMargin = 95
+
+  return {
+    x: viewport.width - rect.width - rightMargin,
+    y: viewport.height - rect.height - bottomMargin,
+  }
+}
+
+function clampPosition(position: PlayerPosition, element: HTMLElement): PlayerPosition {
+  const rect = element.getBoundingClientRect()
+  const viewport = getViewportSize()
+  const maxX = Math.max(PLAYER_VIEWPORT_MARGIN, viewport.width - rect.width - PLAYER_VIEWPORT_MARGIN)
+  const maxY = Math.max(PLAYER_VIEWPORT_MARGIN, viewport.height - rect.height - PLAYER_VIEWPORT_MARGIN)
+
+  return {
+    x: Math.min(Math.max(position.x, PLAYER_VIEWPORT_MARGIN), maxX),
+    y: Math.min(Math.max(position.y, PLAYER_VIEWPORT_MARGIN), maxY),
+  }
+}
 
 function Marquee({ text }: { text: string }) {
   const textRef = useRef<HTMLSpanElement | null>(null)
@@ -64,8 +123,121 @@ export function MiniPlayer() {
   const { t } = useLanguage()
   const { tracks, currentIndex, isPlaying, isLoading, toggle, next, prev, play, pause } = usePlayer()
   const [mode, setMode] = useState<'idle' | 'active'>('idle')
+  const [position, setPosition] = useState<PlayerPosition | null>(() => getStoredPosition())
+  const [isDragging, setIsDragging] = useState(false)
+  const playerRef = useRef<HTMLElement | null>(null)
+  const dragRef = useRef<{
+    pointerId: number
+    startX: number
+    startY: number
+    originX: number
+    originY: number
+    moved: boolean
+  } | null>(null)
+  const suppressClickRef = useRef(false)
 
   const currentTrack = tracks[currentIndex]
+
+  useLayoutEffect(() => {
+    const element = playerRef.current
+    if (!element) return
+
+    const basePosition = position ?? getDefaultPosition(element)
+    const nextPosition = clampPosition(basePosition, element)
+    setPosition(nextPosition)
+  }, [mode])
+
+  useEffect(() => {
+    const keepInBounds = () => {
+      const element = playerRef.current
+      if (!element) return
+
+      setPosition(current => {
+        const nextPosition = clampPosition(current ?? getDefaultPosition(element), element)
+        storePosition(nextPosition)
+        return nextPosition
+      })
+    }
+
+    window.addEventListener('resize', keepInBounds)
+    window.visualViewport?.addEventListener('resize', keepInBounds)
+    return () => {
+      window.removeEventListener('resize', keepInBounds)
+      window.visualViewport?.removeEventListener('resize', keepInBounds)
+    }
+  }, [])
+
+  function updatePosition(nextPosition: PlayerPosition) {
+    const element = playerRef.current
+    if (!element) return
+
+    const clamped = clampPosition(nextPosition, element)
+    setPosition(clamped)
+    storePosition(clamped)
+  }
+
+  function handlePointerDown(event: React.PointerEvent<HTMLElement>) {
+    if (event.button !== 0) return
+
+    const element = playerRef.current
+    if (!element) return
+
+    const origin = position ?? clampPosition(getDefaultPosition(element), element)
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: origin.x,
+      originY: origin.y,
+      moved: false,
+    }
+
+    setPosition(origin)
+    element.setPointerCapture?.(event.pointerId)
+  }
+
+  function handlePointerMove(event: React.PointerEvent<HTMLElement>) {
+    const drag = dragRef.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+
+    const dx = event.clientX - drag.startX
+    const dy = event.clientY - drag.startY
+    const hasMoved = Math.hypot(dx, dy) > DRAG_THRESHOLD
+
+    if (hasMoved) {
+      drag.moved = true
+      suppressClickRef.current = true
+      setIsDragging(true)
+      updatePosition({ x: drag.originX + dx, y: drag.originY + dy })
+    }
+  }
+
+  function finishDrag(event: React.PointerEvent<HTMLElement>) {
+    const drag = dragRef.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+
+    playerRef.current?.releasePointerCapture?.(event.pointerId)
+    dragRef.current = null
+    setIsDragging(false)
+
+    if (drag.moved) {
+      suppressClickRef.current = true
+      window.setTimeout(() => {
+        suppressClickRef.current = false
+      }, 0)
+    }
+  }
+
+  function handleClickCapture(event: React.MouseEvent<HTMLElement>) {
+    if (!suppressClickRef.current) return
+    event.preventDefault()
+    event.stopPropagation()
+    suppressClickRef.current = false
+  }
+
+  const positionStyle: CSSProperties = position
+    ? { left: position.x, top: position.y, right: 'auto', bottom: 'auto' }
+    : {}
 
   async function handleStart() {
     setMode('active')
@@ -80,10 +252,21 @@ export function MiniPlayer() {
   if (mode === 'idle') {
     return (
       <button
+        ref={node => { playerRef.current = node }}
         type="button"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={finishDrag}
+        onPointerCancel={finishDrag}
+        onClickCapture={handleClickCapture}
         onClick={handleStart}
         aria-label={t('music.enable')}
-        style={idleButtonStyle}
+        style={{
+          ...idleButtonStyle,
+          ...positionStyle,
+          cursor: isDragging ? 'grabbing' : 'grab',
+          touchAction: 'none',
+        }}
       >
         <img src={PLAYER_ASSETS.musicOn} alt="" style={musicIconStyle} />
       </button>
@@ -91,7 +274,20 @@ export function MiniPlayer() {
   }
 
   return (
-    <div style={pillStyle}>
+    <div
+      ref={node => { playerRef.current = node }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={finishDrag}
+      onPointerCancel={finishDrag}
+      onClickCapture={handleClickCapture}
+      style={{
+        ...pillStyle,
+        ...positionStyle,
+        cursor: isDragging ? 'grabbing' : 'grab',
+        touchAction: 'none',
+      }}
+    >
       <button
         type="button"
         onClick={handleClose}
