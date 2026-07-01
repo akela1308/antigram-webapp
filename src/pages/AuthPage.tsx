@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { useLanguage } from '../contexts/LanguageContext'
 
 export function AuthPage() {
   const { signIn, signUp, isTelegram, telegramUser, loginWithTelegram, telegramAuthLoading } = useAuth()
+  const { t } = useLanguage()
   const navigate = useNavigate()
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [email, setEmail] = useState('')
@@ -31,7 +33,7 @@ export function AuthPage() {
 
     if (result.error) {
       const err = result.error as { message?: string }
-      setError(err?.message ?? 'Произошла ошибка')
+      setError(err?.message ?? t('common.error'))
     } else {
       navigate('/')
     }
@@ -52,7 +54,7 @@ export function AuthPage() {
           ANTIGRAM
         </h1>
         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-          Реальные моменты, настоящие эмоции
+          {t('auth.tagline')}
         </p>
       </div>
 
@@ -70,14 +72,14 @@ export function AuthPage() {
             }}
           >
             {telegramAuthLoading ? (
-              <span>Входим...</span>
+              <span>{t('common.signingIn')}</span>
             ) : (
               <>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="#140E0A">
                   <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.941z"/>
                 </svg>
                 <span>
-                  Войти как {tgName ?? tgUsername ?? 'пользователь Telegram'}
+                  {t('auth.loginAs', { name: tgName ?? tgUsername ?? t('auth.telegramUser') })}
                 </span>
               </>
             )}
@@ -90,7 +92,7 @@ export function AuthPage() {
 
           <div className="flex items-center gap-3 my-5">
             <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>или</span>
+            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('auth.or')}</span>
             <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
           </div>
         </div>
@@ -103,12 +105,12 @@ export function AuthPage() {
       >
         {mode === 'register' && (
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs" style={{ color: 'var(--text-muted)' }}>Имя</label>
+            <label className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('auth.name')}</label>
             <input
               type="text"
               value={displayName}
               onChange={e => setDisplayName(e.target.value)}
-              placeholder="Как тебя зовут"
+              placeholder={t('auth.namePlaceholder')}
               required
               className="w-full px-4 py-3 rounded-xl text-sm outline-none"
               style={{
@@ -139,12 +141,12 @@ export function AuthPage() {
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs" style={{ color: 'var(--text-muted)' }}>Пароль</label>
+          <label className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('auth.password')}</label>
           <input
             type="password"
             value={password}
             onChange={e => setPassword(e.target.value)}
-            placeholder="Минимум 6 символов"
+            placeholder={t('auth.passwordPlaceholder')}
             required
             minLength={6}
             autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
@@ -172,7 +174,7 @@ export function AuthPage() {
             opacity: loading ? 0.6 : 1,
           }}
         >
-          {loading ? '...' : mode === 'login' ? 'Войти по email' : 'Создать аккаунт'}
+          {loading ? '...' : mode === 'login' ? t('auth.emailLogin') : t('auth.createAccount')}
         </button>
 
         <button
@@ -181,15 +183,15 @@ export function AuthPage() {
           className="text-sm text-center py-1"
           style={{ color: 'var(--text-muted)' }}
         >
-          {mode === 'login' ? 'Нет аккаунта? Зарегистрироваться' : 'Уже есть аккаунт? Войти'}
+          {mode === 'login' ? t('auth.noAccount') : t('auth.hasAccount')}
         </button>
       </form>
 
       <p className="text-xs text-center mt-8 max-w-xs" style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>
-        Продолжая, вы принимаете{' '}
-        <Link to="/terms" style={{ color: 'var(--amber)', textDecoration: 'none' }}>условия</Link>
-        {' '}и{' '}
-        <Link to="/privacy" style={{ color: 'var(--amber)', textDecoration: 'none' }}>политику конфиденциальности</Link>.
+        {t('auth.termsPrefix')}{' '}
+        <Link to="/terms" style={{ color: 'var(--amber)', textDecoration: 'none' }}>{t('auth.terms')}</Link>
+        {' '}{t('auth.and')}{' '}
+        <Link to="/privacy" style={{ color: 'var(--amber)', textDecoration: 'none' }}>{t('auth.privacy')}</Link>.
       </p>
     </div>
   )

@@ -1,3 +1,4 @@
+import { useLanguage } from '../contexts/LanguageContext'
 import { EMOTIONS } from '../lib/types'
 import type { ReactionType } from '../lib/types'
 
@@ -10,6 +11,7 @@ interface ReactionBarProps {
 }
 
 export function ReactionBar({ reactions, userReaction, onReact, size = 'sm', customMood }: ReactionBarProps) {
+  const { t } = useLanguage()
   const counts = reactions.reduce<Record<string, number>>((acc, r) => {
     acc[r.type] = (acc[r.type] ?? 0) + 1
     return acc
@@ -63,7 +65,7 @@ export function ReactionBar({ reactions, userReaction, onReact, size = 'sm', cus
         paddingBottom: 1,
       }}
     >
-      {EMOTIONS.map(e => reactionBtn(e.type, e.type, e.emoji, e.label))}
+      {EMOTIONS.map(e => reactionBtn(e.type, e.type, e.emoji, t(`emotion.${e.type}`)))}
       {customMood && customMood.emoji && customMood.label &&
         reactionBtn('custom', 'custom', customMood.emoji, customMood.label, true)
       }

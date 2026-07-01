@@ -67,6 +67,7 @@ function buildGridRows(moments: Moment[]): GridRow[] {
 export function MyProfilePage() {
   const { user, profile, loading: authLoading, signOut, isTelegram, telegramUser, loginWithTelegram, telegramAuthLoading } = useAuth()
   const navigate = useNavigate()
+  const { t } = useLanguage()
 
   const [moments, setMoments] = useState<Moment[]>([])
   const [highlights, setHighlights] = useState<HighlightWithMoment[]>([])
@@ -145,7 +146,7 @@ export function MyProfilePage() {
   const showToast = useCallback((msg: string) => {
     setToast(msg)
     setTimeout(() => setToast(null), 2500)
-  }, [])
+  }, [t])
 
   const handleSignOut = async () => {
     await signOut()
@@ -176,7 +177,7 @@ export function MyProfilePage() {
     const { error } = await setHighlightAtPosition(user.id, momentId, slot)
     if (error) {
       console.error('setHighlightAtPosition error:', error)
-      showToast('Ошибка сохранения')
+      showToast(t('profile.saveError'))
       const hl = await getHighlights(user.id)
       setHighlights(hl)
       return
@@ -184,7 +185,7 @@ export function MyProfilePage() {
 
     const hl = await getHighlights(user.id)
     setHighlights(hl)
-    showToast('Фото добавлено в плёнку')
+    showToast(t('profile.photoAdded'))
   }
 
   const handleHighlightRemove = async (slotIndex: number) => {
@@ -240,7 +241,7 @@ export function MyProfilePage() {
     return (
       <div className="flex flex-col" style={{ minHeight: '100dvh', paddingTop: 'var(--tg-top, 56px)' }}>
         <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--border)' }}>
-          <h2 style={{ color: 'var(--brown)', fontSize: 17, fontWeight: 700, margin: 0, fontFamily: 'Georgia, serif' }}>Мой профиль</h2>
+          <h2 style={{ color: 'var(--brown)', fontSize: 17, fontWeight: 700, margin: 0, fontFamily: 'Georgia, serif' }}>{t('profile.mine')}</h2>
         </div>
         <ProfileSkeleton />
         <div style={{ padding: '0 12px' }} className="grid grid-cols-2 gap-2">
@@ -260,7 +261,7 @@ export function MyProfilePage() {
       <div className="flex flex-col items-center justify-center min-h-screen gap-4 px-6">
         <span style={{ fontSize: 48 }}>👤</span>
         <p className="text-center" style={{ color: 'var(--text-muted)' }}>
-          Войдите, чтобы увидеть свой профиль
+          {t('profile.signInPrompt')}
         </p>
         {isTelegram && telegramUser ? (
           <button
@@ -269,25 +270,25 @@ export function MyProfilePage() {
             className="px-8 py-3.5 rounded-xl font-semibold text-sm flex items-center gap-2 transition-opacity"
             style={{ background: 'var(--amber)', color: '#140E0A', opacity: telegramAuthLoading ? 0.7 : 1 }}
           >
-            {telegramAuthLoading ? 'Входим...' : (
+            {telegramAuthLoading ? t('common.signingIn') : (
               <>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="#140E0A">
                   <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.941z"/>
                 </svg>
-                Войти как {tgName ?? tgUsername ?? 'Telegram'}
+                {t('auth.loginAs', { name: tgName ?? tgUsername ?? 'Telegram' })}
               </>
             )}
           </button>
         ) : (
           <Link to="/auth" className="px-8 py-3 rounded-xl font-semibold text-sm" style={{ background: 'var(--amber)', color: '#140E0A' }}>
-            Войти
+            {t('common.signIn')}
           </Link>
         )}
       </div>
     )
   }
 
-  const displayName = profile.display_name ?? profile.username ?? telegramUser?.first_name ?? 'Аноним'
+  const displayName = profile.display_name ?? profile.username ?? telegramUser?.first_name ?? t('common.anonymous')
 
   const ringPhotos: (string | null)[] = Array.from({ length: 5 }, (_, i) => {
     const hl = highlights.find(h => h.position === i)
@@ -308,7 +309,7 @@ export function MyProfilePage() {
           borderBottom: '1px solid var(--border)',
         }}
       >
-        <h2 style={{ color: 'var(--brown)', fontSize: 17, fontWeight: 700, margin: 0, fontFamily: 'Georgia, serif' }}>Мой профиль</h2>
+        <h2 style={{ color: 'var(--brown)', fontSize: 17, fontWeight: 700, margin: 0, fontFamily: 'Georgia, serif' }}>{t('profile.mine')}</h2>
         <button
           onClick={() => setShowSettings(true)}
           style={{
@@ -343,7 +344,7 @@ export function MyProfilePage() {
           border: '1px solid rgba(212,137,26,0.2)',
         }}>
           <p style={{ color: '#D4891A', fontSize: 12, margin: 0, textAlign: 'center' }}>
-            Выберите 5 фото для плёнки — нажмите + на кадр
+            {t('profile.pickFilmPhotos')}
           </p>
         </div>
       )}
@@ -382,11 +383,11 @@ export function MyProfilePage() {
 
         {/* Stats */}
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '10px 24px', width: '100%' }}>
-          <Stat label="кадры" value={moments.length} />
+          <Stat label={t('profile.frames')} value={moments.length} />
           <div style={{ width: 1, height: 28, background: 'var(--divider)', margin: '0 20px' }} />
-          <Stat label="подписчики" value={followersCount} onClick={() => navigate('/me/followers')} />
+          <Stat label={t('profile.followers')} value={followersCount} onClick={() => navigate('/me/followers')} />
           <div style={{ width: 1, height: 28, background: 'var(--divider)', margin: '0 20px' }} />
-          <Stat label="подписки" value={followingCount} onClick={() => navigate('/me/following')} />
+          <Stat label={t('profile.following')} value={followingCount} onClick={() => navigate('/me/following')} />
         </div>
       </div>
 
@@ -409,7 +410,7 @@ export function MyProfilePage() {
               transition: 'color 0.15s',
             }}
           >
-            {tab === 'film' ? 'Мои кадры' : 'Мои альбомы'}
+            {tab === 'film' ? t('profile.myFrames') : t('profile.myAlbums')}
           </button>
         ))}
       </div>
@@ -420,7 +421,7 @@ export function MyProfilePage() {
           {moments.length === 0 ? (
             <div className="flex flex-col items-center py-16 gap-2">
               <span style={{ fontSize: 40 }}>📷</span>
-              <p style={{ color: 'var(--text-muted)', fontSize: 14, margin: 0 }}>Нет моментов</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: 14, margin: 0 }}>{t('profile.noMoments')}</p>
             </div>
           ) : (
             gridRows.map(row => {
@@ -512,14 +513,14 @@ export function MyProfilePage() {
             </div>
             <div style={{ padding: '8px 20px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <p style={{ color: '#fff', fontSize: 16, fontWeight: 700, margin: 0 }}>
-                Выберите фото (слот {pickerTarget + 1})
+                {t('profile.pickPhotoSlot', { slot: pickerTarget + 1 })}
               </p>
               <button onClick={() => setPickerTarget(null)} style={{ background: 'none', border: 'none', color: '#555', fontSize: 22, cursor: 'pointer' }}>✕</button>
             </div>
 
             {moments.length > 0 && (
               <p style={{ color: 'var(--text-muted)', fontSize: 11, margin: '0 20px 8px', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>
-                Из моих кадров
+                {t('profile.fromMyFrames')}
               </p>
             )}
 
@@ -542,7 +543,7 @@ export function MyProfilePage() {
                 ))}
                 {moments.length === 0 && (
                   <p style={{ color: 'var(--text-muted)', fontSize: 13, gridColumn: '1/-1', padding: '8px 12px' }}>
-                    Нет опубликованных кадров
+                    {t('profile.noPublishedFrames')}
                   </p>
                 )}
               </div>
@@ -566,11 +567,11 @@ export function MyProfilePage() {
             <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: 8 }}>
               <div style={{ width: 36, height: 4, borderRadius: 2, background: '#333' }} />
             </div>
-            <p style={{ color: '#fff', fontSize: 18, fontWeight: 700, margin: '0 0 16px' }}>Новый альбом</p>
+            <p style={{ color: '#fff', fontSize: 18, fontWeight: 700, margin: '0 0 16px' }}>{t('profile.newAlbum')}</p>
             <input
               value={newAlbumTitle}
               onChange={e => setNewAlbumTitle(e.target.value)}
-              placeholder="Название..."
+              placeholder={t('profile.albumTitlePlaceholder')}
               autoFocus
               style={{
                 width: '100%', padding: '13px 14px', borderRadius: 12,
@@ -590,7 +591,7 @@ export function MyProfilePage() {
                 fontSize: 15, fontWeight: 700, border: 'none', cursor: 'pointer',
               }}
             >
-              Создать
+              {t('profile.create')}
             </button>
           </div>
         </>
@@ -624,7 +625,7 @@ export function MyProfilePage() {
           onSupportInboxPress={() => setShowSupportInbox(true)}
           supportInboxCount={supportInboxCount}
           onSignOut={handleSignOut}
-          onSaved={async () => { await load(); showToast('Сохранено') }}
+          onSaved={async () => { await load(); showToast(t('profile.savedToast')) }}
           showSignOutConfirm={showSignOutConfirm}
           setShowSignOutConfirm={setShowSignOutConfirm}
           handleSignOut={handleSignOut}
@@ -637,7 +638,7 @@ export function MyProfilePage() {
           userId={user.id}
           telegramUser={telegramUser}
           onClose={() => setShowSupport(false)}
-          onSent={() => showToast('Отправлено')}
+          onSent={() => showToast(t('support.sent'))}
         />
       )}
 
@@ -671,8 +672,9 @@ function PhotoTile({
   onDeleteConfirm: (id: string) => void
   onDeleteCancel: () => void
 }) {
+  const { t } = useLanguage()
   const isDeleteTarget = deleteConfirmId === moment.id
-  const topReaction = getTopReaction(moment, reactions)
+  const topReaction = getTopReaction(moment, reactions, t)
 
   return (
     <div
@@ -752,7 +754,7 @@ function PhotoTile({
               color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
             }}
           >
-            Удалить кадр
+            {t('profile.deleteFrame')}
           </button>
           <button
             onClick={onDeleteCancel}
@@ -762,7 +764,7 @@ function PhotoTile({
               color: '#ccc', fontSize: 12, cursor: 'pointer',
             }}
           >
-            Отмена
+            {t('common.cancel')}
           </button>
         </div>
       )}
@@ -770,7 +772,7 @@ function PhotoTile({
   )
 }
 
-function getTopReaction(moment: Moment, reactions: ReactionPreview[]) {
+function getTopReaction(moment: Moment, reactions: ReactionPreview[], t: (key: string) => string) {
   if (reactions.length === 0) return null
 
   const counts: Record<string, number> = {}
@@ -789,7 +791,7 @@ function getTopReaction(moment: Moment, reactions: ReactionPreview[]) {
   }
 
   const emotion = EMOTIONS.find(e => e.type === topType)
-  return emotion ? { emoji: emotion.emoji, label: emotion.label, count } : null
+  return emotion ? { emoji: emotion.emoji, label: t(`emotion.${emotion.type}`), count } : null
 }
 
 // ── AlbumsGrid ────────────────────────────────────────────────────────────────
@@ -799,6 +801,7 @@ function AlbumsGrid({ albums, onCreatePress, onAlbumPress }: {
   onCreatePress: () => void
   onAlbumPress: (album: AlbumWithMoments) => void
 }) {
+  const { t } = useLanguage()
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
       {/* Saved card */}
@@ -806,7 +809,7 @@ function AlbumsGrid({ albums, onCreatePress, onAlbumPress }: {
         cover={null}
         placeholder={<span style={{ fontSize: 28, color: 'var(--amber)' }}>⌂</span>}
         placeholderBg="rgba(201,146,42,0.12)"
-        title="Сохранённые"
+        title={t('profile.saved')}
         subtitle=""
         onClick={() => {}}
       />
@@ -819,7 +822,7 @@ function AlbumsGrid({ albums, onCreatePress, onAlbumPress }: {
           placeholder={null}
           placeholderBg="#1A1208"
           title={album.title.startsWith('#') ? album.title : `#${album.title}`}
-          subtitle={`${album.moments_count} кадров`}
+          subtitle={t('profile.framesCount', { count: album.moments_count })}
           isPrivate={!album.is_public}
           onClick={() => onAlbumPress(album)}
         />
@@ -830,7 +833,7 @@ function AlbumsGrid({ albums, onCreatePress, onAlbumPress }: {
         cover={null}
         placeholder={<span style={{ fontSize: 28, color: 'var(--amber)' }}>+</span>}
         placeholderBg="#1A1208"
-        title="Новая плёнка"
+        title={t('profile.newFilm')}
         subtitle=""
         muted
         onClick={onCreatePress}
@@ -904,7 +907,7 @@ function SettingsSheet({
   setShowSignOutConfirm: (v: boolean) => void
   handleSignOut: () => void
 }) {
-  const { language, detectedLanguage, setLanguage } = useLanguage()
+  const { language, detectedLanguage, setLanguage, t } = useLanguage()
   const [displayName, setDisplayName] = useState(profile.display_name ?? '')
   const [username, setUsername]       = useState(profile.username ?? '')
   const [website, setWebsite]         = useState(profile.website ?? '')
@@ -968,33 +971,33 @@ function SettingsSheet({
         </div>
         {/* Header */}
         <div style={{ padding: '8px 20px 4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <p style={{ color: '#fff', fontSize: 17, fontWeight: 700, margin: 0 }}>Настройки</p>
+          <p style={{ color: '#fff', fontSize: 17, fontWeight: 700, margin: 0 }}>{t('settings.title')}</p>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#555', fontSize: 22, cursor: 'pointer' }}>✕</button>
         </div>
 
         {/* Scrollable content */}
         <div style={{ overflowY: 'auto', padding: '0 20px' }}>
           {/* Profile section */}
-          <p style={sectionTitleStyle}>Профиль</p>
-          <p style={labelStyle}>Имя</p>
-          <input style={inputStyle} value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="Как тебя зовут" maxLength={40} />
-          <p style={labelStyle}>Имя пользователя</p>
+          <p style={sectionTitleStyle}>{t('common.profile')}</p>
+          <p style={labelStyle}>{t('settings.name')}</p>
+          <input style={inputStyle} value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder={t('auth.namePlaceholder')} maxLength={40} />
+          <p style={labelStyle}>{t('settings.username')}</p>
           <input style={inputStyle} value={username} onChange={e => setUsername(e.target.value)} placeholder="username" maxLength={30} autoCapitalize="none" />
-          <p style={labelStyle}>Вебсайт</p>
+          <p style={labelStyle}>{t('settings.website')}</p>
           <input style={inputStyle} value={website} onChange={e => setWebsite(e.target.value)} placeholder="https://" maxLength={100} type="url" />
-          <p style={labelStyle}>Инфо</p>
+          <p style={labelStyle}>{t('settings.info')}</p>
           <textarea
             style={{ ...inputStyle, minHeight: 80, resize: 'none' }}
             value={bio}
             onChange={e => setBio(e.target.value)}
-            placeholder="О себе..."
+            placeholder={t('settings.aboutPlaceholder')}
             maxLength={150}
           />
 
           {/* Language */}
-          <p style={sectionTitleStyle}>Язык / Language</p>
+          <p style={sectionTitleStyle}>{t('settings.language')}</p>
           <p style={{ color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.4, margin: '0 0 8px' }}>
-            По умолчанию: {detectedLanguage === 'ru' ? 'русский' : 'English'} по языку Telegram/устройства.
+            {t('settings.languageAuto', { language: detectedLanguage === 'ru' ? t('settings.langRussian') : t('settings.langEnglish') })}
           </p>
           <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
             {(['ru', 'en'] as const).map(l => (
@@ -1017,7 +1020,7 @@ function SettingsSheet({
           {/* Account */}
           {!isTelegram && (
             <>
-              <p style={sectionTitleStyle}>Аккаунт</p>
+              <p style={sectionTitleStyle}>{t('settings.account')}</p>
               <button
                 style={{
                   width: '100%', padding: '12px 14px', borderRadius: 12,
@@ -1026,18 +1029,18 @@ function SettingsSheet({
                   textAlign: 'left',
                 }}
               >
-                Сменить пароль
+                {t('settings.changePassword')}
               </button>
             </>
           )}
 
-          <p style={sectionTitleStyle}>Правила и поддержка</p>
+          <p style={sectionTitleStyle}>{t('settings.rulesSupport')}</p>
           <button
             type="button"
             onClick={onSupportPress}
             style={linkButtonStyle}
           >
-            Помощь
+            {t('settings.help')}
           </button>
           {profile.is_admin && (
             <button
@@ -1045,7 +1048,7 @@ function SettingsSheet({
               onClick={onSupportInboxPress}
               style={{ ...linkButtonStyle, color: 'var(--amber)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}
             >
-              <span>Чат поддержки</span>
+              <span>{t('settings.supportInbox')}</span>
               <span style={{
                 minWidth: 26,
                 height: 22,
@@ -1068,14 +1071,14 @@ function SettingsSheet({
             onClick={() => onNavigate('/terms')}
             style={linkButtonStyle}
           >
-            Условия и Stars
+            {t('settings.termsStars')}
           </button>
           <button
             type="button"
             onClick={() => onNavigate('/privacy')}
             style={{ ...linkButtonStyle, color: 'var(--text-muted)' }}
           >
-            Политика конфиденциальности
+            {t('settings.privacy')}
           </button>
 
           {/* Save */}
@@ -1089,7 +1092,7 @@ function SettingsSheet({
               fontSize: 15, fontWeight: 700, border: 'none', cursor: saving ? 'not-allowed' : 'pointer',
             }}
           >
-            {saving ? 'Сохраняем...' : 'Сохранить'}
+            {saving ? t('common.saving') : t('common.save')}
           </button>
 
           {/* Sign out */}
@@ -1101,7 +1104,7 @@ function SettingsSheet({
               color: '#e05a5a', fontSize: 14, fontWeight: 600, cursor: 'pointer',
             }}
           >
-            Выйти из аккаунта
+            {t('settings.signOut')}
           </button>
           <div style={{ height: 8 }} />
         </div>
@@ -1117,10 +1120,10 @@ function SettingsSheet({
             padding: '24px 20px',
             paddingBottom: 'max(32px, env(safe-area-inset-bottom, 20px))',
           }}>
-            <p style={{ color: '#fff', fontSize: 17, fontWeight: 600, margin: '0 0 8px', textAlign: 'center' }}>Выйти из аккаунта?</p>
-            <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: '0 0 20px', textAlign: 'center' }}>Вы можете войти снова в любое время</p>
-            <button onClick={handleSignOut} style={{ width: '100%', padding: '14px 0', borderRadius: 30, background: '#e05a5a', color: '#fff', fontSize: 15, fontWeight: 700, border: 'none', cursor: 'pointer', marginBottom: 10 }}>Выйти</button>
-            <button onClick={() => setShowSignOutConfirm(false)} style={{ width: '100%', padding: '12px 0', background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 14, cursor: 'pointer' }}>Отмена</button>
+            <p style={{ color: '#fff', fontSize: 17, fontWeight: 600, margin: '0 0 8px', textAlign: 'center' }}>{t('settings.signOutQuestion')}</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: '0 0 20px', textAlign: 'center' }}>{t('settings.signOutHint')}</p>
+            <button onClick={handleSignOut} style={{ width: '100%', padding: '14px 0', borderRadius: 30, background: '#e05a5a', color: '#fff', fontSize: 15, fontWeight: 700, border: 'none', cursor: 'pointer', marginBottom: 10 }}>{t('settings.signOut')}</button>
+            <button onClick={() => setShowSignOutConfirm(false)} style={{ width: '100%', padding: '12px 0', background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 14, cursor: 'pointer' }}>{t('common.cancel')}</button>
           </div>
         </>
       )}
@@ -1139,6 +1142,7 @@ function SupportSheet({
   onClose: () => void
   onSent: () => void
 }) {
+  const { t } = useLanguage()
   const [message, setMessage] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [sending, setSending] = useState(false)
@@ -1165,7 +1169,7 @@ function SupportSheet({
     }
     if (nextFile.size > SUPPORT_ATTACHMENT_MAX_BYTES) {
       setFile(null)
-      setError('Файл больше 8 МБ')
+      setError(t('support.fileTooLarge'))
       return
     }
     setFile(nextFile)
@@ -1174,7 +1178,7 @@ function SupportSheet({
   const handleSubmit = async () => {
     const trimmed = message.trim()
     if (!trimmed && !file) {
-      setError('Опиши проблему или прикрепи файл')
+      setError(t('support.needTextOrFile'))
       return
     }
 
@@ -1198,7 +1202,7 @@ function SupportSheet({
       onClose()
     } catch (err) {
       setSending(false)
-      setError(err instanceof Error ? err.message : 'Не удалось отправить обращение')
+      setError(err instanceof Error ? err.message : t('support.sendFailed'))
     }
   }
 
@@ -1222,9 +1226,9 @@ function SupportSheet({
         </div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
           <div>
-            <p style={{ color: '#fff', fontSize: 18, fontWeight: 700, margin: 0 }}>Помощь</p>
+            <p style={{ color: '#fff', fontSize: 18, fontWeight: 700, margin: 0 }}>{t('support.helpTitle')}</p>
             <p style={{ color: 'var(--text-muted)', fontSize: 12, margin: '4px 0 0', lineHeight: 1.4 }}>
-              Пожалуйста, опишите максимально подробно Вашу ситуацию и оставьте контакты для связи
+              {t('support.helpHint')}
             </p>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#555', fontSize: 22, cursor: 'pointer' }}>✕</button>
@@ -1233,7 +1237,7 @@ function SupportSheet({
         <textarea
           value={message}
           onChange={e => setMessage(e.target.value)}
-          placeholder="Что случилось?"
+          placeholder={t('support.placeholder')}
           maxLength={1200}
           style={{ ...inputStyle, minHeight: 130, resize: 'none', lineHeight: 1.45 }}
         />
@@ -1254,7 +1258,7 @@ function SupportSheet({
             fontWeight: 600,
             cursor: 'pointer',
           }}>
-            <span>Прикрепить файл</span>
+            <span>{t('support.attachFile')}</span>
             <input
               type="file"
               accept="image/*,.pdf,.txt,.log,.heic,.heif"
@@ -1314,7 +1318,7 @@ function SupportSheet({
             cursor: sending || (!message.trim() && !file) ? 'not-allowed' : 'pointer',
           }}
         >
-          {sending ? 'Отправляем...' : 'Отправить'}
+          {sending ? t('support.sending') : t('support.send')}
         </button>
       </div>
     </>
@@ -1324,6 +1328,7 @@ function SupportSheet({
 // ── SupportInboxSheet ────────────────────────────────────────────────────────
 
 function SupportInboxSheet({ onClose, onChanged }: { onClose: () => void; onChanged: () => void }) {
+  const { language, t } = useLanguage()
   const [items, setItems] = useState<SupportRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -1334,11 +1339,11 @@ function SupportInboxSheet({ onClose, onChanged }: { onClose: () => void; onChan
     try {
       setItems(await getSupportRequests())
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Не удалось загрузить обращения')
+      setError(err instanceof Error ? err.message : t('support.loadFailed'))
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     loadItems()
@@ -1350,7 +1355,7 @@ function SupportInboxSheet({ onClose, onChanged }: { onClose: () => void; onChan
       const url = await getSupportAttachmentUrl(item.attachment_path)
       window.open(url, '_blank', 'noopener,noreferrer')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Не удалось открыть вложение')
+      setError(err instanceof Error ? err.message : t('support.openAttachmentFailed'))
     }
   }
 
@@ -1363,7 +1368,7 @@ function SupportInboxSheet({ onClose, onChanged }: { onClose: () => void; onChan
       )))
       onChanged()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Не удалось обновить статус')
+      setError(err instanceof Error ? err.message : t('support.updateFailed'))
     }
   }
 
@@ -1389,15 +1394,15 @@ function SupportInboxSheet({ onClose, onChanged }: { onClose: () => void; onChan
         </div>
         <div style={{ padding: '8px 20px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div>
-            <p style={{ color: '#fff', fontSize: 18, fontWeight: 700, margin: 0 }}>Чат поддержки</p>
-            <p style={{ color: 'var(--text-muted)', fontSize: 12, margin: '4px 0 0' }}>Обращения пользователей</p>
+            <p style={{ color: '#fff', fontSize: 18, fontWeight: 700, margin: 0 }}>{t('support.inboxTitle')}</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: 12, margin: '4px 0 0' }}>{t('support.inboxHint')}</p>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#555', fontSize: 22, cursor: 'pointer' }}>✕</button>
         </div>
 
         <div style={{ overflowY: 'auto', padding: '0 20px 8px' }}>
           {loading && (
-            <p style={{ color: 'var(--text-muted)', fontSize: 14, margin: '20px 0', textAlign: 'center' }}>Загружаем...</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: 14, margin: '20px 0', textAlign: 'center' }}>{t('common.loading')}</p>
           )}
 
           {error && (
@@ -1405,11 +1410,11 @@ function SupportInboxSheet({ onClose, onChanged }: { onClose: () => void; onChan
           )}
 
           {!loading && items.length === 0 && (
-            <p style={{ color: 'var(--text-muted)', fontSize: 14, margin: '20px 0', textAlign: 'center' }}>Пока нет обращений</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: 14, margin: '20px 0', textAlign: 'center' }}>{t('support.empty')}</p>
           )}
 
           {items.map(item => {
-            const name = item.profiles?.display_name || item.profiles?.username || 'Пользователь'
+            const name = item.profiles?.display_name || item.profiles?.username || t('support.user')
             const metadata = item.metadata ?? {}
             const telegram = typeof metadata.telegramUsername === 'string' && metadata.telegramUsername
               ? `@${metadata.telegramUsername}`
@@ -1441,12 +1446,12 @@ function SupportInboxSheet({ onClose, onChanged }: { onClose: () => void; onChan
                     borderRadius: 999,
                     border: '1px solid #2E1A0A',
                   }}>
-                    {item.status === 'open' ? 'новое' : 'закрыто'}
+                    {item.status === 'open' ? t('support.openStatus') : t('support.closedStatus')}
                   </span>
                 </div>
 
                 <p style={{ color: 'var(--text)', fontSize: 14, lineHeight: 1.45, whiteSpace: 'pre-wrap', margin: '12px 0 0' }}>
-                  {item.message || '(без текста)'}
+                  {item.message || t('support.noText')}
                 </p>
 
                 {item.attachment_path && (
@@ -1469,13 +1474,13 @@ function SupportInboxSheet({ onClose, onChanged }: { onClose: () => void; onChan
                       whiteSpace: 'nowrap',
                     }}
                   >
-                    Вложение: {item.attachment_name || 'файл'}
+                    {t('support.attachment', { name: item.attachment_name || t('common.file') })}
                   </button>
                 )}
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 12 }}>
                   <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>
-                    {new Date(item.created_at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    {new Date(item.created_at).toLocaleString(language === 'ru' ? 'ru-RU' : 'en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                   </span>
                   <button
                     onClick={() => toggleStatus(item)}
@@ -1490,7 +1495,7 @@ function SupportInboxSheet({ onClose, onChanged }: { onClose: () => void; onChan
                       cursor: 'pointer',
                     }}
                   >
-                    {item.status === 'open' ? 'Закрыть' : 'Открыть'}
+                    {item.status === 'open' ? t('support.closeRequest') : t('support.openRequest')}
                   </button>
                 </div>
               </div>

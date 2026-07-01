@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { StarSupportButton } from '../components/StarSupportButton'
 import { useAuth } from '../contexts/AuthContext'
+import { formatRelativeTime, useLanguage } from '../contexts/LanguageContext'
 import {
   getFeedReactions,
   getUserReactionsForMoments,
@@ -25,17 +26,6 @@ interface FeedState {
   startIndex?: number
   isOwner?: boolean
   userId?: string
-}
-
-function formatTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 2) return 'только что'
-  if (mins < 60) return `${mins} мин назад`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours} ч назад`
-  if (hours < 48) return 'вчера'
-  return `${Math.floor(hours / 24)} д назад`
 }
 
 async function savePhoto(photoUrl: string): Promise<void> {
@@ -67,6 +57,7 @@ export function MomentFeedPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, profile: myProfile } = useAuth()
+  const { t } = useLanguage()
   const isAdmin = myProfile?.is_admin === true
   const state = location.state as FeedState | null
 
@@ -166,7 +157,7 @@ export function MomentFeedPage() {
   async function handleReport(momentId: string) {
     if (!user) {
       setMenuMomentId(null)
-      showToast('Войдите, чтобы пожаловаться')
+      showToast(t('moment.reportSignIn'))
       return
     }
 
@@ -174,11 +165,11 @@ export function MomentFeedPage() {
     setMenuMomentId(null)
     if (error) {
       console.error('[Report] failed:', error)
-      showToast('Не удалось отправить жалобу')
+      showToast(t('moment.reportFailed'))
       return
     }
 
-    showToast('Жалоба отправлена')
+    showToast(t('moment.reportSent'))
   }
 
   async function handleAddToAlbum(momentId: string) {
@@ -193,7 +184,7 @@ export function MomentFeedPage() {
     if (!albumPickerMomentId) return
     await addMomentToAlbum(albumId, albumPickerMomentId)
     setAlbumPickerMomentId(null)
-    showToast('Добавлено в альбом')
+    showToast(t('moment.addedToAlbum'))
   }
 
   return (
@@ -212,7 +203,7 @@ export function MomentFeedPage() {
           backdropFilter: 'blur(6px)',
         }}
       >
-        ← Назад
+        ← {t('common.back')}
       </button>
 
       {/* Feed */}
@@ -220,7 +211,7 @@ export function MomentFeedPage() {
         {localMoments.length === 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: 12 }}>
             <span style={{ fontSize: 40 }}>📷</span>
-            <p style={{ color: 'var(--text-muted)', fontSize: 14, margin: 0 }}>Нет моментов</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: 14, margin: 0 }}>{t('profile.noMoments')}</p>
           </div>
         ) : (
           localMoments.map((m, i) => (
@@ -262,18 +253,18 @@ export function MomentFeedPage() {
               return (
                 <>
                   <MenuBtn
-                    label="Скачать фото"
+                    label={t('moment.download')}
                     icon="↓"
                     onClick={() => {
-                      if (menuMoment) savePhoto(menuMoment.photo_url).then(() => showToast('Открываем фото...')).catch(() => {})
+                      if (menuMoment) savePhoto(menuMoment.photo_url).then(() => showToast(t('moment.openingPhoto'))).catch(() => {})
                       trackMomentSaved()
                       setMenuMomentId(null)
                     }}
                   />
                   <MenuBtn
-                    label="Поделиться"
+                    label={t('moment.share')}
                     icon="→"
-                    onClick={() => { sharePhoto(menuMomentId!); showToast('Ссылка скопирована'); setMenuMomentId(null) }}
+                    onClick={() => { sharePhoto(menuMomentId!); showToast(t('moment.linkCopied')); setMenuMomentId(null) }}
                   />
                 </>
               )
@@ -281,12 +272,12 @@ export function MomentFeedPage() {
             {isOwner ? (
               <>
                 <MenuBtn
-                  label="Добавить в альбом"
+                  label={t('moment.addToAlbum')}
                   icon="⊞"
                   onClick={() => handleAddToAlbum(menuMomentId)}
                 />
                 <MenuBtn
-                  label="Удалить кадр"
+                  label={t('profile.deleteFrame')}
                   icon="✕"
                   danger
                   onClick={() => handleDelete(menuMomentId)}
@@ -295,7 +286,7 @@ export function MomentFeedPage() {
             ) : (
               <>
                 <MenuBtn
-                  label="Пожаловаться"
+                  label={t('moment.report')}
                   icon="⚑"
                   danger
                   onClick={() => handleReport(menuMomentId)}
@@ -305,20 +296,20 @@ export function MomentFeedPage() {
                   return (
                     <>
                       <MenuBtn
-                        label="🛡 Удалить (Admin)"
+                        label={t('moment.adminDelete')}
                         icon=""
                         danger
                         onClick={() => handleDelete(menuMomentId)}
                       />
                       <MenuBtn
-                        label="🛡 Теневой бан"
+                        label={t('moment.adminShadowBan')}
                         icon=""
                         danger
                         onClick={async () => {
                           if (!menuMoment) return
                           await adminShadowBanUser(menuMoment.user_id)
                           setMenuMomentId(null)
-                          showToast('Пользователь в теневом бане')
+                          showToast(t('moment.shadowBanned'))
                         }}
                       />
                     </>
@@ -327,7 +318,7 @@ export function MomentFeedPage() {
               </>
             )}
 
-            <MenuBtn label="Отмена" icon="" muted onClick={() => setMenuMomentId(null)} />
+            <MenuBtn label={t('common.cancel')} icon="" muted onClick={() => setMenuMomentId(null)} />
           </div>
         </>
       )}
@@ -349,10 +340,10 @@ export function MomentFeedPage() {
             <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 4px' }}>
               <div style={{ width: 36, height: 4, borderRadius: 2, background: '#333' }} />
             </div>
-            <p style={{ color: '#fff', fontSize: 16, fontWeight: 700, margin: '4px 20px 12px' }}>Добавить в альбом</p>
+            <p style={{ color: '#fff', fontSize: 16, fontWeight: 700, margin: '4px 20px 12px' }}>{t('moment.addToAlbum')}</p>
             <div style={{ overflowY: 'auto' }}>
               {albums.length === 0 ? (
-                <p style={{ color: 'var(--text-muted)', padding: '16px 20px', fontSize: 14 }}>Нет альбомов</p>
+                <p style={{ color: 'var(--text-muted)', padding: '16px 20px', fontSize: 14 }}>{t('moment.noAlbums')}</p>
               ) : (
                 albums.map(al => (
                   <button
@@ -371,7 +362,7 @@ export function MomentFeedPage() {
                     )}
                     <div>
                       <p style={{ color: 'var(--amber)', fontWeight: 600, fontSize: 14, margin: 0 }}>{al.title}</p>
-                      <p style={{ color: 'var(--text-muted)', fontSize: 12, margin: '2px 0 0' }}>{al.moments_count} кадров</p>
+                      <p style={{ color: 'var(--text-muted)', fontSize: 12, margin: '2px 0 0' }}>{t('profile.framesCount', { count: al.moments_count })}</p>
                     </div>
                   </button>
                 ))
@@ -411,11 +402,12 @@ interface ShotCardProps {
 }
 
 function ShotCard({ moment: m, cardRef, reactionCounts, myReaction, starTotal, onStarTotalChange, onReaction, onMenu }: ShotCardProps) {
+  const { language, t } = useLanguage()
   const [showAllReactions, setShowAllReactions] = useState(false)
 
-  const myReactionMeta = getReactionMeta(myReaction, m)
+  const myReactionMeta = getReactionMeta(myReaction, m, t)
   const customMoodMeta = getCustomMoodMeta(m)
-  const reactionEntries = getReactionEntries(reactionCounts, m)
+  const reactionEntries = getReactionEntries(reactionCounts, m, t)
 
   return (
     <div ref={cardRef} style={{ marginBottom: 8, borderBottom: '8px solid #080503' }}>
@@ -476,7 +468,7 @@ function ShotCard({ moment: m, cardRef, reactionCounts, myReaction, starTotal, o
                       style={reactionPillStyle(active)}
                     >
                       <span style={{ fontSize: 15 }}>{e.emoji}</span>
-                      <span>{e.label}</span>
+                      <span>{t(`emotion.${e.type}`)}</span>
                     </button>
                   )
                 })}
@@ -521,7 +513,7 @@ function ShotCard({ moment: m, cardRef, reactionCounts, myReaction, starTotal, o
                   style={reactionPillStyle(!!myReactionMeta)}
                 >
                   <span style={{ fontSize: 15 }}>{myReactionMeta ? myReactionMeta.emoji : '+'}</span>
-                  <span>{myReactionMeta ? myReactionMeta.label : 'Реакция'}</span>
+                  <span>{myReactionMeta ? myReactionMeta.label : t('moment.reaction')}</span>
                 </button>
               </>
             )}
@@ -534,7 +526,7 @@ function ShotCard({ moment: m, cardRef, reactionCounts, myReaction, starTotal, o
           </div>
 
           <span style={{ color: 'var(--text-muted)', fontSize: 11, flexShrink: 0 }}>
-            {formatTime(m.created_at)}
+            {formatRelativeTime(m.created_at, language)}
           </span>
         </div>
       </div>
@@ -569,14 +561,14 @@ function getCustomMoodMeta(moment: Moment): { emoji: string; label: string } | n
   return { emoji: moment.custom_mood_emoji, label: moment.custom_mood_label }
 }
 
-function getReactionMeta(type: ReactionType | null | undefined, moment: Moment): { emoji: string; label: string } | null {
+function getReactionMeta(type: ReactionType | null | undefined, moment: Moment, t: (key: string) => string): { emoji: string; label: string } | null {
   if (!type) return null
   if (type === 'custom') return getCustomMoodMeta(moment)
   const emotion = EMOTIONS.find(e => e.type === type)
-  return emotion ? { emoji: emotion.emoji, label: emotion.label } : null
+  return emotion ? { emoji: emotion.emoji, label: t(`emotion.${emotion.type}`) } : null
 }
 
-function getReactionEntries(reactionCounts: ReactionCounts, moment: Moment): Array<{
+function getReactionEntries(reactionCounts: ReactionCounts, moment: Moment, t: (key: string) => string): Array<{
   type: ReactionType
   emoji: string
   label: string
@@ -594,14 +586,14 @@ function getReactionEntries(reactionCounts: ReactionCounts, moment: Moment): Arr
   const entries = (Object.entries(reactionCounts) as [ReactionType, number][])
     .filter(([, count]) => count > 0)
     .map(([type, count]) => {
-      const meta = getReactionMeta(type, moment)
+      const meta = getReactionMeta(type, moment, t)
       return meta ? { type, ...meta, count } : null
     })
     .filter(Boolean) as ReactionEntry[]
 
   const moodType = moment.mood as ReactionType | null
   if (moodType && !entries.some(entry => entry.type === moodType)) {
-    const moodMeta = getReactionMeta(moodType, moment)
+    const moodMeta = getReactionMeta(moodType, moment, t)
     if (moodMeta) {
       entries.unshift({ type: moodType, ...moodMeta, count: 1, synthetic: true })
     }

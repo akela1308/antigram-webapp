@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { useLanguage } from '../contexts/LanguageContext'
 import { FILM_PRESETS } from '../lib/filmPresets'
 import type { FilmPreset } from '../lib/filmPresets'
 import { getUnreadNotificationsCount } from '../lib/db'
@@ -10,6 +11,7 @@ const INACTIVE = '#8A6A50'
 
 export function BottomNav() {
   const { user } = useAuth()
+  const { t } = useLanguage()
   const navigate = useNavigate()
   const [showPicker, setShowPicker] = useState(false)
   const [selected, setSelected] = useState<FilmPreset>(FILM_PRESETS[1])
@@ -166,10 +168,10 @@ export function BottomNav() {
             {/* Title */}
             <div style={{ padding: '12px 20px 8px' }}>
               <p style={{ color: '#fff', fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: 0.2 }}>
-                Зарядить плёнку
+                {t('filmPicker.title')}
               </p>
               <p style={{ color: '#666', fontSize: 13, margin: '4px 0 0' }}>
-                Выберите плёнку для съёмки
+                {t('filmPicker.hint')}
               </p>
             </div>
 
@@ -258,7 +260,7 @@ export function BottomNav() {
                   fontSize: 16, fontWeight: 700, border: 'none', cursor: 'pointer',
                 }}
               >
-                Зарядить
+                {t('filmPicker.load')}
               </button>
               <button
                 onClick={skipFilm}
@@ -268,7 +270,7 @@ export function BottomNav() {
                   color: '#555', fontSize: 14, cursor: 'pointer',
                 }}
               >
-                Без фильтра
+                {t('common.noFilter')}
               </button>
             </div>
           </div>

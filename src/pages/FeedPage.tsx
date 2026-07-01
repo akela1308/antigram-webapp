@@ -5,6 +5,7 @@ import { StarSupportButton } from '../components/StarSupportButton'
 import { MomentCardSkeleton } from '../components/Skeleton'
 import { Avatar } from '../components/Avatar'
 import { useAuth } from '../contexts/AuthContext'
+import { formatRelativeTime, useLanguage } from '../contexts/LanguageContext'
 import { getFeed, getRandomMoments, getMomentsByEmotion, getFeedReactions, getMomentStarTotals, getUserReactionsForMoments, addReaction, removeReaction } from '../lib/db'
 import { EMOTIONS } from '../lib/types'
 import type { MomentWithProfile, ReactionType } from '../lib/types'
@@ -16,19 +17,9 @@ interface ReactionsMap {
   [momentId: string]: { type: ReactionType }[]
 }
 
-function formatTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 2) return 'только что'
-  if (mins < 60) return `${mins} мин назад`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours} ч назад`
-  if (hours < 48) return 'вчера'
-  return `${Math.floor(hours / 24)} д назад`
-}
-
 export function FeedPage() {
   const { user, profile } = useAuth()
+  const { t } = useLanguage()
   const navigate = useNavigate()
   const [filter, setFilter] = useState<FilterValue>('for_you')
   const [moments, setMoments] = useState<MomentWithProfile[]>([])
@@ -162,7 +153,7 @@ export function FeedPage() {
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round">
               <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
             </svg>
-            <span style={{ color: 'var(--text-muted)', fontSize: 14, flex: 1, textAlign: 'left' }}>Поиск</span>
+            <span style={{ color: 'var(--text-muted)', fontSize: 14, flex: 1, textAlign: 'left' }}>{t('common.search')}</span>
           </button>
 
           {/* Avatar */}
@@ -237,7 +228,7 @@ export function FeedPage() {
                   textTransform: 'uppercase',
                 }}
               >
-                Фото дня
+                {t('feed.photoOfDay')}
               </span>
             </div>
 
@@ -290,10 +281,11 @@ function PhotoOfDayCard({
   userReaction?: ReactionType | null
   onReact?: (momentId: string, type: ReactionType) => void
 }) {
+  const { language, t } = useLanguage()
   const navigate = useNavigate()
   const [showReactionPicker, setShowReactionPicker] = useState(false)
   const profile = moment.profiles
-  const displayName = profile?.display_name ?? profile?.username ?? 'Аноним'
+  const displayName = profile?.display_name ?? profile?.username ?? t('common.anonymous')
   const customMood = getCustomMood(moment)
   const topReaction = getTopReaction(reactions, customMood)
   const isReacted = topReaction ? userReaction === topReaction.type : false
@@ -358,7 +350,7 @@ function PhotoOfDayCard({
               <div>
                 <p style={{ color: '#fff', fontSize: 13, fontWeight: 600, margin: 0 }}>{displayName}</p>
                 <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, margin: 0 }}>
-                  {formatTime(moment.created_at)}
+                  {formatRelativeTime(moment.created_at, language)}
                 </p>
               </div>
             </div>
@@ -379,7 +371,7 @@ function PhotoOfDayCard({
                   }}
                 >
                   <span style={{ fontSize: 14 }}>{topReaction.emoji}</span>
-                  <span style={{ color: isReacted ? 'var(--amber)' : 'rgba(255,255,255,0.8)', fontSize: 11 }}>{topReaction.label}</span>
+                  <span style={{ color: isReacted ? 'var(--amber)' : 'rgba(255,255,255,0.8)', fontSize: 11 }}>{topReaction.type === 'custom' ? topReaction.label : t(`emotion.${topReaction.type}`)}</span>
                   <span style={{ color: isReacted ? 'var(--amber)' : 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: 700 }}>{topReaction.count}</span>
                 </div>
               )}
@@ -415,7 +407,7 @@ function PhotoOfDayCard({
                   key={e.type}
                   onClick={() => handleReact(e.type)}
                   style={quickReactionStyle(userReaction === e.type)}
-                  aria-label={e.label}
+                  aria-label={t(`emotion.${e.type}`)}
                 >
                   {e.emoji}
                 </button>
@@ -511,13 +503,14 @@ function FilmStripDivider() {
 
 
 function EmptyState({ filter }: { filter: FilterValue }) {
+  const { t } = useLanguage()
   return (
     <div className="flex flex-col items-center justify-center py-24 gap-3 text-center">
       <span style={{ fontSize: 48 }}>{filter === 'for_you' ? '🌅' : '🔍'}</span>
       <p style={{ color: 'var(--text-muted)' }}>
         {filter === 'for_you'
-          ? 'Пока нет моментов.\nПодпишитесь на людей, чтобы увидеть их.'
-          : 'Нет постов с такой эмоцией.'}
+          ? t('feed.emptyFollowing')
+          : t('feed.emptyEmotion')}
       </p>
     </div>
   )

@@ -1,3 +1,4 @@
+import { useLanguage } from '../contexts/LanguageContext'
 import { EMOTIONS } from '../lib/types'
 import type { ReactionType } from '../lib/types'
 
@@ -8,12 +9,13 @@ interface EmotionFilterProps {
   onChange: (value: FilterValue) => void
 }
 
-const ALL_FILTERS: { value: FilterValue; emoji?: string; label: string }[] = [
-  { value: 'for_you', label: 'Для вас' },
-  ...EMOTIONS.map(e => ({ value: e.type, emoji: e.emoji, label: e.label })),
+const ALL_FILTERS: { value: FilterValue; emoji?: string }[] = [
+  { value: 'for_you' },
+  ...EMOTIONS.map(e => ({ value: e.type, emoji: e.emoji })),
 ]
 
 export function EmotionFilter({ active, onChange }: EmotionFilterProps) {
+  const { t } = useLanguage()
   return (
     <div
       className="flex gap-2 overflow-x-auto py-3 px-4 no-scrollbar"
@@ -33,7 +35,7 @@ export function EmotionFilter({ active, onChange }: EmotionFilterProps) {
             }}
           >
             {f.emoji && <span>{f.emoji}</span>}
-            <span>{f.label}</span>
+            <span>{f.value === 'for_you' ? t('category.forYou') : t(`emotion.${f.value}`)}</span>
           </button>
         )
       })}

@@ -2,6 +2,7 @@ import { useRef, useState, useEffect, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useLanguage } from '../contexts/LanguageContext'
 import { EMOTIONS } from '../lib/types'
 import { FILM_PRESETS } from '../lib/filmPresets'
 import type { FilmPreset, AlgoType, GrainConfig, FlareType } from '../lib/filmPresets'
@@ -258,6 +259,7 @@ function getTelegramWebApp(): TelegramWebApp | null {
 
 export function UploadPage() {
   const { user } = useAuth()
+  const { t } = useLanguage()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -359,9 +361,9 @@ export function UploadPage() {
         videoRef.current.play().catch(() => {})
       }
     } catch {
-      setCamError('Нет доступа к камере')
+      setCamError(t('camera.noCameraAccess'))
     }
-  }, [facing])
+  }, [facing, t])
 
   useEffect(() => {
     if (phase === 'viewfinder') startCamera()
@@ -430,9 +432,9 @@ export function UploadPage() {
       console.error('[Camera] capture failed:', err)
       captureLockRef.current = false
       setIsCapturing(false)
-      setCamError('Не удалось снять кадр')
+      setCamError(t('camera.captureFailed'))
     }
-  }, [preset, selectedFlare])
+  }, [preset, selectedFlare, t])
 
   // ── Hardware volume buttons → shutter ────────────────────────────────────────
 
@@ -465,7 +467,7 @@ export function UploadPage() {
   async function publish() {
     if (!photoBlob || !user) return
     if (!mood) {
-      setError('Выбери эмоцию кадра')
+      setError(t('camera.pickMood'))
       return
     }
     setPhase('uploading')
@@ -475,7 +477,7 @@ export function UploadPage() {
       const currentCount = await getTodaysMomentCount(user.id)
       if (currentCount >= DAILY_FRAME_LIMIT) {
         setTodayCount(currentCount)
-        setError('Лимит кадров на сегодня исчерпан')
+        setError(t('camera.limitReached'))
         setPhase('preview')
         return
       }
@@ -512,10 +514,10 @@ export function UploadPage() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       if (msg.includes('daily_frame_limit_exceeded')) {
-        setError('Лимит кадров на сегодня исчерпан')
+        setError(t('camera.limitReached'))
         setTodayCount(DAILY_FRAME_LIMIT)
       } else {
-        setError('Ошибка при публикации')
+        setError(t('camera.publishError'))
       }
       setPhase('preview')
     }
@@ -541,8 +543,8 @@ export function UploadPage() {
       <div style={S.root}>
         <div style={S.centered}>
           <span style={{ fontSize: 48 }}>📷</span>
-          <p style={{ color: '#666', margin: 0 }}>Войдите, чтобы снимать</p>
-          <button onClick={() => navigate('/auth')} style={S.amberBtn}>Войти</button>
+          <p style={{ color: '#666', margin: 0 }}>{t('camera.signInToShoot')}</p>
+          <button onClick={() => navigate('/auth')} style={S.amberBtn}>{t('common.signIn')}</button>
         </div>
       </div>
     )
@@ -577,7 +579,7 @@ export function UploadPage() {
             }}
           >
             <span style={{ fontSize: 20, lineHeight: 1 }}>←</span>
-            <span>Переснять</span>
+            <span>{t('camera.retake')}</span>
           </button>
         </div>
 
@@ -607,9 +609,9 @@ export function UploadPage() {
           )}
         </div>
 
-        {/* Атмосфера */}
+        {/* Atmosphere */}
         <div style={{ padding: '12px 16px 4px' }}>
-          <p style={S.sectionLabel}>✦ Атмосфера</p>
+          <p style={S.sectionLabel}>{t('camera.atmosphere')}</p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {EMOTIONS.map(e => {
               const active = mood === e.type
@@ -629,7 +631,7 @@ export function UploadPage() {
                     fontSize: 14, fontWeight: active ? 600 : 400, cursor: 'pointer',
                   }}
                 >
-                  <span>{e.emoji}</span><span>{e.label}</span>
+                  <span>{e.emoji}</span><span>{t(`emotion.${e.type}`)}</span>
                 </button>
               )
             })}
@@ -664,7 +666,7 @@ export function UploadPage() {
                   color: '#555', fontSize: 13, cursor: 'pointer',
                 }}
               >
-                <span>+</span><span>Своя</span>
+                <span>+</span><span>{t('emotion.custom')}</span>
               </button>
             )}
           </div>
@@ -689,12 +691,12 @@ export function UploadPage() {
               </div>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
                 <div>
-                  <p style={{ color: '#fff', fontSize: 17, fontWeight: 700, margin: '0 0 4px' }}>Своя эмоция</p>
-                  <p style={{ color: '#555', fontSize: 13, margin: 0 }}>Выбери эмодзи и назови её</p>
+                  <p style={{ color: '#fff', fontSize: 17, fontWeight: 700, margin: '0 0 4px' }}>{t('camera.customEmotion')}</p>
+                  <p style={{ color: '#555', fontSize: 13, margin: 0 }}>{t('camera.customEmotionHint')}</p>
                 </div>
                 <button
                   onClick={closeCustomMoodSheet}
-                  aria-label="Закрыть"
+                  aria-label={t('common.close')}
                   style={{
                     width: 34,
                     height: 34,
@@ -743,7 +745,7 @@ export function UploadPage() {
                 <input
                   value={draftLabel}
                   onChange={e => setDraftLabel(e.target.value)}
-                  placeholder="Нежно, Дерзко..."
+                  placeholder={t('camera.customEmotionPlaceholder')}
                   maxLength={24}
                   style={{
                     flex: 1, padding: '12px 14px', borderRadius: 10,
@@ -770,7 +772,7 @@ export function UploadPage() {
                   fontSize: 15, fontWeight: 700, border: 'none', cursor: 'pointer',
                 }}
               >
-                Добавить
+                {t('camera.add')}
               </button>
             </div>
           </>
@@ -779,7 +781,7 @@ export function UploadPage() {
         <textarea
           value={caption}
           onChange={e => setCaption(e.target.value)}
-          placeholder="Добавь подпись..."
+          placeholder={t('camera.captionPlaceholder')}
           rows={3}
           maxLength={300}
           style={{
@@ -804,7 +806,7 @@ export function UploadPage() {
               color: '#777', fontSize: 15, cursor: 'pointer',
             }}
           >
-            Переснять
+            {t('camera.retake')}
           </button>
           <button
             onClick={publish}
@@ -816,7 +818,7 @@ export function UploadPage() {
               border: 'none', opacity: phase === 'uploading' ? 0.6 : 1,
             }}
           >
-            {phase === 'uploading' ? 'Публикация...' : 'Опубликовать'}
+            {phase === 'uploading' ? t('camera.publishing') : t('camera.publish')}
           </button>
         </div>
       </div>
@@ -863,7 +865,7 @@ export function UploadPage() {
               }}
             >
               <span style={{ fontSize: 17, lineHeight: 1 }}>‹</span>
-              Назад
+              {t('common.back')}
             </button>
 
             {/* Active film indicator */}
@@ -896,7 +898,7 @@ export function UploadPage() {
           <div style={{ ...S.viewfinderBox, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
             <span style={{ fontSize: 40 }}>📷</span>
             <p style={{ color: '#666', fontSize: 14, textAlign: 'center', margin: 0 }}>{camError}</p>
-            <button onClick={startCamera} style={{ ...S.amberBtn, padding: '10px 24px' }}>Разрешить</button>
+            <button onClick={startCamera} style={{ ...S.amberBtn, padding: '10px 24px' }}>{t('camera.allow')}</button>
           </div>
         ) : (
           <div style={S.viewfinderBox}>
@@ -927,7 +929,7 @@ export function UploadPage() {
       <div style={{ ...S.bottomPanel, ...cameraUi.bottomPanel }}>
         {/* Light leak selector */}
         <div style={{ display: 'flex', gap: cameraUi.controlGap, padding: '0 16px', alignItems: 'center' }}>
-          {!isTinyCamera && <span style={{ color: '#555', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, flexShrink: 0 }}>СВЕТ</span>}
+          {!isTinyCamera && <span style={{ color: '#555', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, flexShrink: 0 }}>{t('camera.light')}</span>}
           {(['none', 'leak_warm', 'leak_cool', 'edge_burn', 'streak'] as FlareType[]).map(f => {
             const active = selectedFlare === f
             return (
@@ -1008,7 +1010,7 @@ export function UploadPage() {
                 </div>
                 {!isTinyCamera && (
                   <span style={{ color: active ? 'var(--amber)' : '#555', fontSize: 9, maxWidth: 52, textAlign: 'center', lineHeight: 1.2 }}>
-                    {p.id === 'none' ? 'Без' : p.name.split(' ')[0]}
+                    {p.id === 'none' ? t('common.none') : p.name.split(' ')[0]}
                   </span>
                 )}
               </button>
@@ -1053,13 +1055,13 @@ export function UploadPage() {
             {todayCount === null
               ? ''
               : limitReached
-                ? 'кадры обновятся в полночь'
-                : `${framesRemaining} из ${DAILY_FRAME_LIMIT} кадров сегодня`
+                ? t('camera.framesResetMidnight')
+                : t('camera.framesToday', { remaining: framesRemaining, limit: DAILY_FRAME_LIMIT })
             }
           </span>
           {limitMsg && (
             <span style={{ fontSize: 12, color: 'rgba(201,132,62,0.7)', marginTop: 2 }}>
-              Лимит на сегодня исчерпан
+              {t('camera.limitReached')}
             </span>
           )}
         </div>
@@ -1143,6 +1145,8 @@ export function UploadPage() {
 // ── Decorative film strip bar ────────────────────────────────────────────────
 
 function CaptureFeedback() {
+  const { t } = useLanguage()
+
   return (
     <div
       style={{
@@ -1227,10 +1231,10 @@ function CaptureFeedback() {
         }}
       >
         <span style={{ color: '#F3E0C1', fontSize: 13, fontWeight: 800, letterSpacing: 0.2 }}>
-          Снимаем кадр
+          {t('camera.capturing')}
         </span>
         <span style={{ color: 'rgba(243,224,193,0.58)', fontSize: 11 }}>
-          держим момент на плёнке
+          {t('camera.holdingMoment')}
         </span>
       </div>
     </div>
@@ -1238,6 +1242,8 @@ function CaptureFeedback() {
 }
 
 function DevelopingScreen({ previewUrl, preset }: { previewUrl: string | null; preset: FilmPreset }) {
+  const { t } = useLanguage()
+
   return (
     <div style={{ ...S.root, background: '#0B0704', paddingTop: 'var(--tg-top, 56px)' }}>
       <style>
@@ -1384,10 +1390,10 @@ function DevelopingScreen({ previewUrl, preset }: { previewUrl: string | null; p
             </span>
           </div>
           <h1 style={{ color: '#F3E0C1', fontSize: 24, lineHeight: 1.1, fontWeight: 800, margin: '4px 0 0', fontFamily: 'Georgia, serif' }}>
-            Плёнка проявляется
+            {t('camera.developing')}
           </h1>
           <p style={{ color: 'rgba(232,196,144,0.58)', fontSize: 14, lineHeight: 1.5, margin: 0, maxWidth: 280 }}>
-            Кадр сохранился. Через мгновение он появится в ленте.
+            {t('camera.developingHint')}
           </p>
           <div
             style={{

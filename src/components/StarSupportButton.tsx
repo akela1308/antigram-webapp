@@ -2,6 +2,7 @@ import { useEffect, useState, type CSSProperties, type MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { useLanguage } from '../contexts/LanguageContext'
 import {
   STAR_SUPPORT_AMOUNTS,
   createStarInvoice,
@@ -37,6 +38,7 @@ export function StarSupportButton({
 }: StarSupportButtonProps) {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { t } = useLanguage()
   const [total, setTotal] = useState(initialTotal)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [pendingAmount, setPendingAmount] = useState<StarSupportAmount | null>(null)
@@ -100,8 +102,8 @@ export function StarSupportButton({
         const nextTotal = await refreshTotalAfterPayment(amount)
         setMessage(
           nextTotal >= total + amount
-            ? 'Готово. Звезды засчитаны кадру.'
-            : 'Платеж принят. Счетчик обновится чуть позже.',
+            ? t('stars.success')
+            : t('stars.accepted'),
         )
         setTimeout(() => {
           setSheetOpen(false)
@@ -111,19 +113,19 @@ export function StarSupportButton({
       }
 
       if (status === 'cancelled') {
-        setMessage('Оплата отменена.')
+        setMessage(t('stars.cancelled'))
         return
       }
 
       if (status === 'opened') {
-        setMessage('Счет открыт. После оплаты Stars появятся у кадра.')
+        setMessage(t('stars.invoiceOpened'))
         return
       }
 
-      setMessage('Не удалось завершить оплату. Попробуйте еще раз.')
+      setMessage(t('stars.finishFailed'))
     } catch (error) {
       console.error('[Stars] invoice failed:', error)
-      setMessage('Не получилось создать счет. Попробуйте позже.')
+      setMessage(t('stars.createFailed'))
       getTelegramWebApp()?.HapticFeedback?.notificationOccurred?.('error')
     } finally {
       setPendingAmount(null)
@@ -166,10 +168,10 @@ export function StarSupportButton({
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
           <div>
             <p style={{ color: '#fff', fontSize: 17, fontWeight: 800, margin: 0 }}>
-              Поддержать кадр
+              {t('stars.supportFrame')}
             </p>
             <p style={{ color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.45, margin: '5px 0 0' }}>
-              Stars увеличивают рейтинг кадра и автора в Antigram.
+              {t('stars.supportRating')}
             </p>
           </div>
           <button
@@ -220,12 +222,11 @@ export function StarSupportButton({
         </div>
 
         <p style={{ color: 'var(--text-muted)', fontSize: 11, lineHeight: 1.45, margin: '14px 2px 0' }}>
-          Это добровольная поддержка и статус внутри приложения. Возможные выплаты, бонусы или premium-функции могут появиться позже
-          отдельной программой и сейчас не гарантируются. Подробнее: <Link to="/terms" style={{ color: 'var(--amber)' }}>условия</Link>.
+          {t('stars.termsNote')} <Link to="/terms" style={{ color: 'var(--amber)' }}>{t('stars.termsLink')}</Link>.
         </p>
 
         {message && (
-          <p style={{ color: message.includes('Готово') ? 'var(--amber)' : 'var(--text-muted)', fontSize: 12, margin: '12px 2px 0' }}>
+          <p style={{ color: message === t('stars.success') ? 'var(--amber)' : 'var(--text-muted)', fontSize: 12, margin: '12px 2px 0' }}>
             {message}
           </p>
         )}
@@ -237,7 +238,7 @@ export function StarSupportButton({
     <>
       <button
         type="button"
-        aria-label={`Поддержать кадр Stars, сейчас ${total}`}
+        aria-label={t('stars.aria', { total })}
         onClick={openSheet}
         style={getButtonStyle(variant)}
       >

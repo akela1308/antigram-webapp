@@ -6,6 +6,7 @@ import { searchUsers, getRandomMoments, getMomentsByEmotion, getFeedReactions, g
 import type { MomentWithProfile, ReactionType } from '../lib/types'
 import type { Profile } from '../lib/types'
 import { useNavigate } from 'react-router-dom'
+import { useLanguage } from '../contexts/LanguageContext'
 
 type FilterValue = 'for_you' | ReactionType
 
@@ -14,6 +15,7 @@ interface ReactionsMap {
 }
 
 export function SearchPage() {
+  const { t } = useLanguage()
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
   const [userResults, setUserResults] = useState<Profile[]>([])
@@ -89,7 +91,7 @@ export function SearchPage() {
         {/* Title */}
         <div style={{ padding: '12px 14px 6px' }}>
           <h1 style={{ color: 'var(--brown)', fontSize: 18, fontWeight: 800, letterSpacing: 0.3, margin: 0, fontFamily: 'Georgia, serif' }}>
-            Подборки
+            {t('explore.title')}
           </h1>
         </div>
 
@@ -110,7 +112,7 @@ export function SearchPage() {
               type="text"
               value={query}
               onChange={e => setQuery(e.target.value)}
-              placeholder="Поиск людей..."
+              placeholder={t('common.searchPeople')}
               style={{
                 flex: 1, background: 'none', border: 'none', outline: 'none',
                 color: 'var(--text)', fontSize: 14, fontFamily: 'inherit',
@@ -147,7 +149,7 @@ export function SearchPage() {
 
           {!searchLoading && userResults.length === 0 && (
             <div style={{ padding: '48px 24px', textAlign: 'center' }}>
-              <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Никого не найдено</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>{t('common.notFound')}</p>
             </div>
           )}
 
@@ -168,7 +170,7 @@ export function SearchPage() {
           ) : moments.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 gap-3 text-center">
               <span style={{ fontSize: 48 }}>🔍</span>
-              <p style={{ color: 'var(--text-muted)' }}>Нет постов с такой эмоцией.</p>
+              <p style={{ color: 'var(--text-muted)' }}>{t('explore.emptyEmotion')}</p>
             </div>
           ) : (
             <PhotoGrid>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
+import { useLanguage } from '../contexts/LanguageContext'
 import { usePlayer } from '../contexts/PlayerContext'
 
 const PLAYER_ASSETS = {
@@ -60,6 +61,7 @@ function Marquee({ text }: { text: string }) {
 }
 
 export function MiniPlayer() {
+  const { t } = useLanguage()
   const { tracks, currentIndex, isPlaying, isLoading, toggle, next, prev, play, pause } = usePlayer()
   const [mode, setMode] = useState<'idle' | 'active'>('idle')
 
@@ -80,7 +82,7 @@ export function MiniPlayer() {
       <button
         type="button"
         onClick={handleStart}
-        aria-label="Включить музыку"
+        aria-label={t('music.enable')}
         style={idleButtonStyle}
       >
         <img src={PLAYER_ASSETS.musicOn} alt="" style={musicIconStyle} />
@@ -93,21 +95,21 @@ export function MiniPlayer() {
       <button
         type="button"
         onClick={handleClose}
-        aria-label="Закрыть плеер"
+        aria-label={t('music.close')}
         style={closeButtonStyle}
       >
         ✕
       </button>
 
       <div style={controlsStyle}>
-        <button type="button" onClick={prev} aria-label="Предыдущий трек" style={controlButtonStyle}>
+        <button type="button" onClick={prev} aria-label={t('music.previous')} style={controlButtonStyle}>
           <img src={PLAYER_ASSETS.prev} alt="" style={controlIconStyle} />
         </button>
 
         <button
           type="button"
           onClick={toggle}
-          aria-label={isPlaying ? 'Пауза' : 'Играть'}
+          aria-label={isPlaying ? t('music.pause') : t('music.play')}
           disabled={isLoading}
           style={{ ...controlButtonStyle, opacity: isLoading ? 0.55 : 1 }}
         >
@@ -118,7 +120,7 @@ export function MiniPlayer() {
           />
         </button>
 
-        <button type="button" onClick={next} aria-label="Следующий трек" style={controlButtonStyle}>
+        <button type="button" onClick={next} aria-label={t('music.next')} style={controlButtonStyle}>
           <img src={PLAYER_ASSETS.next} alt="" style={controlIconStyle} />
         </button>
       </div>

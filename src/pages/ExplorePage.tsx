@@ -4,6 +4,7 @@ import { MomentCard } from '../components/MomentCard'
 import { MomentCardSkeleton } from '../components/Skeleton'
 import { getRandomMoments, getMomentsByEmotion, getFeedReactions, getMomentStarTotals, getUserReactionsForMoments, addReaction, removeReaction } from '../lib/db'
 import { useAuth } from '../contexts/AuthContext'
+import { useLanguage } from '../contexts/LanguageContext'
 import type { MomentWithProfile, ReactionType } from '../lib/types'
 
 type FilterValue = 'for_you' | ReactionType
@@ -14,6 +15,7 @@ interface ReactionsMap {
 
 export function ExplorePage() {
   const { user } = useAuth()
+  const { t } = useLanguage()
   const [filter, setFilter] = useState<FilterValue>('for_you')
   const [moments, setMoments] = useState<MomentWithProfile[]>([])
   const [reactionsMap, setReactionsMap] = useState<ReactionsMap>({})
@@ -97,7 +99,7 @@ export function ExplorePage() {
       >
         <div style={{ padding: '12px 14px 10px' }}>
           <h1 style={{ color: 'var(--brown)', fontSize: 18, fontWeight: 800, letterSpacing: 0.3, margin: 0, fontFamily: 'Georgia, serif' }}>
-            Подборки
+            {t('explore.title')}
           </h1>
         </div>
         <CategoryFilmStrip active={filter} onChange={setFilter} />
@@ -111,7 +113,7 @@ export function ExplorePage() {
         ) : moments.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3 text-center">
             <span style={{ fontSize: 48 }}>🔍</span>
-            <p style={{ color: 'var(--text-muted)' }}>Нет постов с такой эмоцией.</p>
+            <p style={{ color: 'var(--text-muted)' }}>{t('explore.emptyEmotion')}</p>
           </div>
         ) : (
           <PhotoGrid>

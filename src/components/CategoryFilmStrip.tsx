@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useLanguage } from '../contexts/LanguageContext'
 import { getFollowingCategoryThumbnails, getGlobalCategoryThumbnails } from '../lib/db'
 import { EMOTIONS } from '../lib/types'
 import type { ReactionType } from '../lib/types'
@@ -7,13 +8,12 @@ type FilterValue = 'for_you' | ReactionType
 
 interface CategoryItem {
   id: FilterValue
-  label: string
   photoUrl?: string | null
 }
 
 const BASE_CATEGORIES: CategoryItem[] = [
-  { id: 'for_you', label: 'Для вас' },
-  ...EMOTIONS.map(e => ({ id: e.type as FilterValue, label: e.label })),
+  { id: 'for_you' },
+  ...EMOTIONS.map(e => ({ id: e.type as FilterValue })),
 ]
 
 const FRAME_W = 80
@@ -32,6 +32,7 @@ export function CategoryFilmStrip({
   thumbnailScope = 'global',
   userId = null,
 }: Props) {
+  const { t } = useLanguage()
   const [categories, setCategories] = useState<CategoryItem[]>(BASE_CATEGORIES)
 
   useEffect(() => {
@@ -69,6 +70,7 @@ export function CategoryFilmStrip({
       >
         {categories.map(cat => {
           const isActive = cat.id === active
+          const label = cat.id === 'for_you' ? t('category.forYou') : t(`emotion.${cat.id}`)
           return (
             <button
               key={cat.id}
@@ -121,7 +123,7 @@ export function CategoryFilmStrip({
                   lineHeight: 1.2,
                 }}
               >
-                {cat.label}
+                {label}
               </span>
             </button>
           )

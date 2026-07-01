@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { useLanguage } from '../contexts/LanguageContext'
 
 interface FilmStripHeaderProps {
   photos: (string | null)[]  // exactly 5 slots
@@ -67,6 +68,7 @@ export function FilmStripHeader({
   onOpenPhoto,
   onRemoveRequest,
 }: FilmStripHeaderProps) {
+  const { t } = useLanguage()
   const [menuSlot, setMenuSlot] = useState<number | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const itemRefs     = useRef<(HTMLDivElement | null)[]>(Array(TOTAL).fill(null))
@@ -258,15 +260,15 @@ export function FilmStripHeader({
             <button
               onClick={() => { onOpenPhoto?.(menuSlot); setMenuSlot(null) }}
               style={{ display: 'block', width: '100%', padding: '11px 16px', background: 'none', border: 'none', textAlign: 'left', color: '#F0E8D8', fontSize: 14, cursor: 'pointer', borderBottom: '1px solid #2E1A0A' }}
-            >Открыть</button>
+            >{t('filmHeader.open')}</button>
             <button
               onClick={() => { onReplaceRequest?.(menuSlot); setMenuSlot(null) }}
               style={{ display: 'block', width: '100%', padding: '11px 16px', background: 'none', border: 'none', textAlign: 'left', color: '#F0E8D8', fontSize: 14, cursor: 'pointer', borderBottom: '1px solid #2E1A0A' }}
-            >Заменить</button>
+            >{t('filmHeader.replace')}</button>
             <button
               onClick={() => { onRemoveRequest?.(menuSlot); setMenuSlot(null) }}
               style={{ display: 'block', width: '100%', padding: '11px 16px', background: 'none', border: 'none', textAlign: 'left', color: '#e05a5a', fontSize: 14, cursor: 'pointer' }}
-            >Убрать</button>
+            >{t('filmHeader.remove')}</button>
           </div>
         </>
       )}

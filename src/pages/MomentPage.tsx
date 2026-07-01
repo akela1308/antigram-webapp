@@ -5,6 +5,7 @@ import { ReactionBar } from '../components/ReactionBar'
 import { StarSupportButton } from '../components/StarSupportButton'
 import { Skeleton } from '../components/Skeleton'
 import { useAuth } from '../contexts/AuthContext'
+import { useLanguage } from '../contexts/LanguageContext'
 import {
   getMoment,
   getReactions,
@@ -22,6 +23,7 @@ export function MomentPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { language, t } = useLanguage()
 
   const [moment, setMoment] = useState<MomentWithProfile | null>(null)
   const [reactions, setReactions] = useState<{ moment_id: string; user_id: string; type: ReactionType }[]>([])
@@ -99,15 +101,15 @@ export function MomentPage() {
   if (!moment) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-3">
-        <p style={{ color: 'var(--text-muted)' }}>Момент не найден</p>
-        <button onClick={() => navigate(-1)} style={{ color: 'var(--amber)' }}>← Назад</button>
+        <p style={{ color: 'var(--text-muted)' }}>{t('moment.notFound')}</p>
+        <button onClick={() => navigate(-1)} style={{ color: 'var(--amber)' }}>← {t('common.back')}</button>
       </div>
     )
   }
 
   const profile = moment.profiles
-  const displayName = profile?.display_name ?? profile?.username ?? 'Аноним'
-  const dateStr = new Date(moment.created_at).toLocaleDateString('ru-RU', {
+  const displayName = profile?.display_name ?? profile?.username ?? t('common.anonymous')
+  const dateStr = new Date(moment.created_at).toLocaleDateString(language === 'ru' ? 'ru-RU' : 'en-US', {
     day: 'numeric', month: 'long', year: 'numeric',
   })
 
@@ -229,8 +231,8 @@ export function MomentPage() {
             padding: '24px 20px',
             paddingBottom: 'max(32px, env(safe-area-inset-bottom, 20px))',
           }}>
-            <p style={{ color: '#fff', fontSize: 17, fontWeight: 600, margin: '0 0 6px', textAlign: 'center' }}>Удалить кадр?</p>
-            <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: '0 0 20px', textAlign: 'center' }}>Это действие нельзя отменить</p>
+            <p style={{ color: '#fff', fontSize: 17, fontWeight: 600, margin: '0 0 6px', textAlign: 'center' }}>{t('moment.deleteQuestion')}</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: '0 0 20px', textAlign: 'center' }}>{t('moment.deleteHint')}</p>
             <button
               onClick={async () => {
                 if (!id) return
@@ -239,13 +241,13 @@ export function MomentPage() {
               }}
               style={{ width: '100%', padding: '14px 0', borderRadius: 30, background: '#e05a5a', color: '#fff', fontSize: 15, fontWeight: 700, border: 'none', cursor: 'pointer', marginBottom: 10 }}
             >
-              Удалить
+              {t('common.delete')}
             </button>
             <button
               onClick={() => setShowDeleteConfirm(false)}
               style={{ width: '100%', padding: '12px 0', background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 14, cursor: 'pointer' }}
             >
-              Отмена
+              {t('common.cancel')}
             </button>
           </div>
         </>

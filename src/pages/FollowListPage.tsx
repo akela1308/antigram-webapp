@@ -2,31 +2,33 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
 import { useAuth } from '../contexts/AuthContext'
+import { useLanguage } from '../contexts/LanguageContext'
 import { getFollowers, getFollowing } from '../lib/db'
 import type { FollowProfile } from '../lib/types'
 
 type FollowListKind = 'followers' | 'following'
 
-function formatName(item: FollowProfile): string {
-  return item.profile.display_name || item.profile.username || 'Аноним'
+function formatName(item: FollowProfile, fallback: string): string {
+  return item.profile.display_name || item.profile.username || fallback
 }
 
-function formatUsername(item: FollowProfile): string {
-  return item.profile.username ? `@${item.profile.username}` : 'Профиль Antigram'
+function formatUsername(item: FollowProfile, fallback: string): string {
+  return item.profile.username ? `@${item.profile.username}` : fallback
 }
 
 export function FollowListPage() {
   const { kind } = useParams<{ kind: FollowListKind }>()
   const navigate = useNavigate()
   const { user, loading: authLoading } = useAuth()
+  const { t } = useLanguage()
   const [items, setItems] = useState<FollowProfile[]>([])
   const [loading, setLoading] = useState(true)
 
   const mode: FollowListKind = kind === 'following' ? 'following' : 'followers'
-  const title = mode === 'followers' ? 'Подписчики' : 'Подписки'
+  const title = mode === 'followers' ? t('follow.followers') : t('follow.following')
   const emptyText = mode === 'followers'
-    ? 'Пока никто не подписался'
-    : 'Пока нет подписок'
+    ? t('follow.emptyFollowers')
+    : t('follow.emptyFollowing')
 
   useEffect(() => {
     let active = true
@@ -68,7 +70,7 @@ export function FollowListPage() {
       >
         <button
           onClick={() => navigate(-1)}
-          aria-label="Назад"
+          aria-label={t('common.back')}
           style={{ width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', padding: 0 }}
         >
           <BackIcon />
@@ -79,7 +81,7 @@ export function FollowListPage() {
           </h1>
           {user && (
             <p style={{ color: 'var(--text-muted)', fontSize: 11, margin: '2px 0 0' }}>
-              Видно только вам
+              {t('follow.onlyYou')}
             </p>
           )}
         </div>
@@ -94,8 +96,8 @@ export function FollowListPage() {
         </div>
       ) : !user ? (
         <EmptyState
-          text="Войдите, чтобы видеть свои подписки"
-          actionLabel="Войти"
+          text={t('follow.signIn')}
+          actionLabel={t('common.signIn')}
           onAction={() => navigate('/auth')}
         />
       ) : items.length === 0 ? (
@@ -120,13 +122,13 @@ export function FollowListPage() {
                 cursor: 'pointer',
               }}
             >
-              <Avatar url={item.profile.avatar_url} name={formatName(item)} size={48} />
+              <Avatar url={item.profile.avatar_url} name={formatName(item, t('common.anonymous'))} size={48} />
               <div style={{ minWidth: 0 }}>
                 <p style={{ color: 'var(--text)', fontSize: 15, fontWeight: 700, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {formatName(item)}
+                  {formatName(item, t('common.anonymous'))}
                 </p>
                 <p style={{ color: 'var(--text-muted)', fontSize: 12, margin: '3px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {formatUsername(item)}
+                  {formatUsername(item, t('follow.profileFallback'))}
                 </p>
               </div>
               <ChevronIcon />

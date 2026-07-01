@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Avatar } from './Avatar'
 import { StarSupportButton } from './StarSupportButton'
+import { useLanguage } from '../contexts/LanguageContext'
 import type { MomentWithProfile } from '../lib/types'
 import type { ReactionType } from '../lib/types'
 import { EMOTIONS } from '../lib/types'
@@ -27,6 +28,7 @@ export function MomentCard({
   onReact,
   directTopReaction = false,
 }: MomentCardProps) {
+  const { t } = useLanguage()
   const navigate = useNavigate()
   const [showReactionPicker, setShowReactionPicker] = useState(false)
   const profile = moment.profiles
@@ -126,7 +128,7 @@ export function MomentCard({
             }}
           >
             <span style={{ fontSize: 12 }}>{topReaction.emoji}</span>
-            <span style={{ fontSize: 10, color: isReacted ? 'var(--amber)' : 'var(--text-muted)', fontWeight: 600 }}>{topReaction.label}</span>
+            <span style={{ fontSize: 10, color: isReacted ? 'var(--amber)' : 'var(--text-muted)', fontWeight: 600 }}>{topReaction.type === 'custom' ? topReaction.label : t(`emotion.${topReaction.type}`)}</span>
             <span style={{ fontSize: 10, color: isReacted ? 'var(--amber)' : 'var(--text-muted)' }}>{topReaction.count}</span>
           </div>
         )}
@@ -142,7 +144,7 @@ export function MomentCard({
       <div className="flex items-center gap-1.5 px-0.5">
         <Avatar url={profile?.avatar_url} name={profile?.display_name ?? profile?.username} size={20} />
         <span className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
-          {profile?.display_name ?? profile?.username ?? 'Аноним'}
+          {profile?.display_name ?? profile?.username ?? t('common.anonymous')}
         </span>
       </div>
     </div>

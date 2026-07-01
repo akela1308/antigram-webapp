@@ -1,27 +1,17 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { formatRelativeTime, useLanguage } from '../contexts/LanguageContext'
 import { EMOTIONS } from '../lib/types'
 import type { NotificationItem, Profile, ReactionType } from '../lib/types'
 import { getNotifications, markNotificationsRead } from '../lib/db'
 
-function formatTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 2) return 'только что'
-  if (mins < 60) return `${mins} мин назад`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours} ч назад`
-  if (hours < 48) return 'вчера'
-  return `${Math.floor(hours / 24)} д назад`
+function getProfileName(profile: Profile | null, fallback: string): string {
+  return profile?.display_name || profile?.username || fallback
 }
 
-function getProfileName(profile: Profile | null): string {
-  return profile?.display_name || profile?.username || 'Кто-то'
-}
-
-function getProfileInitial(profile: Profile | null): string {
-  return getProfileName(profile).trim().slice(0, 1).toUpperCase() || 'A'
+function getProfileInitial(profile: Profile | null, fallback: string): string {
+  return getProfileName(profile, fallback).trim().slice(0, 1).toUpperCase() || 'A'
 }
 
 function getPayloadText(payload: Record<string, unknown>, key: string): string | null {
@@ -29,25 +19,25 @@ function getPayloadText(payload: Record<string, unknown>, key: string): string |
   return typeof value === 'string' && value.trim() ? value : null
 }
 
-function getNotificationText(notification: NotificationItem): string {
-  const actor = getProfileName(notification.profiles)
+function getNotificationText(notification: NotificationItem, t: ReturnType<typeof useLanguage>['t']): string {
+  const actor = getProfileName(notification.profiles, t('common.someone'))
 
   if (notification.type === 'follow') {
-    return `${actor} подписался на вас`
+    return t('notifications.follow', { actor })
   }
 
   if (notification.type === 'reaction') {
     const reactionType = getPayloadText(notification.payload, 'reaction_type') as ReactionType | null
     const emotion = EMOTIONS.find(e => e.type === reactionType)
     return emotion
-      ? `${actor} отреагировал: ${emotion.emoji} ${emotion.label}`
-      : `${actor} отреагировал на ваш момент`
+      ? t('notifications.reaction', { actor, reaction: `${emotion.emoji} ${t(`emotion.${emotion.type}`)}` })
+      : t('notifications.reactionFallback', { actor })
   }
 
   const preview = getPayloadText(notification.payload, 'text_preview')
   return preview
     ? `${actor}: ${preview}`
-    : `${actor} прокомментировал ваш момент`
+    : t('notifications.commentFallback', { actor })
 }
 
 function getNotificationTarget(notification: NotificationItem): string | null {
@@ -59,6 +49,7 @@ function getNotificationTarget(notification: NotificationItem): string | null {
 export function NotificationsPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { language, t } = useLanguage()
   const [items, setItems] = useState<NotificationItem[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -114,7 +105,7 @@ export function NotificationsPage() {
             fontFamily: 'Georgia, serif',
           }}
         >
-          Уведомления
+          {t('notifications.title')}
         </h1>
       </div>
 
@@ -130,12 +121,12 @@ export function NotificationsPage() {
         </div>
       ) : !user ? (
         <EmptyState
-          text="Войдите, чтобы видеть уведомления"
-          actionLabel="Войти"
+          text={t('notifications.signIn')}
+          actionLabel={t('common.signIn')}
           onAction={() => navigate('/auth')}
         />
       ) : items.length === 0 ? (
-        <EmptyState text="Пока нет уведомлений" />
+        <EmptyState text={t('notifications.empty')} />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', paddingBottom: 96 }}>
           {items.map(item => {
@@ -181,7 +172,7 @@ export function NotificationsPage() {
                         fontWeight: 800,
                       }}
                     >
-                      {getProfileInitial(item.profiles)}
+                      {getProfileInitial(item.profiles, t('common.someone'))}
                     </div>
                   )}
                   {!item.read && (
@@ -210,10 +201,10 @@ export function NotificationsPage() {
                       margin: 0,
                     }}
                   >
-                    {getNotificationText(item)}
+                    {getNotificationText(item, t)}
                   </p>
                   <p style={{ color: 'var(--text-muted)', fontSize: 11, margin: '4px 0 0' }}>
-                    {formatTime(item.created_at)}
+                    {formatRelativeTime(item.created_at, language)}
                   </p>
                 </div>
 

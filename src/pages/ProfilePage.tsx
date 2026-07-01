@@ -5,6 +5,7 @@ import { FilmStripHeader } from '../components/FilmStripHeader'
 import { ProfileSkeleton, MomentCardSkeleton } from '../components/Skeleton'
 import { StarCountPill } from '../components/StarSupportButton'
 import { useAuth } from '../contexts/AuthContext'
+import { useLanguage } from '../contexts/LanguageContext'
 import {
   getProfile,
   getUserMoments,
@@ -27,6 +28,7 @@ export function ProfilePage() {
   const { userId } = useParams<{ userId: string }>()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { t } = useLanguage()
 
   const [profile, setProfile] = useState<Profile | null>(null)
   const [moments, setMoments] = useState<Moment[]>([])
@@ -114,13 +116,13 @@ export function ProfilePage() {
   if (!profile) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-3">
-        <p style={{ color: 'var(--text-muted)' }}>Профиль не найден</p>
-        <button onClick={() => navigate(-1)} style={{ color: 'var(--amber)' }}>← Назад</button>
+        <p style={{ color: 'var(--text-muted)' }}>{t('profile.notFound')}</p>
+        <button onClick={() => navigate(-1)} style={{ color: 'var(--amber)' }}>← {t('common.back')}</button>
       </div>
     )
   }
 
-  const displayName = profile.display_name ?? profile.username ?? 'Аноним'
+  const displayName = profile.display_name ?? profile.username ?? t('common.anonymous')
 
   const ringPhotos: (string | null)[] = Array.from({ length: 5 }, (_, i) => {
     const hl = highlights.find(h => h.position === i)
@@ -175,9 +177,9 @@ export function ProfilePage() {
 
         {/* Stats */}
         <div className="flex gap-8 mt-1">
-          <Stat label="постов" value={moments.length} />
-          <Stat label="подписчиков" value={followersCount} />
-          <Stat label="подписок" value={followingCount} />
+          <Stat label={t('profile.posts')} value={moments.length} />
+          <Stat label={t('profile.followers')} value={followersCount} />
+          <Stat label={t('profile.following')} value={followingCount} />
         </div>
 
         {/* Follow button */}
@@ -193,7 +195,7 @@ export function ProfilePage() {
               opacity: followLoading ? 0.6 : 1,
             }}
           >
-            {following ? 'Отписаться' : 'Подписаться'}
+            {following ? t('profile.unfollow') : t('profile.follow')}
           </button>
         )}
 
@@ -203,7 +205,7 @@ export function ProfilePage() {
             className="mt-2 px-8 py-2.5 rounded-xl font-semibold text-sm"
             style={{ background: 'rgba(201,132,62,0.1)', color: 'var(--amber)', border: '1px solid var(--border)' }}
           >
-            Редактировать профиль
+            {t('profile.edit')}
           </Link>
         )}
       </div>
@@ -216,7 +218,7 @@ export function ProfilePage() {
         {moments.length === 0 ? (
           <div className="col-span-2 flex flex-col items-center py-16 gap-2">
             <span style={{ fontSize: 40 }}>📷</span>
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Нет моментов</p>
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('profile.noMoments')}</p>
           </div>
         ) : (
           moments.map((m, idx) => (

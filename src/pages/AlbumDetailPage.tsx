@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { StarCountPill } from '../components/StarSupportButton'
 import { useAuth } from '../contexts/AuthContext'
+import { useLanguage } from '../contexts/LanguageContext'
 import {
   getAlbumMoments,
   getUserMoments,
@@ -18,11 +19,12 @@ export function AlbumDetailPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user } = useAuth()
+  const { t } = useLanguage()
   const state = location.state as { albumTitle?: string; userId?: string } | null
 
   const [albumMoments, setAlbumMoments] = useState<Moment[]>([])
   const [allMoments, setAllMoments] = useState<Moment[]>([])
-  const [albumTitle, setAlbumTitle] = useState(state?.albumTitle ?? 'Альбом')
+  const [albumTitle, setAlbumTitle] = useState(state?.albumTitle ?? t('albums.album'))
   const [momentStarTotals, setMomentStarTotals] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [showMenu, setShowMenu] = useState(false)
@@ -120,13 +122,13 @@ export function AlbumDetailPage() {
                 onClick={e => { e.stopPropagation(); setRenameValue(albumTitle); setShowRename(true); setShowMenu(false) }}
                 style={{ display: 'block', width: '100%', padding: '11px 16px', background: 'none', border: 'none', borderBottom: '1px solid #2E1A0A', textAlign: 'left', color: 'var(--text)', fontSize: 14, cursor: 'pointer' }}
               >
-                Переименовать
+                {t('albums.rename')}
               </button>
               <button
                 onClick={e => { e.stopPropagation(); setShowDeleteConfirm(true); setShowMenu(false) }}
                 style={{ display: 'block', width: '100%', padding: '11px 16px', background: 'none', border: 'none', textAlign: 'left', color: '#e05a5a', fontSize: 14, cursor: 'pointer' }}
               >
-                Удалить альбом
+                {t('albums.deleteAlbum')}
               </button>
             </div>
           )}
@@ -143,7 +145,7 @@ export function AlbumDetailPage() {
             fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer',
           }}
         >
-          + Добавить фото
+          {t('albums.addPhoto')}
         </button>
       </div>
 
@@ -157,7 +159,7 @@ export function AlbumDetailPage() {
       ) : albumMoments.length === 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '40vh', gap: 12 }}>
           <span style={{ fontSize: 40 }}>📷</span>
-          <p style={{ color: 'var(--text-muted)', fontSize: 14, margin: 0 }}>Альбом пуст</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: 14, margin: 0 }}>{t('albums.empty')}</p>
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 2, padding: '0 2px 112px' }}>
@@ -191,13 +193,13 @@ export function AlbumDetailPage() {
                     onClick={() => handleRemoveMoment(m.id)}
                     style={{ padding: '7px 14px', borderRadius: 16, background: '#e05a5a', border: 'none', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
                   >
-                    Убрать
+                    {t('albums.remove')}
                   </button>
                   <button
                     onClick={() => setRemoveConfirmId(null)}
                     style={{ padding: '5px 12px', borderRadius: 16, background: 'rgba(0,0,0,0.5)', border: '1px solid #555', color: '#ccc', fontSize: 11, cursor: 'pointer' }}
                   >
-                    Отмена
+                    {t('common.cancel')}
                   </button>
                 </div>
               )}
@@ -219,7 +221,7 @@ export function AlbumDetailPage() {
             <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: 8 }}>
               <div style={{ width: 36, height: 4, borderRadius: 2, background: '#333' }} />
             </div>
-            <p style={{ color: '#fff', fontSize: 17, fontWeight: 700, margin: '0 0 14px' }}>Переименовать</p>
+            <p style={{ color: '#fff', fontSize: 17, fontWeight: 700, margin: '0 0 14px' }}>{t('albums.rename')}</p>
             <input
               value={renameValue}
               onChange={e => setRenameValue(e.target.value)}
@@ -240,7 +242,7 @@ export function AlbumDetailPage() {
                 fontSize: 15, fontWeight: 700, border: 'none', cursor: 'pointer',
               }}
             >
-              Сохранить
+              {t('common.save')}
             </button>
           </div>
         </>
@@ -257,19 +259,19 @@ export function AlbumDetailPage() {
             padding: '24px 20px',
             paddingBottom: 'max(32px, env(safe-area-inset-bottom, 20px))',
           }}>
-            <p style={{ color: '#fff', fontSize: 17, fontWeight: 600, margin: '0 0 6px', textAlign: 'center' }}>Удалить альбом?</p>
-            <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: '0 0 20px', textAlign: 'center' }}>Фотографии останутся в ленте</p>
+            <p style={{ color: '#fff', fontSize: 17, fontWeight: 600, margin: '0 0 6px', textAlign: 'center' }}>{t('albums.deleteAlbumQuestion')}</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: '0 0 20px', textAlign: 'center' }}>{t('albums.deleteAlbumHint')}</p>
             <button
               onClick={handleDeleteAlbum}
               style={{ width: '100%', padding: '14px 0', borderRadius: 30, background: '#e05a5a', color: '#fff', fontSize: 15, fontWeight: 700, border: 'none', cursor: 'pointer', marginBottom: 10 }}
             >
-              Удалить
+              {t('common.delete')}
             </button>
             <button
               onClick={() => setShowDeleteConfirm(false)}
               style={{ width: '100%', padding: '12px 0', background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 14, cursor: 'pointer' }}
             >
-              Отмена
+              {t('common.cancel')}
             </button>
           </div>
         </>
@@ -290,12 +292,12 @@ export function AlbumDetailPage() {
               <div style={{ width: 36, height: 4, borderRadius: 2, background: '#333' }} />
             </div>
             <div style={{ padding: '8px 20px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <p style={{ color: '#fff', fontSize: 16, fontWeight: 700, margin: 0 }}>Добавить фото</p>
+              <p style={{ color: '#fff', fontSize: 16, fontWeight: 700, margin: 0 }}>{t('albums.addPhoto')}</p>
               <button onClick={() => setShowAddPicker(false)} style={{ background: 'none', border: 'none', color: '#555', fontSize: 22, cursor: 'pointer' }}>✕</button>
             </div>
             {availableMoments.length === 0 ? (
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Все фото уже добавлены</p>
+                <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>{t('albums.allAdded')}</p>
               </div>
             ) : (
               <div className="no-scrollbar" style={{ overflowY: 'auto', padding: '0 8px' }}>
