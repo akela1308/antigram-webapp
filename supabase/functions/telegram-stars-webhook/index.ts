@@ -133,10 +133,6 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: 'Method not allowed' }, 405)
   }
 
-  if (WEBHOOK_SECRET && req.headers.get('x-telegram-bot-api-secret-token') !== WEBHOOK_SECRET) {
-    return json({ ok: false, error: 'Invalid webhook secret' }, 401)
-  }
-
   try {
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !BOT_TOKEN) {
       console.error('[Stars] missing env vars')
@@ -144,6 +140,19 @@ Deno.serve(async (req) => {
     }
 
     const update = await req.json() as TelegramUpdate
+    const hasValidWebhookSecret =
+      !WEBHOOK_SECRET || req.headers.get('x-telegram-bot-api-secret-token') === WEBHOOK_SECRET
+    const hasPaymentUpdate = Boolean(update.pre_checkout_query || update.message?.successful_payment)
+
+    if (!hasValidWebhookSecret && hasPaymentUpdate) {
+      console.error('[Stars] payment update rejected: invalid webhook secret')
+      return json({ ok: false, error: 'Invalid webhook secret' }, 401)
+    }
+
+    if (!hasValidWebhookSecret) {
+      console.warn('[Bot] non-payment update received without valid webhook secret')
+    }
+
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: { autoRefreshToken: false, persistSession: false },
     })
@@ -216,6 +225,12 @@ async function handleBotMessage(message: NonNullable<TelegramUpdate['message']>)
   const language = getUserLanguage(message.from)
 
   if (text.startsWith('/start') || text.startsWith('/help') || text === 'start') {
+    await configureBotSurface(chatId, language)
+    await sendWelcome(chatId, message.from, language)
+    return
+  }
+
+  if (text.startsWith('/language')) {
     await sendWelcome(chatId, message.from, language)
     return
   }
@@ -261,6 +276,34 @@ async function sendWelcome(chatId: number | string, user?: TelegramUser, languag
     text: greeting + BOT_TEXT[language].welcome,
     reply_markup: mainKeyboard(language),
   })
+}
+
+async function configureBotSurface(chatId: number | string, language: BotLanguage) {
+  await Promise.all([
+    telegramApi('setMyCommands', {
+      commands: [
+        { command: 'start', description: 'Open Antigram menu' },
+        { command: 'help', description: 'Show Antigram help' },
+        { command: 'language', description: 'Change language' },
+      ],
+    }),
+    telegramApi('setMyCommands', {
+      language_code: 'ru',
+      commands: [
+        { command: 'start', description: 'Открыть меню Antigram' },
+        { command: 'help', description: 'Помощь по Antigram' },
+        { command: 'language', description: 'Сменить язык' },
+      ],
+    }),
+    telegramApi('setChatMenuButton', {
+      chat_id: chatId,
+      menu_button: {
+        type: 'web_app',
+        text: language === 'ru' ? 'Открыть Antigram' : 'Open Antigram',
+        web_app: { url: WEBAPP_URL },
+      },
+    }),
+  ])
 }
 
 function mainKeyboard(language: BotLanguage) {
