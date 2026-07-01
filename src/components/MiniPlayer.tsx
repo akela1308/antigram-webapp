@@ -18,14 +18,28 @@ const PLAYER_VIEWPORT_MARGIN = 8
 const DRAG_THRESHOLD = 6
 
 type PlayerPosition = { x: number; y: number }
+type TelegramWebApp = {
+  CloudStorage?: {
+    getItem?: (key: string, callback: (error: string | null, value: string | null) => void) => void
+    setItem?: (key: string, value: string, callback?: (error: string | null, success?: boolean) => void) => void
+  }
+  disableVerticalSwipes?: () => void
+  enableVerticalSwipes?: () => void
+}
 
-function getStoredPosition(): PlayerPosition | null {
-  if (typeof window === 'undefined') return null
+function getTelegramWebApp(): TelegramWebApp | null {
+  try {
+    return (window as unknown as { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp ?? null
+  } catch {
+    return null
+  }
+}
+
+function parsePosition(value: string | null): PlayerPosition | null {
+  if (!value) return null
 
   try {
-    const raw = window.localStorage.getItem(PLAYER_POSITION_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as Partial<PlayerPosition>
+    const parsed = JSON.parse(value) as Partial<PlayerPosition>
     if (typeof parsed.x !== 'number' || typeof parsed.y !== 'number') return null
     return parsed as PlayerPosition
   } catch {
@@ -33,11 +47,54 @@ function getStoredPosition(): PlayerPosition | null {
   }
 }
 
-function storePosition(position: PlayerPosition) {
+function getStoredPosition(): PlayerPosition | null {
+  if (typeof window === 'undefined') return null
+
   try {
-    window.localStorage.setItem(PLAYER_POSITION_KEY, JSON.stringify(position))
+    return parsePosition(window.localStorage.getItem(PLAYER_POSITION_KEY))
+  } catch {
+    return null
+  }
+}
+
+function storePosition(position: PlayerPosition) {
+  const serialized = JSON.stringify(position)
+
+  try {
+    window.localStorage.setItem(PLAYER_POSITION_KEY, serialized)
   } catch {
     // Position persistence is a comfort feature; dragging should keep working without it.
+  }
+
+  try {
+    getTelegramWebApp()?.CloudStorage?.setItem?.(PLAYER_POSITION_KEY, serialized)
+  } catch {
+    // CloudStorage is available only inside supported Telegram clients.
+  }
+}
+
+function getCloudStoredPosition(): Promise<PlayerPosition | null> {
+  const storage = getTelegramWebApp()?.CloudStorage
+  if (!storage?.getItem) return Promise.resolve(null)
+
+  return new Promise(resolve => {
+    try {
+      storage.getItem?.(PLAYER_POSITION_KEY, (_error, value) => {
+        resolve(parsePosition(value))
+      })
+    } catch {
+      resolve(null)
+    }
+  })
+}
+
+function setTelegramVerticalSwipes(enabled: boolean) {
+  try {
+    const tg = getTelegramWebApp()
+    if (enabled) tg?.enableVerticalSwipes?.()
+    else tg?.disableVerticalSwipes?.()
+  } catch {
+    // Older Telegram clients simply do not support this API.
   }
 }
 
@@ -148,6 +205,34 @@ export function MiniPlayer() {
   }, [mode])
 
   useEffect(() => {
+    let cancelled = false
+
+    getCloudStoredPosition().then(stored => {
+      if (cancelled || !stored) return
+      const element = playerRef.current
+      if (!element) return
+
+      const nextPosition = clampPosition(stored, element)
+      setPosition(nextPosition)
+      try {
+        window.localStorage.setItem(PLAYER_POSITION_KEY, JSON.stringify(nextPosition))
+      } catch {
+        // Local mirror is optional; CloudStorage remains the source of truth here.
+      }
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      setTelegramVerticalSwipes(true)
+    }
+  }, [])
+
+  useEffect(() => {
     const keepInBounds = () => {
       const element = playerRef.current
       if (!element) return
@@ -193,12 +278,16 @@ export function MiniPlayer() {
     }
 
     setPosition(origin)
+    setTelegramVerticalSwipes(false)
     element.setPointerCapture?.(event.pointerId)
   }
 
   function handlePointerMove(event: React.PointerEvent<HTMLElement>) {
     const drag = dragRef.current
     if (!drag || drag.pointerId !== event.pointerId) return
+
+    event.preventDefault()
+    event.stopPropagation()
 
     const dx = event.clientX - drag.startX
     const dy = event.clientY - drag.startY
@@ -219,6 +308,7 @@ export function MiniPlayer() {
     playerRef.current?.releasePointerCapture?.(event.pointerId)
     dragRef.current = null
     setIsDragging(false)
+    setTelegramVerticalSwipes(true)
 
     if (drag.moved) {
       suppressClickRef.current = true
