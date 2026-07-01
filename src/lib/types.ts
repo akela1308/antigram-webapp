@@ -119,6 +119,23 @@ export interface StarInvoiceResponse {
   paymentId: string
 }
 
+export interface PremiumSubscription {
+  id: string
+  user_id: string
+  status: 'pending' | 'active' | 'expired' | 'cancelled' | 'refunded'
+  source: 'telegram_stars'
+  price_stars: number
+  period_days: number
+  started_at: string | null
+  expires_at: string | null
+  invoice_payload: string | null
+  telegram_payment_charge_id: string | null
+  provider_payment_charge_id: string | null
+  raw_update: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
 export const EMOTIONS = [
   { type: 'warm' as ReactionType,      emoji: '🔥', label: 'Тепло'      },
   { type: 'nostalgic' as ReactionType, emoji: '🌅', label: 'Ностальгия' },

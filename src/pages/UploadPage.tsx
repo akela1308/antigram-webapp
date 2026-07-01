@@ -8,7 +8,8 @@ import { FILM_PRESETS } from '../lib/filmPresets'
 import type { FilmPreset, AlgoType, GrainConfig, FlareType } from '../lib/filmPresets'
 import type { ReactionType } from '../lib/types'
 import { trackPhotoPosted, trackFilterApplied } from '../lib/analytics'
-import { addReaction, getTodaysMomentCount, DAILY_FRAME_LIMIT } from '../lib/db'
+import { addReaction, getTodaysMomentCount } from '../lib/db'
+import { getDailyFrameLimit } from '../lib/premium'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -297,8 +298,9 @@ export function UploadPage() {
     typeof window === 'undefined' ? 720 : window.innerHeight,
   )
 
+  const dailyFrameLimit = getDailyFrameLimit(false)
   const framesUsed      = todayCount ?? 0
-  const framesRemaining = Math.max(0, DAILY_FRAME_LIMIT - framesUsed)
+  const framesRemaining = Math.max(0, dailyFrameLimit - framesUsed)
   const limitReached    = todayCount !== null && framesRemaining === 0
   const isCompactCamera = viewportHeight <= 700
   const isTinyCamera    = viewportHeight <= 600
@@ -475,7 +477,7 @@ export function UploadPage() {
     try {
       // Server-side double-check before upload (DB trigger is the final guard)
       const currentCount = await getTodaysMomentCount(user.id)
-      if (currentCount >= DAILY_FRAME_LIMIT) {
+      if (currentCount >= dailyFrameLimit) {
         setTodayCount(currentCount)
         setError(t('camera.limitReached'))
         setPhase('preview')
@@ -515,7 +517,7 @@ export function UploadPage() {
       const msg = err instanceof Error ? err.message : String(err)
       if (msg.includes('daily_frame_limit_exceeded')) {
         setError(t('camera.limitReached'))
-        setTodayCount(DAILY_FRAME_LIMIT)
+        setTodayCount(dailyFrameLimit)
       } else {
         setError(t('camera.publishError'))
       }
@@ -1021,7 +1023,7 @@ export function UploadPage() {
         {/* Frame counter */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
           <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
-            {Array.from({ length: DAILY_FRAME_LIMIT }).map((_, i) => {
+            {Array.from({ length: dailyFrameLimit }).map((_, i) => {
               const isAvailable = todayCount === null || i >= framesUsed
               return (
                 <div
@@ -1056,13 +1058,32 @@ export function UploadPage() {
               ? ''
               : limitReached
                 ? t('camera.framesResetMidnight')
-                : t('camera.framesToday', { remaining: framesRemaining, limit: DAILY_FRAME_LIMIT })
+                : t('camera.framesToday', { remaining: framesRemaining, limit: dailyFrameLimit })
             }
           </span>
           {limitMsg && (
             <span style={{ fontSize: 12, color: 'rgba(201,132,62,0.7)', marginTop: 2 }}>
               {t('camera.limitReached')}
             </span>
+          )}
+          {limitReached && (
+            <button
+              onClick={() => navigate('/premium')}
+              style={{
+                marginTop: 4,
+                padding: '8px 13px',
+                borderRadius: 18,
+                border: '1px solid rgba(201,132,62,0.3)',
+                background: 'rgba(201,132,62,0.09)',
+                color: 'var(--amber)',
+                fontSize: 12,
+                fontWeight: 800,
+                lineHeight: 1.25,
+                cursor: 'pointer',
+              }}
+            >
+              {t('camera.premiumLimitHint')} {t('camera.premiumOpen')}
+            </button>
           )}
         </div>
 

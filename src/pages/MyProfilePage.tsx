@@ -389,6 +389,8 @@ export function MyProfilePage() {
           <div style={{ width: 1, height: 28, background: 'var(--divider)', margin: '0 20px' }} />
           <Stat label={t('profile.following')} value={followingCount} onClick={() => navigate('/me/following')} />
         </div>
+
+        <PremiumProfileCard onClick={() => navigate('/premium')} />
       </div>
 
       {/* Tabs */}
@@ -649,6 +651,58 @@ export function MyProfilePage() {
         />
       )}
     </div>
+  )
+}
+
+function PremiumProfileCard({ onClick }: { onClick: () => void }) {
+  const { t } = useLanguage()
+
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        width: '100%',
+        marginTop: 2,
+        padding: '11px 13px',
+        borderRadius: 14,
+        border: '1px solid rgba(201,132,62,0.28)',
+        background: 'linear-gradient(135deg, rgba(201,132,62,0.12), rgba(255,255,255,0.025))',
+        display: 'grid',
+        gridTemplateColumns: '34px minmax(0, 1fr) auto',
+        alignItems: 'center',
+        gap: 10,
+        textAlign: 'left',
+        cursor: 'pointer',
+      }}
+    >
+      <span
+        style={{
+          width: 34,
+          height: 34,
+          borderRadius: 17,
+          background: '#C4A882',
+          color: '#1A0F05',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 16,
+          fontWeight: 900,
+        }}
+      >
+        ★
+      </span>
+      <span style={{ minWidth: 0 }}>
+        <span style={{ display: 'block', color: 'var(--text)', fontSize: 13, fontWeight: 900 }}>
+          {t('premium.profileTitle')}
+        </span>
+        <span style={{ display: 'block', color: 'var(--text-muted)', fontSize: 11, lineHeight: 1.35, marginTop: 2 }}>
+          {t('premium.profileHint')}
+        </span>
+      </span>
+      <span style={{ color: 'var(--amber)', fontSize: 12, fontWeight: 800 }}>
+        {t('premium.open')}
+      </span>
+    </button>
   )
 }
 
@@ -1035,6 +1089,23 @@ function SettingsSheet({
           )}
 
           <p style={sectionTitleStyle}>{t('settings.rulesSupport')}</p>
+          <button
+            type="button"
+            onClick={() => onNavigate('/premium')}
+            style={{
+              ...linkButtonStyle,
+              color: 'var(--amber)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+            }}
+          >
+            <span>{t('settings.premium')}</span>
+            <span style={{ color: 'var(--text-muted)', fontSize: 12, fontWeight: 700 }}>
+              {t('premium.comingSoon')}
+            </span>
+          </button>
           <button
             type="button"
             onClick={onSupportPress}

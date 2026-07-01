@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { PREMIUM_REGULAR_DAILY_FRAME_LIMIT } from './premium'
 import type {
   Profile,
   Moment,
@@ -11,6 +12,7 @@ import type {
   NotificationItem,
   MomentStarTotal,
   ProfileStarTotal,
+  PremiumSubscription,
   StarInvoiceResponse,
   FollowProfile,
 } from './types'
@@ -265,7 +267,7 @@ export async function removeReaction(
 
 // ─── DAILY FRAME LIMIT ───────────────────────────────────────────────────────
 
-export const DAILY_FRAME_LIMIT = 4
+export const DAILY_FRAME_LIMIT = PREMIUM_REGULAR_DAILY_FRAME_LIMIT
 
 /** Returns how many moments the user has published today (UTC midnight reset, matches DB trigger). */
 export async function getTodaysMomentCount(userId: string): Promise<number> {
@@ -357,6 +359,25 @@ export async function createStarInvoice(
   }
 
   return data
+}
+
+export async function getActivePremiumSubscription(userId: string): Promise<PremiumSubscription | null> {
+  const { data, error } = await supabase
+    .from('premium_subscriptions')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('status', 'active')
+    .gt('expires_at', new Date().toISOString())
+    .order('expires_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    console.error('[Premium] active subscription load failed:', error)
+    return null
+  }
+
+  return data as PremiumSubscription | null
 }
 
 // ─── FOLLOWS ─────────────────────────────────────────────────────────────────

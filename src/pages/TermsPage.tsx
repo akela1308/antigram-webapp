@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useLanguage } from '../contexts/LanguageContext'
+import { PREMIUM_PERIOD_DAYS, PREMIUM_PRICE_STARS } from '../lib/premium'
 
 const sectionStyle: React.CSSProperties = { marginTop: 20 }
 const headingStyle: React.CSSProperties = { fontSize: 16, margin: '0 0 8px', color: 'var(--text)' }
@@ -21,8 +22,8 @@ export function TermsPage() {
       </h1>
       <p style={textStyle}>
         {isRu
-          ? 'Эти условия описывают использование Antigram, публикацию фотографий и будущую механику поддержки авторов через Telegram Stars. Последнее обновление: 28 июня 2026.'
-          : 'These terms describe the use of Antigram, photo publishing, and the future creator support mechanics through Telegram Stars. Last updated: June 28, 2026.'}
+          ? 'Эти условия описывают использование Antigram, публикацию фотографий, Premium и будущую механику поддержки авторов через Telegram Stars. Последнее обновление: 1 июля 2026.'
+          : 'These terms describe the use of Antigram, photo publishing, Premium, and the future creator support mechanics through Telegram Stars. Last updated: July 1, 2026.'}
       </p>
 
       <section style={sectionStyle}>
@@ -85,7 +86,21 @@ export function TermsPage() {
       </section>
 
       <section style={sectionStyle}>
-        <h2 style={headingStyle}>{isRu ? '7. Модерация' : '7. Moderation'}</h2>
+        <h2 style={headingStyle}>{isRu ? '7. Antigram Premium' : '7. Antigram Premium'}</h2>
+        <p style={textStyle}>
+          {isRu
+            ? `Antigram Premium — цифровая услуга внутри приложения. На запуске Premium планируется по цене ${PREMIUM_PRICE_STARS} Stars за ${PREMIUM_PERIOD_DAYS} дней и будет оплачиваться через Telegram Stars. Premium может включать увеличенный дневной лимит кадров, редкие плёнки и фильтры, расширенную плёнку профиля, Premium-бейдж, ранний доступ к функциям и приоритетную поддержку. Состав функций может меняться, но активные оплаченные преимущества сохраняются на оплаченный период.`
+            : `Antigram Premium is a digital service inside the app. At launch, Premium is planned at ${PREMIUM_PRICE_STARS} Stars for ${PREMIUM_PERIOD_DAYS} days and will be paid through Telegram Stars. Premium may include a higher daily frame limit, rare films and filters, an expanded profile film strip, a Premium badge, early access to features, and priority support. The feature set may change, but active paid benefits remain available for the paid period.`}
+        </p>
+        <p style={{ ...textStyle, marginTop: 8 }}>
+          {isRu
+            ? 'Premium не гарантирует выплаты, продвижение, попадание в подборки или защиту от модерации. Возвраты по Premium рассматриваются через поддержку Antigram и инструменты Telegram, если возврат применим.'
+            : 'Premium does not guarantee payouts, promotion, collection placement, or protection from moderation. Premium refunds are reviewed through Antigram support and Telegram tools where applicable.'}
+        </p>
+      </section>
+
+      <section style={sectionStyle}>
+        <h2 style={headingStyle}>{isRu ? '8. Модерация' : '8. Moderation'}</h2>
         <p style={textStyle}>
           {isRu
             ? 'Мы можем скрывать, ограничивать или удалять материалы, которые нарушают правила сообщества, права других людей, закон или правила Telegram. Платная поддержка Stars не защищает публикацию от модерации.'
@@ -94,7 +109,7 @@ export function TermsPage() {
       </section>
 
       <section style={sectionStyle}>
-        <h2 style={headingStyle}>{isRu ? '8. Поддержка' : '8. Support'}</h2>
+        <h2 style={headingStyle}>{isRu ? '9. Поддержка' : '9. Support'}</h2>
         <p style={textStyle}>
           {isRu
             ? 'По вопросам платежей, Stars, удаления аккаунта и модерации напишите в поддержку: support@antigram.app.'
@@ -103,7 +118,7 @@ export function TermsPage() {
       </section>
 
       <section style={sectionStyle}>
-        <h2 style={headingStyle}>{isRu ? '9. Политика конфиденциальности' : '9. Privacy Policy'}</h2>
+        <h2 style={headingStyle}>{isRu ? '10. Политика конфиденциальности' : '10. Privacy Policy'}</h2>
         <p style={textStyle}>
           {isRu ? 'То, какие данные мы собираем и как их используем, описано отдельно: ' : 'What data we collect and how we use it is described separately: '}
           <Link to="/privacy" style={{ color: 'var(--amber)' }}>
