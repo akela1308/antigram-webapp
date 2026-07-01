@@ -5,6 +5,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 const BOT_TOKEN = Deno.env.get('BOT_TOKEN') ?? ''
 const WEBHOOK_SECRET = Deno.env.get('TELEGRAM_WEBHOOK_SECRET') ?? ''
+const WEBAPP_URL = Deno.env.get('WEBAPP_URL') ?? 'https://antigram-webapp.vercel.app'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -21,6 +22,15 @@ interface TelegramUser {
 
 interface TelegramUpdate {
   update_id?: number
+  callback_query?: {
+    id: string
+    from?: TelegramUser
+    message?: {
+      chat?: { id: number | string }
+      message_id?: number
+    }
+    data?: string
+  }
   pre_checkout_query?: {
     id: string
     from?: TelegramUser
@@ -29,7 +39,9 @@ interface TelegramUpdate {
     invoice_payload: string
   }
   message?: {
+    chat?: { id: number | string }
     from?: TelegramUser
+    text?: string
     successful_payment?: {
       currency: string
       total_amount: number
@@ -79,6 +91,18 @@ Deno.serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false },
     })
 
+    // ── bot menu / onboarding ──────────────────────────────────────────────────
+    if (update.callback_query) {
+      await handleCallbackQuery(update.callback_query)
+      return json({ ok: true })
+    }
+
+    const text = update.message?.text?.trim()
+    if (text) {
+      await handleBotMessage(update.message)
+      return json({ ok: true })
+    }
+
     // ── pre_checkout_query ──────────────────────────────────────────────────────
     if (update.pre_checkout_query) {
       await handlePreCheckout(admin, update.pre_checkout_query)
@@ -124,6 +148,110 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: 'Unexpected error' }, 500)
   }
 })
+
+// ── bot onboarding ──────────────────────────────────────────────────────────────
+
+async function handleBotMessage(message: NonNullable<TelegramUpdate['message']>) {
+  const chatId = message.chat?.id
+  if (!chatId) return
+
+  const text = message.text?.trim().toLowerCase() ?? ''
+
+  if (text.startsWith('/start') || text.startsWith('/help') || text === 'start') {
+    await sendWelcome(chatId, message.from)
+    return
+  }
+
+  await telegramApi('sendMessage', {
+    chat_id: chatId,
+    text:
+      'Я бот Antigram. Пока главный путь здесь простой: открыть приложение и публиковать моменты.\n\n' +
+      'Нажми кнопку ниже или отправь /start, чтобы увидеть меню.',
+    reply_markup: mainKeyboard(),
+  })
+}
+
+async function handleCallbackQuery(query: NonNullable<TelegramUpdate['callback_query']>) {
+  await telegramApi('answerCallbackQuery', { callback_query_id: query.id })
+
+  const chatId = query.message?.chat?.id
+  if (!chatId) return
+
+  if (query.data === 'what') {
+    await telegramApi('sendMessage', {
+      chat_id: chatId,
+      text:
+        'Что можно делать в Antigram:\n\n' +
+        '• публиковать моменты как кадры на плёнке;\n' +
+        '• выбирать настроение кадра;\n' +
+        '• собирать альбомы;\n' +
+        '• находить людей через поиск и подборки;\n' +
+        '• ставить реакции и поддерживать авторов Stars.',
+      reply_markup: mainKeyboard(),
+    })
+    return
+  }
+
+  if (query.data === 'upload') {
+    await telegramApi('sendMessage', {
+      chat_id: chatId,
+      text:
+        'Как загрузить кадр:\n\n' +
+        '1. Нажми “Открыть Antigram”.\n' +
+        '2. Перейди на камеру/загрузку.\n' +
+        '3. Выбери фото, плёнку и настроение.\n' +
+        '4. Опубликуй момент — он появится в ленте и профиле.',
+      reply_markup: mainKeyboard(),
+    })
+    return
+  }
+
+  if (query.data === 'support') {
+    await telegramApi('sendMessage', {
+      chat_id: chatId,
+      text:
+        'Если что-то не работает или есть идея — напиши в поддержку внутри профиля Antigram.\n\n' +
+        'Можно также описать проблему прямо здесь, а мы позже подключим полноценные ответы бота.',
+      reply_markup: mainKeyboard(),
+    })
+    return
+  }
+
+  await sendWelcome(chatId, query.from)
+}
+
+async function sendWelcome(chatId: number | string, user?: TelegramUser) {
+  const name = user?.first_name ? `, ${user.first_name}` : ''
+
+  await telegramApi('sendMessage', {
+    chat_id: chatId,
+    text:
+      `Привет${name}. Это Antigram.\n\n` +
+      'Здесь сохраняют моменты как кадры на плёнке: фото, настроение, альбомы, реакции и люди, которых хочется найти по вайбу.\n\n' +
+      'Начни с приложения — там уже можно смотреть ленту, загружать кадры и собирать профиль.',
+    reply_markup: mainKeyboard(),
+  })
+}
+
+function mainKeyboard() {
+  return {
+    inline_keyboard: [
+      [
+        {
+          text: 'Открыть Antigram',
+          web_app: { url: WEBAPP_URL },
+        },
+      ],
+      [
+        { text: 'Что здесь делать?', callback_data: 'what' },
+        { text: 'Как загрузить кадр?', callback_data: 'upload' },
+      ],
+      [
+        { text: 'Поддержка', callback_data: 'support' },
+      ],
+    ],
+  }
+}
 
 // ── notifyAuthor ────────────────────────────────────────────────────────────────
 
