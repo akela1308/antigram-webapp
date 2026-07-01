@@ -304,6 +304,8 @@ export function UploadPage() {
   const limitReached    = todayCount !== null && framesRemaining === 0
   const isCompactCamera = viewportHeight <= 700
   const isTinyCamera    = viewportHeight <= 600
+  const isCompactPreview = viewportHeight <= 720
+  const isTinyPreview    = viewportHeight <= 620
   const cameraUi        = getCameraUi(isCompactCamera, isTinyCamera)
 
   useEffect(() => {
@@ -560,7 +562,15 @@ export function UploadPage() {
 
   if (phase === 'preview' || phase === 'uploading') {
     return (
-      <div style={{ ...S.root, overflowY: 'auto', paddingTop: 'var(--tg-top, 56px)' }}>
+      <div
+        style={{
+          ...S.root,
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          paddingTop: 'var(--tg-top, 56px)',
+          scrollPaddingBottom: 'calc(var(--tg-bottom, 0px) + 112px)',
+        }}
+      >
         {/* Sticky back bar */}
         <div style={{
           position: 'sticky', top: 0, zIndex: 20,
@@ -590,7 +600,15 @@ export function UploadPage() {
         <img
           src={previewUrl ?? ''}
           alt=""
-          style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', display: 'block' }}
+          style={{
+            width: '100%',
+            height: isTinyPreview ? '34dvh' : isCompactPreview ? '40dvh' : 'min(52dvh, 520px)',
+            minHeight: isTinyPreview ? 220 : isCompactPreview ? 260 : 320,
+            maxHeight: isTinyPreview ? 280 : isCompactPreview ? 340 : 520,
+            objectFit: 'cover',
+            display: 'block',
+            flexShrink: 0,
+          }}
         />
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '8px 16px 4px', alignItems: 'center' }}>
@@ -612,9 +630,9 @@ export function UploadPage() {
         </div>
 
         {/* Atmosphere */}
-        <div style={{ padding: '12px 16px 4px' }}>
+        <div style={{ padding: isCompactPreview ? '8px 16px 4px' : '12px 16px 4px' }}>
           <p style={S.sectionLabel}>{t('camera.atmosphere')}</p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: isCompactPreview ? 7 : 8 }}>
             {EMOTIONS.map(e => {
               const active = mood === e.type
               return (
@@ -626,11 +644,11 @@ export function UploadPage() {
                   }}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 6,
-                    padding: '7px 13px', borderRadius: 20,
+                    padding: isCompactPreview ? '6px 12px' : '7px 13px', borderRadius: 20,
                     border: active ? 'none' : '1px solid #2E2218',
                     background: active ? 'var(--amber)' : '#1A1208',
                     color: active ? '#140E0A' : '#666',
-                    fontSize: 14, fontWeight: active ? 600 : 400, cursor: 'pointer',
+                    fontSize: isCompactPreview ? 13 : 14, fontWeight: active ? 600 : 400, cursor: 'pointer',
                   }}
                 >
                   <span>{e.emoji}</span><span>{t(`emotion.${e.type}`)}</span>
@@ -644,9 +662,9 @@ export function UploadPage() {
                 onClick={() => { setMood(null); setCustomMoodEmoji(''); setCustomMoodLabel('') }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '7px 13px', borderRadius: 20,
+                  padding: isCompactPreview ? '6px 12px' : '7px 13px', borderRadius: 20,
                   border: 'none', background: 'var(--amber)',
-                  color: '#140E0A', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                  color: '#140E0A', fontSize: isCompactPreview ? 13 : 14, fontWeight: 600, cursor: 'pointer',
                 }}
               >
                 <span>{customMoodEmoji || '✦'}</span>
@@ -663,7 +681,7 @@ export function UploadPage() {
                 }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 5,
-                  padding: '7px 12px', borderRadius: 20,
+                  padding: isCompactPreview ? '6px 11px' : '7px 12px', borderRadius: 20,
                   border: '1px dashed #3E3228', background: 'transparent',
                   color: '#555', fontSize: 13, cursor: 'pointer',
                 }}
@@ -783,22 +801,41 @@ export function UploadPage() {
         <textarea
           value={caption}
           onChange={e => setCaption(e.target.value)}
+          onFocus={e => {
+            setTimeout(() => e.currentTarget.scrollIntoView({ block: 'center', behavior: 'smooth' }), 80)
+          }}
           placeholder={t('camera.captionPlaceholder')}
-          rows={3}
+          rows={isTinyPreview ? 2 : 3}
           maxLength={300}
           style={{
-            margin: '8px 16px 0',
+            margin: '10px 16px 12px',
             width: 'calc(100% - 32px)',
+            minHeight: isTinyPreview ? 58 : 74,
             borderRadius: 12, padding: '12px 14px',
             resize: 'none', fontSize: 14, outline: 'none',
             background: '#1A1208', color: '#fff',
             border: '1px solid #2E2218', fontFamily: 'inherit',
+            boxSizing: 'border-box',
+            flexShrink: 0,
           }}
         />
 
         {error && <p style={{ color: '#e05a5a', padding: '0 16px', textAlign: 'center' }}>{error}</p>}
 
-        <div style={{ display: 'flex', gap: 12, padding: '16px', paddingBottom: 'max(32px, calc(var(--tg-bottom,0px) + 16px))' }}>
+        <div
+          style={{
+            position: 'sticky',
+            bottom: 0,
+            zIndex: 25,
+            display: 'flex',
+            gap: 12,
+            padding: '12px 16px',
+            paddingBottom: 'max(18px, calc(var(--tg-bottom,0px) + 12px))',
+            background: 'linear-gradient(180deg, rgba(13,13,13,0.72), rgba(13,13,13,0.98) 34%, #0D0D0D)',
+            borderTop: '1px solid rgba(255,255,255,0.06)',
+            backdropFilter: 'blur(12px)',
+          }}
+        >
           <button
             onClick={retake}
             disabled={phase === 'uploading'}
