@@ -661,45 +661,63 @@ function PremiumProfileCard({ onClick }: { onClick: () => void }) {
     <button
       onClick={onClick}
       style={{
-        width: '100%',
-        marginTop: 2,
-        padding: '11px 13px',
-        borderRadius: 14,
-        border: '1px solid rgba(201,132,62,0.28)',
-        background: 'linear-gradient(135deg, rgba(201,132,62,0.12), rgba(255,255,255,0.025))',
-        display: 'grid',
-        gridTemplateColumns: '34px minmax(0, 1fr) auto',
+        width: 'min(100%, 360px)',
+        minHeight: 38,
+        marginTop: -2,
+        padding: '7px 10px',
+        borderRadius: 999,
+        border: '1px solid rgba(201,132,62,0.22)',
+        background: 'rgba(18,11,7,0.42)',
+        display: 'flex',
         alignItems: 'center',
-        gap: 10,
+        gap: 8,
         textAlign: 'left',
         cursor: 'pointer',
+        boxShadow: '0 8px 22px rgba(0,0,0,0.14)',
       }}
     >
       <span
         style={{
-          width: 34,
-          height: 34,
-          borderRadius: 17,
-          background: '#C4A882',
-          color: '#1A0F05',
+          width: 24,
+          height: 24,
+          flex: '0 0 24px',
+          borderRadius: 12,
+          background: 'rgba(196,168,130,0.92)',
+          color: '#160E08',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: 16,
+          fontSize: 12,
           fontWeight: 900,
         }}
       >
         ★
       </span>
-      <span style={{ minWidth: 0 }}>
-        <span style={{ display: 'block', color: 'var(--text)', fontSize: 13, fontWeight: 900 }}>
+      <span
+        style={{
+          minWidth: 0,
+          flex: 1,
+          display: 'flex',
+          alignItems: 'baseline',
+          gap: 6,
+        }}
+      >
+        <span style={{ color: 'var(--text)', fontSize: 12, fontWeight: 900, whiteSpace: 'nowrap' }}>
           {t('premium.profileTitle')}
         </span>
-        <span style={{ display: 'block', color: 'var(--text-muted)', fontSize: 11, lineHeight: 1.35, marginTop: 2 }}>
-          {t('premium.profileHint')}
+        <span
+          style={{
+            color: 'var(--text-muted)',
+            fontSize: 11,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {t('premium.profileCompactHint')}
         </span>
       </span>
-      <span style={{ color: 'var(--amber)', fontSize: 12, fontWeight: 800 }}>
+      <span style={{ color: 'var(--amber)', fontSize: 11, fontWeight: 800, whiteSpace: 'nowrap' }}>
         {t('premium.open')}
       </span>
     </button>
