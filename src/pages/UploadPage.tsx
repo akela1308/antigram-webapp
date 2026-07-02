@@ -290,9 +290,10 @@ export function UploadPage() {
   const captureLockRef = useRef(false)
 
   // Read film preset from router state (set by FilmPicker sheet in BottomNav)
+  const loadedFilmId = (location.state as { filmId?: string } | null)?.filmId
+  const filmSelectionLocked = loadedFilmId !== undefined
   const initialPreset = (() => {
-    const filmId = (location.state as { filmId?: string } | null)?.filmId
-    return FILM_PRESETS.find(p => p.id === filmId) ?? FILM_PRESETS[1]
+    return FILM_PRESETS.find(p => p.id === loadedFilmId) ?? FILM_PRESETS[1]
   })()
 
   const [phase, setPhase]               = useState<Phase>('viewfinder')
@@ -329,6 +330,7 @@ export function UploadPage() {
   const isTinyPreview    = viewportHeight <= 620
   const cameraUi        = getCameraUi(isCompactCamera, isTinyCamera)
   const shutterIsPressed = shutterPressed || isCapturing
+  const loadedFilmName = preset.id === 'none' ? t('common.noFilter') : preset.name
 
   useEffect(() => {
     const updateViewportHeight = () => setViewportHeight(window.innerHeight)
@@ -911,6 +913,7 @@ export function UploadPage() {
               onClick={() => navigate(-1)}
               disabled={isCapturing}
               style={{
+                ...S.neomorphicPill,
                 display: 'flex',
                 alignItems: 'center',
                 gap: 4,
@@ -918,8 +921,6 @@ export function UploadPage() {
                 height: cameraUi.backButtonHeight,
                 padding: '0 11px',
                 borderRadius: 999,
-                background: 'rgba(0,0,0,0.55)',
-                border: '1px solid rgba(255,255,255,0.12)',
                 color: '#fff',
                 fontSize: 12,
                 fontWeight: 700,
@@ -934,10 +935,10 @@ export function UploadPage() {
             {/* Active film indicator */}
             {preset.id !== 'none' ? (
               <div style={{
+                ...S.neomorphicPill,
                 display: 'flex', alignItems: 'center', gap: 6,
                 minWidth: 0,
-                background: 'rgba(0,0,0,0.55)', borderRadius: 20, padding: '5px 12px',
-                border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: 20, padding: '5px 12px',
               }}>
                 <div style={{ width: 10, height: 10, borderRadius: 5, background: preset.color, flexShrink: 0 }} />
                 <span style={{ color: '#fff', fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{preset.name}</span>
@@ -948,7 +949,14 @@ export function UploadPage() {
           <button
             onClick={() => setFlash(f => !f)}
             disabled={isCapturing}
-            style={{ ...S.topBtn, color: flash ? '#E8B84B' : '#fff', opacity: isCapturing ? 0.45 : 1 }}
+            style={{
+              ...S.topBtn,
+              color: flash ? '#E8B84B' : '#fff',
+              opacity: isCapturing ? 0.45 : 1,
+              boxShadow: flash
+                ? '0 12px 22px rgba(0,0,0,0.42), inset 0 2px 5px rgba(255,216,135,0.18), 0 0 18px rgba(232,184,75,0.2)'
+                : S.topBtn.boxShadow,
+            }}
           >
             ⚡
           </button>
@@ -980,7 +988,8 @@ export function UploadPage() {
             />
             <div style={{
               position: 'absolute', inset: 0, borderRadius: 20,
-              border: '1px solid rgba(255,255,255,0.07)',
+              border: '1px solid rgba(255,229,169,0.08)',
+              boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.025), inset 0 12px 26px rgba(255,244,214,0.035), inset 0 -18px 30px rgba(0,0,0,0.36)',
               pointerEvents: 'none',
             }} />
             {isCapturing && <CaptureFeedback />}
@@ -992,7 +1001,7 @@ export function UploadPage() {
       <div style={{ ...S.bottomPanel, ...cameraUi.bottomPanel }}>
         {/* Light leak selector */}
         <div style={{ display: 'flex', gap: cameraUi.controlGap, padding: '0 16px', alignItems: 'center' }}>
-          {!isTinyCamera && <span style={{ color: '#555', fontSize: 11, fontWeight: 700, letterSpacing: 0.5, flexShrink: 0 }}>{t('camera.light')}</span>}
+          {!isTinyCamera && <span style={{ color: '#725946', fontSize: 11, fontWeight: 800, letterSpacing: 0.5, flexShrink: 0 }}>{t('camera.light')}</span>}
           {(['none', 'leak_warm', 'leak_cool', 'edge_burn', 'streak'] as FlareType[]).map(f => {
             const active = selectedFlare === f
             return (
@@ -1001,15 +1010,21 @@ export function UploadPage() {
                 onClick={() => setSelectedFlare(f)}
                 disabled={isCapturing}
                 style={{
+                  ...S.neomorphicRound,
                   width: cameraUi.flareButtonSize,
                   height: cameraUi.flareButtonSize,
                   borderRadius: cameraUi.flareButtonSize / 2,
-                  border: `${active ? 2 : 1}px solid ${active ? 'var(--amber)' : '#333'}`,
-                  background: active ? 'rgba(196,168,130,0.15)' : 'transparent',
+                  border: active ? '1px solid rgba(212,137,26,0.72)' : S.neomorphicRound.border,
+                  background: active
+                    ? 'linear-gradient(145deg, rgba(61,38,19,0.96), rgba(12,9,7,0.98))'
+                    : S.neomorphicRound.background,
                   color: active ? 'var(--amber)' : '#555',
                   fontSize: isTinyCamera ? 14 : 16, cursor: isCapturing ? 'default' : 'pointer',
                   opacity: isCapturing ? 0.45 : 1,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: active
+                    ? 'inset 0 4px 9px rgba(0,0,0,0.62), inset 0 -1px 2px rgba(255,215,138,0.1), 0 0 0 1px rgba(212,137,26,0.12)'
+                    : S.neomorphicRound.boxShadow,
                 }}
               >
                 {flareLabels[f]}
@@ -1018,68 +1033,110 @@ export function UploadPage() {
           })}
         </div>
 
-        {/* Film presets strip */}
-        <div
-          className="no-scrollbar"
-          style={{
-            display: 'flex', gap: cameraUi.filmGap, overflowX: 'auto',
-            padding: '0 16px', alignItems: 'center',
-          }}
-        >
-          {FILM_PRESETS.map(p => {
-            const active = p.id === preset.id
-            return (
-              <button
-                key={p.id}
-                onClick={() => { setPreset(p); if (p.id !== 'none') trackFilterApplied(p.id) }}
-                disabled={isCapturing}
-                style={{
-                  flexShrink: 0,
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: isTinyCamera ? 2 : 5,
-                  padding: isTinyCamera ? 2 : 4, borderRadius: 12,
-                  border: `${active ? 2 : 1.5}px solid ${active ? 'var(--amber)' : 'transparent'}`,
-                  background: 'none', cursor: isCapturing ? 'default' : 'pointer',
-                  opacity: isCapturing ? 0.45 : 1,
-                }}
-              >
-                <div
+        {filmSelectionLocked ? (
+          <div style={{
+            ...S.loadedFilmCard,
+            margin: '0 16px',
+            padding: isTinyCamera ? '9px 12px' : '11px 14px',
+          }}>
+            <div style={{
+              width: isTinyCamera ? 34 : 40,
+              height: isTinyCamera ? 34 : 40,
+              borderRadius: isTinyCamera ? 17 : 20,
+              background: preset.id === 'none'
+                ? 'radial-gradient(circle at 35% 30%, #3A3936, #12110F 70%)'
+                : preset.color,
+              border: '1px solid rgba(255,229,169,0.18)',
+              boxShadow: 'inset 0 4px 9px rgba(255,255,255,0.12), inset 0 -7px 12px rgba(0,0,0,0.48), 0 8px 16px rgba(0,0,0,0.28)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}>
+              <div style={{
+                width: isTinyCamera ? 12 : 15,
+                height: isTinyCamera ? 12 : 15,
+                borderRadius: isTinyCamera ? 6 : 8,
+                background: 'rgba(0,0,0,0.34)',
+                border: '1px solid rgba(255,255,255,0.12)',
+              }} />
+            </div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <span style={{ display: 'block', color: '#6F5542', fontSize: 9, fontWeight: 900, letterSpacing: 1.2, textTransform: 'uppercase' }}>
+                Loaded film
+              </span>
+              <span style={{ display: 'block', color: '#F0E8D8', fontSize: isTinyCamera ? 12 : 14, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>
+                {loadedFilmName}
+              </span>
+            </div>
+            <span style={{ color: '#6F5542', fontSize: 18, lineHeight: 1 }}>●</span>
+          </div>
+        ) : (
+          <div
+            className="no-scrollbar"
+            style={{
+              display: 'flex', gap: cameraUi.filmGap, overflowX: 'auto',
+              padding: '0 16px', alignItems: 'center',
+            }}
+          >
+            {FILM_PRESETS.map(p => {
+              const active = p.id === preset.id
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => { setPreset(p); if (p.id !== 'none') trackFilterApplied(p.id) }}
+                  disabled={isCapturing}
                   style={{
-                    width: cameraUi.filmIconSize,
-                    height: cameraUi.filmIconSize,
-                    borderRadius: cameraUi.filmIconSize / 2,
-                    background: p.id === 'none' ? '#1A1A1A' : p.color,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    position: 'relative', overflow: 'hidden',
-                    border: active ? '2px solid var(--amber)' : '1px solid rgba(255,255,255,0.1)',
+                    flexShrink: 0,
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: isTinyCamera ? 2 : 5,
+                    padding: isTinyCamera ? 2 : 4, borderRadius: 14,
+                    border: active ? '1px solid rgba(212,137,26,0.75)' : '1px solid transparent',
+                    background: active ? 'rgba(28,18,11,0.72)' : 'none',
+                    cursor: isCapturing ? 'default' : 'pointer',
+                    opacity: isCapturing ? 0.45 : 1,
+                    boxShadow: active ? 'inset 0 4px 9px rgba(0,0,0,0.45), 0 0 18px rgba(212,137,26,0.12)' : 'none',
                   }}
                 >
-                  {p.id === 'none' ? (
-                    <span style={{
-                      position: 'absolute',
-                      top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-                      color: active ? 'var(--amber)' : '#555', fontSize: 18, lineHeight: 1,
-                    }}>∅</span>
-                  ) : (
-                    <div
-                      style={{
-                        width: isTinyCamera ? 12 : 16,
-                        height: isTinyCamera ? 12 : 16,
-                        borderRadius: isTinyCamera ? 6 : 8,
-                        background: 'rgba(0,0,0,0.35)',
-                        border: '1px solid rgba(255,255,255,0.15)',
-                      }}
-                    />
+                  <div
+                    style={{
+                      width: cameraUi.filmIconSize,
+                      height: cameraUi.filmIconSize,
+                      borderRadius: cameraUi.filmIconSize / 2,
+                      background: p.id === 'none' ? '#1A1A1A' : p.color,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      position: 'relative', overflow: 'hidden',
+                      border: active ? '1px solid var(--amber)' : '1px solid rgba(255,255,255,0.1)',
+                      boxShadow: 'inset 0 4px 9px rgba(255,255,255,0.12), inset 0 -7px 12px rgba(0,0,0,0.45), 0 8px 14px rgba(0,0,0,0.24)',
+                    }}
+                  >
+                    {p.id === 'none' ? (
+                      <span style={{
+                        position: 'absolute',
+                        top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+                        color: active ? 'var(--amber)' : '#555', fontSize: 18, lineHeight: 1,
+                      }}>∅</span>
+                    ) : (
+                      <div
+                        style={{
+                          width: isTinyCamera ? 12 : 16,
+                          height: isTinyCamera ? 12 : 16,
+                          borderRadius: isTinyCamera ? 6 : 8,
+                          background: 'rgba(0,0,0,0.35)',
+                          border: '1px solid rgba(255,255,255,0.15)',
+                        }}
+                      />
+                    )}
+                  </div>
+                  {!isTinyCamera && (
+                    <span style={{ color: active ? 'var(--amber)' : '#555', fontSize: 9, maxWidth: 52, textAlign: 'center', lineHeight: 1.2 }}>
+                      {p.id === 'none' ? t('common.none') : p.name.split(' ')[0]}
+                    </span>
                   )}
-                </div>
-                {!isTinyCamera && (
-                  <span style={{ color: active ? 'var(--amber)' : '#555', fontSize: 9, maxWidth: 52, textAlign: 'center', lineHeight: 1.2 }}>
-                    {p.id === 'none' ? t('common.none') : p.name.split(' ')[0]}
-                  </span>
-                )}
-              </button>
-            )
-          })}
-        </div>
+                </button>
+              )
+            })}
+          </div>
+        )}
 
         {/* Frame counter */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
@@ -1096,14 +1153,14 @@ export function UploadPage() {
                     background: todayCount === null
                       ? 'rgba(255,255,255,0.06)'
                       : isAvailable
-                        ? 'rgba(201,132,62,0.85)'
-                        : 'rgba(255,255,255,0.05)',
+                        ? 'linear-gradient(145deg, #D28A2B, #8A4B18)'
+                        : 'linear-gradient(145deg, rgba(26,21,17,0.95), rgba(8,7,6,0.98))',
                     border: isAvailable && todayCount !== null
-                      ? '1px solid rgba(201,132,62,0.3)'
-                      : '1px solid rgba(255,255,255,0.07)',
+                      ? '1px solid rgba(255,202,117,0.24)'
+                      : '1px solid rgba(255,255,255,0.06)',
                     boxShadow: isAvailable && todayCount !== null
-                      ? '0 0 8px rgba(201,132,62,0.3)'
-                      : 'none',
+                      ? '0 6px 12px rgba(0,0,0,0.25), inset 0 2px 4px rgba(255,226,157,0.22), inset 0 -4px 7px rgba(59,30,8,0.34)'
+                      : 'inset 0 3px 6px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.025)',
                     transition: 'background 0.3s, box-shadow 0.3s',
                   }}
                 />
@@ -1223,11 +1280,10 @@ export function UploadPage() {
             onClick={() => setFacing(f => f === 'environment' ? 'user' : 'environment')}
             disabled={isCapturing}
             style={{
+              ...S.neomorphicRound,
               width: cameraUi.flipButtonSize,
               height: cameraUi.flipButtonSize,
               borderRadius: cameraUi.flipButtonSize / 2,
-              background: 'rgba(255,255,255,0.07)',
-              border: '1px solid rgba(255,255,255,0.1)',
               color: '#fff', fontSize: isTinyCamera ? 18 : 22, cursor: isCapturing ? 'default' : 'pointer',
               opacity: isCapturing ? 0.45 : 1,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1573,7 +1629,10 @@ function getCameraUi(isCompact: boolean, isTiny: boolean) {
 const S: Record<string, React.CSSProperties> = {
   root: {
     height: '100dvh',
-    background: '#0D0D0D',
+    background: [
+      'radial-gradient(circle at 50% 0%, rgba(77,43,18,0.18), transparent 34%)',
+      'linear-gradient(180deg, #100D0B 0%, #090807 52%, #070605 100%)',
+    ].join(', '),
     display: 'flex',
     flexDirection: 'column',
     position: 'relative',
@@ -1600,29 +1659,77 @@ const S: Record<string, React.CSSProperties> = {
   viewfinderBox: {
     width: '100%',
     flex: 1,
-    borderRadius: 20,
+    borderRadius: 24,
     overflow: 'hidden',
-    background: '#1A1208',
+    background: '#120E0B',
     position: 'relative',
+    border: '1px solid rgba(255,229,169,0.1)',
+    boxShadow: [
+      '0 20px 36px rgba(0,0,0,0.44)',
+      '0 3px 12px rgba(212,137,26,0.08)',
+      'inset 0 2px 4px rgba(255,238,196,0.12)',
+      'inset 0 -12px 22px rgba(0,0,0,0.42)',
+    ].join(', '),
   },
   bottomPanel: {
     display: 'flex',
     flexDirection: 'column',
     gap: 16,
     paddingTop: 12,
+    background: [
+      'radial-gradient(circle at 50% 0%, rgba(89,49,20,0.14), transparent 58%)',
+      'linear-gradient(180deg, rgba(18,14,11,0.0), rgba(11,9,8,0.96) 20%, rgba(8,7,6,0.98) 100%)',
+    ].join(', '),
+    borderTop: '1px solid rgba(255,229,169,0.035)',
   },
   topBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    background: 'rgba(0,0,0,0.55)',
-    border: '1px solid rgba(255,255,255,0.15)',
+    background: 'linear-gradient(145deg, rgba(28,23,19,0.96), rgba(7,6,5,0.98))',
+    border: '1px solid rgba(255,229,169,0.1)',
     color: '#fff',
     fontSize: 18,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     cursor: 'pointer',
+    boxShadow: [
+      '0 12px 22px rgba(0,0,0,0.42)',
+      'inset 0 2px 5px rgba(255,238,196,0.08)',
+      'inset 0 -5px 10px rgba(0,0,0,0.44)',
+    ].join(', '),
+  },
+  neomorphicPill: {
+    background: 'linear-gradient(145deg, rgba(28,23,19,0.96), rgba(7,6,5,0.98))',
+    border: '1px solid rgba(255,229,169,0.1)',
+    boxShadow: [
+      '0 10px 20px rgba(0,0,0,0.38)',
+      'inset 0 2px 5px rgba(255,238,196,0.08)',
+      'inset 0 -5px 10px rgba(0,0,0,0.42)',
+    ].join(', '),
+  },
+  neomorphicRound: {
+    background: 'linear-gradient(145deg, rgba(28,23,19,0.96), rgba(7,6,5,0.98))',
+    border: '1px solid rgba(255,229,169,0.09)',
+    boxShadow: [
+      '0 10px 18px rgba(0,0,0,0.36)',
+      'inset 0 2px 5px rgba(255,238,196,0.07)',
+      'inset 0 -5px 10px rgba(0,0,0,0.44)',
+    ].join(', '),
+  },
+  loadedFilmCard: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 11,
+    borderRadius: 22,
+    background: 'linear-gradient(145deg, rgba(27,21,16,0.94), rgba(8,7,6,0.98))',
+    border: '1px solid rgba(255,229,169,0.08)',
+    boxShadow: [
+      '0 14px 28px rgba(0,0,0,0.36)',
+      'inset 0 2px 6px rgba(255,238,196,0.07)',
+      'inset 0 -8px 16px rgba(0,0,0,0.34)',
+    ].join(', '),
   },
   shutter: {
     width: 84,
