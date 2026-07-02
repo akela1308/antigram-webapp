@@ -13,12 +13,32 @@ import { getDailyFrameLimit } from '../lib/premium'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+const MOMENT_EXPORT_MAX_SIZE = 1600
+const MOMENT_EXPORT_QUALITY = 0.85
+
 function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v))
 }
 
 function triangleRandom(): number {
   return (Math.random() + Math.random()) / 2
+}
+
+function getMomentExportCanvas(source: HTMLCanvasElement): HTMLCanvasElement {
+  const maxSide = Math.max(source.width, source.height)
+  if (maxSide <= MOMENT_EXPORT_MAX_SIZE) return source
+
+  const scale = MOMENT_EXPORT_MAX_SIZE / maxSide
+  const output = document.createElement('canvas')
+  output.width = Math.round(source.width * scale)
+  output.height = Math.round(source.height * scale)
+
+  const outputCtx = output.getContext('2d')!
+  outputCtx.imageSmoothingEnabled = true
+  outputCtx.imageSmoothingQuality = 'high'
+  outputCtx.drawImage(source, 0, 0, output.width, output.height)
+
+  return output
 }
 
 // ── Grain ─────────────────────────────────────────────────────────────────────
@@ -423,7 +443,8 @@ export function UploadPage() {
         applyFlare(ctx, canvas, effectiveFlare)
       }
 
-      canvas.toBlob(blob => {
+      const exportCanvas = getMomentExportCanvas(canvas)
+      exportCanvas.toBlob(blob => {
         captureLockRef.current = false
         setIsCapturing(false)
         if (!blob) return
@@ -431,7 +452,7 @@ export function UploadPage() {
         setPreviewUrl(URL.createObjectURL(blob))
         streamRef.current?.getTracks().forEach(t => t.stop())
         setPhase('preview')
-      }, 'image/jpeg', 0.92)
+      }, 'image/jpeg', MOMENT_EXPORT_QUALITY)
     } catch (err) {
       console.error('[Camera] capture failed:', err)
       captureLockRef.current = false
