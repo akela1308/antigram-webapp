@@ -124,11 +124,22 @@ export function ProfilePage() {
 
   const displayName = profile.display_name ?? profile.username ?? t('common.anonymous')
 
-  const ringPhotos: (string | null)[] = Array.from({ length: 5 }, (_, i) => {
-    const hl = highlights.find(h => h.position === i)
-    return hl?.moments?.photo_url ?? null
+  const highlightItems = Array.from({ length: 5 }, (_, i) => {
+    const highlight = highlights.find(h => h.position === i)
+    return highlight?.moments
+      ? { momentId: highlight.moments.id, photoUrl: highlight.moments.photo_url }
+      : null
   })
-  const hasHighlights = highlights.length > 0
+  const fallbackItems = moments.slice(0, 5).map(moment => ({
+    momentId: moment.id,
+    photoUrl: moment.photo_url,
+  }))
+  const hasHighlights = highlightItems.some(Boolean)
+  const filmStripItems = hasHighlights
+    ? highlightItems
+    : Array.from({ length: 5 }, (_, i) => fallbackItems[i] ?? null)
+  const ringPhotos: (string | null)[] = filmStripItems.map(item => item?.photoUrl ?? null)
+  const hasFilmStrip = ringPhotos.some(Boolean)
 
   return (
     <div className="flex flex-col" style={{ minHeight: '100dvh', background: 'var(--bg)', paddingTop: 'var(--tg-top, 56px)' }}>
@@ -143,14 +154,14 @@ export function ProfilePage() {
         </span>
       </div>
 
-      {/* Film strip highlights — сразу под шапкой, если есть */}
-      {hasHighlights && (
+      {/* Film strip highlights, falling back to latest public moments. */}
+      {hasFilmStrip && (
         <FilmStripHeader
           photos={ringPhotos}
           isOwner={false}
           onOpenPhoto={i => {
-            const hl = highlights.find(h => h.position === i)
-            if (hl?.moments?.id) navigate(`/moment/${hl.moments.id}`)
+            const momentId = filmStripItems[i]?.momentId
+            if (momentId) navigate(`/moment/${momentId}`)
           }}
         />
       )}
