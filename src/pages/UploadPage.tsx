@@ -303,6 +303,7 @@ export function UploadPage() {
   const [previewUrl, setPreviewUrl]     = useState<string | null>(null)
   const [photoBlob, setPhotoBlob]       = useState<Blob | null>(null)
   const [isCapturing, setIsCapturing]   = useState(false)
+  const [shutterPressed, setShutterPressed] = useState(false)
   const [caption, setCaption]           = useState('')
   const [mood, setMood]                 = useState<ReactionType | null>(null)
   const [customMoodEmoji, setCustomMoodEmoji] = useState('')
@@ -327,6 +328,7 @@ export function UploadPage() {
   const isCompactPreview = viewportHeight <= 720
   const isTinyPreview    = viewportHeight <= 620
   const cameraUi        = getCameraUi(isCompactCamera, isTinyCamera)
+  const shutterIsPressed = shutterPressed || isCapturing
 
   useEffect(() => {
     const updateViewportHeight = () => setViewportHeight(window.innerHeight)
@@ -407,6 +409,7 @@ export function UploadPage() {
 
     captureLockRef.current = true
     setIsCapturing(true)
+    setShutterPressed(false)
 
     // Let Telegram WebView paint the shutter feedback before canvas processing blocks the main thread.
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
@@ -1160,6 +1163,12 @@ export function UploadPage() {
               }
               void capture()
             }}
+            onPointerDown={() => {
+              if (!limitReached && !isCapturing) setShutterPressed(true)
+            }}
+            onPointerUp={() => setShutterPressed(false)}
+            onPointerLeave={() => setShutterPressed(false)}
+            onPointerCancel={() => setShutterPressed(false)}
             disabled={isCapturing}
             style={{
               ...S.shutter,
@@ -1168,8 +1177,11 @@ export function UploadPage() {
               borderRadius: cameraUi.shutterSize / 2,
               opacity: limitReached ? 0.35 : isCapturing ? 0.78 : 1,
               cursor: limitReached || isCapturing ? 'default' : 'pointer',
-              transform: isCapturing ? 'scale(0.94)' : 'scale(1)',
-              transition: 'opacity 0.3s, transform 0.18s',
+              transform: shutterIsPressed ? 'translateY(2px) scale(0.95)' : 'translateY(0) scale(1)',
+              transition: 'opacity 0.3s, transform 0.16s ease, box-shadow 0.16s ease',
+              boxShadow: shutterIsPressed
+                ? '0 8px 18px rgba(0,0,0,0.42), inset 0 3px 8px rgba(0,0,0,0.38), inset 0 -1px 2px rgba(255,229,172,0.18)'
+                : S.shutter.boxShadow,
             }}
           >
             <div style={{
@@ -1177,22 +1189,30 @@ export function UploadPage() {
               width: cameraUi.shutterInnerSize,
               height: cameraUi.shutterInnerSize,
               borderRadius: cameraUi.shutterInnerSize / 2,
+              transform: shutterIsPressed ? 'scale(0.965)' : 'scale(1)',
+              boxShadow: shutterIsPressed
+                ? 'inset 0 6px 15px rgba(48,26,8,0.45), inset 0 -2px 4px rgba(255,239,190,0.16)'
+                : S.shutterInner.boxShadow,
             }}>
               <div style={{
                 ...S.shutterGlow,
                 width: cameraUi.shutterGlowSize,
                 height: cameraUi.shutterGlowSize,
                 borderRadius: cameraUi.shutterGlowSize / 2,
+                opacity: shutterIsPressed ? 0.28 : S.shutterGlow.opacity,
               }} />
               <span style={{
                 position: 'relative',
                 zIndex: 1,
                 fontFamily: "'JetBrains Mono', 'Courier New', monospace",
-                color: '#1A0F05',
+                color: shutterIsPressed ? '#120A04' : '#1A0F05',
                 fontSize: isTinyCamera ? 18 : isCompactCamera ? 20 : 22,
                 fontWeight: 800,
                 letterSpacing: 0,
                 lineHeight: 1,
+                textShadow: shutterIsPressed
+                  ? '0 1px 0 rgba(255,226,158,0.18)'
+                  : '0 1px 0 rgba(255,243,205,0.36)',
               }}>
                 [A]
               </span>
@@ -1608,31 +1628,48 @@ const S: Record<string, React.CSSProperties> = {
     width: 84,
     height: 84,
     borderRadius: 42,
-    background: '#2E1A0A',
-    border: 'none',
+    background: 'radial-gradient(circle at 50% 42%, #593114 0%, #2A1608 58%, #090604 100%)',
+    border: '1px solid rgba(226,161,76,0.34)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     cursor: 'pointer',
-    boxShadow: '0 4px 20px rgba(46,26,10,0.6)',
+    padding: 0,
+    boxShadow: [
+      '0 18px 30px rgba(0,0,0,0.46)',
+      '0 4px 12px rgba(212,137,26,0.24)',
+      'inset 0 2px 3px rgba(255,221,151,0.28)',
+      'inset 0 -7px 14px rgba(0,0,0,0.5)',
+    ].join(', '),
   },
   shutterInner: {
     width: 74,
     height: 74,
     borderRadius: 37,
-    background: '#C4A882',
+    background: [
+      'radial-gradient(circle at 42% 32%, rgba(255,242,190,0.92) 0%, rgba(214,163,87,0.88) 26%, rgba(162,93,31,0.95) 62%, rgba(82,43,16,1) 100%)',
+      'linear-gradient(145deg, #E1BD78, #9B561F 58%, #4B260E)',
+    ].join(', '),
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
+    overflow: 'hidden',
+    border: '1px solid rgba(255,229,169,0.4)',
+    boxShadow: [
+      'inset 0 5px 12px rgba(255,239,190,0.32)',
+      'inset 0 -9px 16px rgba(43,22,8,0.48)',
+      '0 1px 0 rgba(255,255,255,0.14)',
+    ].join(', '),
   },
   shutterGlow: {
     position: 'absolute',
     width: 44,
     height: 44,
     borderRadius: 22,
-    background: '#D4B99A',
-    opacity: 0.45,
+    background: 'radial-gradient(circle, rgba(255,244,198,0.72) 0%, rgba(244,186,91,0.32) 44%, rgba(99,49,14,0) 72%)',
+    opacity: 0.58,
+    boxShadow: '0 0 22px rgba(226,151,54,0.34)',
   },
   amberBtn: {
     padding: '12px 32px',
