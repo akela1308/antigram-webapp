@@ -408,6 +408,7 @@ function ShotCard({ moment: m, cardRef, reactionCounts, myReaction, starTotal, o
   const myReactionMeta = getReactionMeta(myReaction, m, t)
   const customMoodMeta = getCustomMoodMeta(m)
   const reactionEntries = getReactionEntries(reactionCounts, m, t)
+  const myReactionIsDisplayed = Boolean(myReaction && reactionEntries.some(entry => entry.type === myReaction))
 
   return (
     <div ref={cardRef} style={{ marginBottom: 8, borderBottom: '8px solid #080503' }}>
@@ -499,7 +500,13 @@ function ShotCard({ moment: m, cardRef, reactionCounts, myReaction, starTotal, o
                   return (
                     <button
                       key={entry.type}
-                      onClick={() => onReaction(entry.type)}
+                      onClick={() => {
+                        if (active) {
+                          setShowAllReactions(true)
+                        } else {
+                          onReaction(entry.type)
+                        }
+                      }}
                       style={reactionPillStyle(active, entry.synthetic)}
                     >
                       <span style={{ fontSize: 14 }}>{entry.emoji}</span>
@@ -508,13 +515,15 @@ function ShotCard({ moment: m, cardRef, reactionCounts, myReaction, starTotal, o
                     </button>
                   )
                 })}
-                <button
-                  onClick={() => setShowAllReactions(true)}
-                  style={reactionPillStyle(!!myReactionMeta)}
-                >
-                  <span style={{ fontSize: 15 }}>{myReactionMeta ? myReactionMeta.emoji : '+'}</span>
-                  <span>{myReactionMeta ? myReactionMeta.label : t('moment.reaction')}</span>
-                </button>
+                {!myReactionIsDisplayed && (
+                  <button
+                    onClick={() => setShowAllReactions(true)}
+                    style={reactionPillStyle(!!myReactionMeta)}
+                  >
+                    <span style={{ fontSize: 15 }}>{myReactionMeta ? myReactionMeta.emoji : '+'}</span>
+                    <span>{myReactionMeta ? myReactionMeta.label : t('moment.reaction')}</span>
+                  </button>
+                )}
               </>
             )}
             <StarSupportButton
