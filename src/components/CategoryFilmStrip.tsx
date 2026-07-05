@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLanguage } from '../contexts/LanguageContext'
 import { getFollowingCategoryThumbnails, getGlobalCategoryThumbnails } from '../lib/db'
 import { EMOTIONS } from '../lib/types'
@@ -18,6 +18,9 @@ const BASE_CATEGORIES: CategoryItem[] = [
 
 const FRAME_W = 80
 const FRAME_H = 60
+const GAP = 8
+const SNAP = FRAME_W + GAP
+const COPIES = 3
 
 interface Props {
   active: FilterValue
@@ -34,6 +37,31 @@ export function CategoryFilmStrip({
 }: Props) {
   const { t } = useLanguage()
   const [categories, setCategories] = useState<CategoryItem[]>(BASE_CATEGORIES)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const scrollEndTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const ringSize = categories.length
+  const virtualCategories = ringSize > 0
+    ? Array.from({ length: ringSize * COPIES }, (_, i) => categories[i % ringSize])
+    : []
+  const middleStart = ringSize
+
+  function checkLoop() {
+    const el = containerRef.current
+    if (!el || ringSize === 0) return
+
+    const snapIdx = Math.round(el.scrollLeft / SNAP)
+    if (snapIdx < ringSize) {
+      el.scrollLeft += ringSize * SNAP
+    } else if (snapIdx >= ringSize * 2) {
+      el.scrollLeft -= ringSize * SNAP
+    }
+  }
+
+  function handleScroll() {
+    if (scrollEndTimer.current) clearTimeout(scrollEndTimer.current)
+    scrollEndTimer.current = setTimeout(checkLoop, 80)
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -56,24 +84,46 @@ export function CategoryFilmStrip({
     return () => { cancelled = true }
   }, [thumbnailScope, userId])
 
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el || ringSize === 0) return
+
+    const timer = setTimeout(() => {
+      el.scrollLeft = middleStart * SNAP
+    }, 30)
+
+    return () => clearTimeout(timer)
+  }, [middleStart, ringSize])
+
+  useEffect(() => {
+    return () => {
+      if (scrollEndTimer.current) clearTimeout(scrollEndTimer.current)
+    }
+  }, [])
+
   return (
     <div style={{ background: 'var(--film-track)', borderBottom: '1px solid var(--film-amber-dark)' }}>
       <SprocketEdge />
       <div
+        ref={containerRef}
         className="no-scrollbar"
+        onScroll={handleScroll}
         style={{
           display: 'flex',
-          gap: 8,
-          overflowX: 'auto',
+          gap: GAP,
+          overflowX: 'scroll',
+          overflowY: 'hidden',
           padding: '8px 14px',
+          WebkitOverflowScrolling: 'touch',
+          scrollSnapType: 'x mandatory',
         }}
       >
-        {categories.map(cat => {
+        {virtualCategories.map((cat, virtualIndex) => {
           const isActive = cat.id === active
           const label = cat.id === 'for_you' ? t('category.forYou') : t(`emotion.${cat.id}`)
           return (
             <button
-              key={cat.id}
+              key={`${cat.id}-${virtualIndex}`}
               onClick={() => onChange(cat.id)}
               style={{
                 flexShrink: 0,
@@ -85,6 +135,7 @@ export function CategoryFilmStrip({
                 border: 'none',
                 padding: 0,
                 cursor: 'pointer',
+                scrollSnapAlign: 'start',
               }}
             >
               <div
