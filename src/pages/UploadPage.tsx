@@ -8,7 +8,7 @@ import { FILM_PRESETS } from '../lib/filmPresets'
 import type { FilmPreset, AlgoType, GrainConfig, FlareType } from '../lib/filmPresets'
 import type { ReactionType } from '../lib/types'
 import { trackPhotoPosted, trackFilterApplied, trackShareCardOpened, trackShareCardSent } from '../lib/analytics'
-import { addReaction, getTodaysMomentCount } from '../lib/db'
+import { addReaction, getTodaysMomentCount, getUserEntitlements } from '../lib/db'
 import { getDailyFrameLimit } from '../lib/premium'
 import { shareMomentToChat, shareMomentToStory, canShareMomentToStory } from '../lib/telegramShare'
 import { createResizedJpegBlob, MOMENT_IMAGE_VARIANTS } from '../lib/imageVariants'
@@ -387,13 +387,13 @@ export function UploadPage() {
   const [camError, setCamError]         = useState<string | null>(null)
   const [error, setError]               = useState<string | null>(null)
   const [todayCount, setTodayCount]     = useState<number | null>(null)
+  const [dailyFrameLimit, setDailyFrameLimit] = useState(getDailyFrameLimit(false))
   const [limitMsg, setLimitMsg]         = useState(false)
   const [publishedMoment, setPublishedMoment] = useState<{ id: string; photoUrl: string; caption: string | null } | null>(null)
   const [viewportHeight, setViewportHeight] = useState(() =>
     typeof window === 'undefined' ? 720 : window.innerHeight,
   )
 
-  const dailyFrameLimit = getDailyFrameLimit(false)
   const framesUsed      = todayCount ?? 0
   const framesRemaining = Math.max(0, dailyFrameLimit - framesUsed)
   const limitReached    = todayCount !== null && framesRemaining === 0
@@ -417,8 +417,20 @@ export function UploadPage() {
   }, [])
 
   useEffect(() => {
-    if (user) {
-      getTodaysMomentCount(user.id).then(setTodayCount)
+    if (!user) return
+
+    let cancelled = false
+    Promise.all([
+      getTodaysMomentCount(user.id),
+      getUserEntitlements(user.id),
+    ]).then(([count, entitlements]) => {
+      if (cancelled) return
+      setTodayCount(count)
+      setDailyFrameLimit(entitlements.daily_frame_limit)
+    })
+
+    return () => {
+      cancelled = true
     }
   }, [user])
 

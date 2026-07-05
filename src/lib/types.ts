@@ -178,6 +178,14 @@ export interface AdminAuditLogItem {
   created_at: string
 }
 
+export interface UserEntitlements {
+  is_premium: boolean
+  premium_until: string | null
+  daily_frame_limit: number
+  highlight_limit: number
+  features: Record<string, boolean>
+}
+
 export const EMOTIONS = [
   { type: 'warm' as ReactionType,      emoji: '🔥', label: 'Тепло'      },
   { type: 'nostalgic' as ReactionType, emoji: '🌅', label: 'Ностальгия' },

@@ -1,5 +1,10 @@
 import { supabase } from './supabase'
-import { PREMIUM_REGULAR_DAILY_FRAME_LIMIT } from './premium'
+import {
+  PREMIUM_REGULAR_DAILY_FRAME_LIMIT,
+  PREMIUM_REGULAR_HIGHLIGHT_LIMIT,
+  getDailyFrameLimit,
+  getHighlightLimit,
+} from './premium'
 import type {
   Profile,
   Moment,
@@ -18,6 +23,7 @@ import type {
   FollowProfile,
   ReportStatus,
   ModerationReport,
+  UserEntitlements,
 } from './types'
 import { EMOTIONS } from './types'
 import { getMomentImageUrl } from './imageVariants'
@@ -525,6 +531,37 @@ export async function removeReaction(
 // ─── DAILY FRAME LIMIT ───────────────────────────────────────────────────────
 
 export const DAILY_FRAME_LIMIT = PREMIUM_REGULAR_DAILY_FRAME_LIMIT
+
+function getFallbackEntitlements(isPremium = false): UserEntitlements {
+  return {
+    is_premium: isPremium,
+    premium_until: null,
+    daily_frame_limit: getDailyFrameLimit(isPremium),
+    highlight_limit: isPremium ? getHighlightLimit(true) : PREMIUM_REGULAR_HIGHLIGHT_LIMIT,
+    features: {
+      rare_films: isPremium,
+      premium_badge: isPremium,
+      priority_support: isPremium,
+    },
+  }
+}
+
+export async function getUserEntitlements(userId: string): Promise<UserEntitlements> {
+  const { data, error } = await supabase.rpc('get_user_entitlements', { p_user_id: userId })
+
+  if (error) {
+    if (!isMissingRpcError(error, 'get_user_entitlements')) {
+      console.error('[Entitlements] load failed:', error)
+    }
+    const activeSubscription = await getActivePremiumSubscription(userId)
+    return getFallbackEntitlements(Boolean(activeSubscription))
+  }
+
+  return {
+    ...getFallbackEntitlements(false),
+    ...((data as Partial<UserEntitlements> | null) ?? {}),
+  }
+}
 
 /** Returns how many moments the user has published today (UTC midnight reset, matches DB trigger). */
 export async function getTodaysMomentCount(userId: string): Promise<number> {

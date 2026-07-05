@@ -47,6 +47,11 @@ Supabase CLI сейчас подвисает на DB connection (`Initialising l
    - хранит привязки `telegram/email/google/apple` к одному `user_id`;
    - позволяет Telegram-входу работать после привязки реального email/пароля.
 
+9. `supabase/migrations/202607050009_user_entitlements_rpc.sql`
+   - добавляет `get_user_entitlements(auth.uid())`;
+   - возвращает серверные права пользователя: Premium, лимит кадров, лимит highlights и feature flags;
+   - позволяет клиенту показывать лимиты из базы, а не решать доступ локально.
+
 ## Почему приложение не должно упасть до применения
 
 - Image variants имеют fallback на старый `photo_url`.
@@ -59,6 +64,7 @@ Supabase CLI сейчас подвисает на DB connection (`Initialising l
 - Moderation UI покажет пустую очередь/ошибку действия, если `reports` еще не расширена.
 - Saved album будет пустым или покажет ошибку сохранения, если `saved_moments`/RLS еще не применены.
 - Email/password linking будет недоступен, если `account_identities` еще не применена.
+- Entitlements откатываются на локальный fallback и active subscription query, если `get_user_entitlements` еще не применена.
 
 ## Проверка после применения
 
@@ -125,4 +131,13 @@ select exists (
   where table_schema = 'public'
     and table_name = 'account_identities'
 ) as has_account_identities;
+```
+
+```sql
+select exists (
+  select 1
+  from information_schema.routines
+  where routine_schema = 'public'
+    and routine_name = 'get_user_entitlements'
+) as has_user_entitlements_rpc;
 ```
