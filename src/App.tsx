@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 import { FeedPage } from './pages/FeedPage'
 import { ExplorePage } from './pages/ExplorePage'
@@ -19,12 +19,30 @@ import { PrivacyPage } from './pages/PrivacyPage'
 import { TermsPage } from './pages/TermsPage'
 import { PremiumPage } from './pages/PremiumPage'
 import { trackSessionStart } from './lib/analytics'
+import { getTelegramLaunchPath, getTelegramStartParam } from './lib/telegramLaunch'
 
 export function App() {
   const { loading } = useAuth()
   const location = useLocation()
+  const navigate = useNavigate()
 
   useEffect(() => { trackSessionStart() }, [])
+
+  useEffect(() => {
+    if (loading) return
+
+    const startParam = getTelegramStartParam()
+    const launchPath = getTelegramLaunchPath(startParam)
+    if (!startParam || !launchPath) return
+
+    const storageKey = `antigram:start-param:${startParam}`
+    if (sessionStorage.getItem(storageKey) === '1') return
+
+    sessionStorage.setItem(storageKey, '1')
+    if (location.pathname !== launchPath) {
+      navigate(launchPath, { replace: true })
+    }
+  }, [loading, location.pathname, navigate])
 
   if (loading) {
     return (

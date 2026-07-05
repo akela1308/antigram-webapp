@@ -31,8 +31,28 @@ function getTelegramWebApp(): TelegramWebApp | null {
   return (window as unknown as { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp ?? null
 }
 
+function cleanTelegramName(value: string | undefined): string {
+  return (value ?? '').trim().replace(/^@/, '').replace(/^\//, '').replace(/\/$/, '')
+}
+
+export function buildMomentStartParam(momentId: string): string {
+  return `moment_${momentId}`
+}
+
+export function buildMiniAppUrl(startParam?: string): string | null {
+  const botUsername = cleanTelegramName(import.meta.env.VITE_TELEGRAM_BOT_USERNAME)
+  const appName = cleanTelegramName(import.meta.env.VITE_TELEGRAM_APP_NAME)
+
+  if (!botUsername) return null
+
+  const path = appName ? `${botUsername}/${appName}` : botUsername
+  const query = startParam ? `?startapp=${encodeURIComponent(startParam)}` : ''
+
+  return `https://t.me/${path}${query}`
+}
+
 export function buildMomentUrl(momentId: string): string {
-  return `${window.location.origin}/moment/${momentId}`
+  return buildMiniAppUrl(buildMomentStartParam(momentId)) ?? `${window.location.origin}/moment/${momentId}`
 }
 
 export function buildMomentShareText(caption: string | null | undefined, language: ShareLanguage): string {
@@ -94,4 +114,3 @@ export async function shareMomentToStory(params: MomentShareParams): Promise<voi
 
   await shareMomentToChat(params)
 }
-
