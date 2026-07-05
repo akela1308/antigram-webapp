@@ -4,12 +4,22 @@ type TelegramCloudStorage = {
 }
 
 type TelegramHapticFeedback = {
-  impactOccurred?: (style: 'light' | 'medium' | 'heavy') => void
+  impactOccurred?: (style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft') => void
   notificationOccurred?: (type: 'error' | 'success' | 'warning') => void
+}
+
+export type TelegramPlatformUser = {
+  id: number
+  first_name: string
+  last_name?: string
+  username?: string
+  photo_url?: string
+  language_code?: string
 }
 
 export type TelegramWebAppPlatform = {
   initData?: string
+  initDataUnsafe?: { user?: TelegramPlatformUser; start_param?: string }
   platform?: string
   CloudStorage?: TelegramCloudStorage
   HapticFeedback?: TelegramHapticFeedback
@@ -29,6 +39,7 @@ export type TelegramWebAppPlatform = {
   openLink?: (url: string) => void
   openTelegramLink?: (url: string) => void
   openInvoice?: (url: string, callback?: (status: string) => void) => void
+  downloadFile?: (url: string, fileName: string) => void
   shareToStory?: (
     mediaUrl: string,
     params?: {
@@ -73,6 +84,10 @@ export function getPlatformName(): PlatformName {
 
 export function getTelegramInitData(): string {
   return getTelegramWebApp()?.initData ?? ''
+}
+
+export function getTelegramUser(): TelegramPlatformUser | null {
+  return getTelegramWebApp()?.initDataUnsafe?.user ?? null
 }
 
 export function getPlatformSafeArea(): PlatformSafeArea {
@@ -133,6 +148,17 @@ export function hapticImpact(style: 'light' | 'medium' | 'heavy' = 'light'): voi
   }
 }
 
+export function withBackButton(onClick: () => void): () => void {
+  const backButton = getTelegramWebApp()?.BackButton
+  backButton?.show?.()
+  backButton?.onClick?.(onClick)
+
+  return () => {
+    backButton?.offClick?.(onClick)
+    backButton?.hide?.()
+  }
+}
+
 export function hapticNotification(type: 'error' | 'success' | 'warning'): void {
   try {
     getTelegramWebApp()?.HapticFeedback?.notificationOccurred?.(type)
@@ -158,6 +184,28 @@ export function openExternalLink(url: string): void {
     return
   }
   window.open(url, '_blank', 'noopener,noreferrer')
+}
+
+export function downloadOrOpenFile(url: string, fileName: string): void {
+  const tg = getTelegramWebApp()
+  if (typeof tg?.downloadFile === 'function') {
+    tg.downloadFile(url, fileName)
+    return
+  }
+  openExternalLink(url)
+}
+
+export function openPlatformInvoice(invoiceLink: string): Promise<string> {
+  const tg = getTelegramWebApp()
+
+  if (typeof tg?.openInvoice === 'function') {
+    return new Promise(resolve => {
+      tg.openInvoice?.(invoiceLink, status => resolve(status))
+    })
+  }
+
+  openExternalLink(invoiceLink)
+  return Promise.resolve('opened')
 }
 
 export function openTelegramLink(url: string): void {

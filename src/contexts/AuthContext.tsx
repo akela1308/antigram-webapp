@@ -4,6 +4,12 @@ import { supabase } from '../lib/supabase'
 import type { Profile, UserEntitlements } from '../lib/types'
 import { getProfile, getUserEntitlements } from '../lib/db'
 import { identify, reset, trackTelegramAuthStarted, trackTelegramAuthSucceeded } from '../lib/analytics'
+import {
+  getTelegramInitData,
+  getTelegramUser,
+  isTelegramPlatform,
+  type TelegramPlatformUser,
+} from '../lib/platform'
 
 interface AuthContextValue {
   session: Session | null
@@ -13,7 +19,7 @@ interface AuthContextValue {
   isPremium: boolean
   loading: boolean
   isTelegram: boolean
-  telegramUser: TelegramUser | null
+  telegramUser: TelegramPlatformUser | null
   telegramAuthLoading: boolean
   signIn: (email: string, password: string) => Promise<{ error: unknown }>
   signUp: (email: string, password: string, displayName: string) => Promise<{ error: unknown }>
@@ -27,38 +33,10 @@ interface AuthContextValue {
   loginWithTelegram: () => Promise<void>
 }
 
-interface TelegramUser {
-  id: number
-  first_name: string
-  last_name?: string
-  username?: string
-  photo_url?: string
-  language_code?: string
-}
-
 const AuthContext = createContext<AuthContextValue | null>(null)
 
-function getTelegramUser(): TelegramUser | null {
-  try {
-    const tg = (window as unknown as { Telegram?: { WebApp?: { initDataUnsafe?: { user?: TelegramUser } } } }).Telegram
-    return tg?.WebApp?.initDataUnsafe?.user ?? null
-  } catch {
-    return null
-  }
-}
-
-function getInitDataRaw(): string {
-  try {
-    const tg = (window as unknown as { Telegram?: { WebApp?: { initData?: string } } }).Telegram
-    return tg?.WebApp?.initData ?? ''
-  } catch {
-    return ''
-  }
-}
-
 function isTelegramContext(): boolean {
-  const initData = getInitDataRaw()
-  return initData.length > 0
+  return isTelegramPlatform() && getTelegramInitData().length > 0
 }
 
 function normalizeLoginEmail(email: string | null | undefined): string | null {
@@ -100,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [entitlements, setEntitlements] = useState<UserEntitlements | null>(null)
   const [loading, setLoading] = useState(true)
-  const [telegramUser] = useState<TelegramUser | null>(getTelegramUser)
+  const [telegramUser] = useState<TelegramPlatformUser | null>(getTelegramUser)
   const [isTelegram] = useState(isTelegramContext)
   const [telegramAuthLoading, setTelegramAuthLoading] = useState(false)
 
@@ -129,7 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Telegram auth: send initData to Edge Function and get back a session
   const authenticateTelegram = useCallback(async () => {
-    const initData = getInitDataRaw()
+    const initData = getTelegramInitData()
     if (!initData) return
 
     setTelegramAuthLoading(true)
@@ -181,7 +159,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('[TG Auth] fetch exception:', err)
     }
     setTelegramAuthLoading(false)
-  }, [loadProfile])
+  }, [loadEntitlements, loadProfile])
 
   useEffect(() => {
     let mounted = true

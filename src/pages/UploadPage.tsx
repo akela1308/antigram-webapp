@@ -13,6 +13,7 @@ import { getDailyFrameLimit } from '../lib/premium'
 import { shareMomentToChat, shareMomentToStory, canShareMomentToStory } from '../lib/telegramShare'
 import { createResizedJpegBlob, MOMENT_IMAGE_VARIANTS } from '../lib/imageVariants'
 import type { ImageVariants } from '../lib/types'
+import { hapticImpact, withBackButton } from '../lib/platform'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -331,25 +332,6 @@ function applyFlare(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, fl
 // ── Main component ────────────────────────────────────────────────────────────
 
 type Phase = 'viewfinder' | 'preview' | 'uploading' | 'success'
-type TelegramBackButton = {
-  show?: () => void
-  hide?: () => void
-  onClick?: (handler: () => void) => void
-  offClick?: (handler: () => void) => void
-}
-type TelegramWebApp = {
-  BackButton?: TelegramBackButton
-  HapticFeedback?: { impactOccurred?: (style: 'light' | 'medium' | 'heavy') => void }
-}
-
-function getTelegramWebApp(): TelegramWebApp | null {
-  try {
-    return ((window as unknown as { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp) ?? null
-  } catch {
-    return null
-  }
-}
-
 export function UploadPage() {
   const { user, entitlements } = useAuth()
   const { language, t } = useLanguage()
@@ -432,21 +414,13 @@ export function UploadPage() {
   useEffect(() => {
     if (!showCustomMoodSheet) return
 
-    const tg = getTelegramWebApp()
     const closeSheet = () => setShowCustomMoodSheet(false)
-
-    tg?.BackButton?.show?.()
-    tg?.BackButton?.onClick?.(closeSheet)
-
-    return () => {
-      tg?.BackButton?.offClick?.(closeSheet)
-      tg?.BackButton?.hide?.()
-    }
+    return withBackButton(closeSheet)
   }, [showCustomMoodSheet])
 
   function closeCustomMoodSheet() {
     setShowCustomMoodSheet(false)
-    getTelegramWebApp()?.HapticFeedback?.impactOccurred?.('light')
+    hapticImpact('light')
   }
 
   // ── Camera lifecycle ────────────────────────────────────────────────────────

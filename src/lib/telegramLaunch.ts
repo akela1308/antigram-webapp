@@ -1,16 +1,7 @@
-type TelegramLaunchWebApp = {
-  initDataUnsafe?: {
-    start_param?: string
-  }
-}
+import { getTelegramWebApp } from './platform'
 
 export function getTelegramStartParam(): string | null {
-  try {
-    const tg = (window as unknown as { Telegram?: { WebApp?: TelegramLaunchWebApp } }).Telegram
-    return tg?.WebApp?.initDataUnsafe?.start_param ?? null
-  } catch {
-    return null
-  }
+  return getTelegramWebApp()?.initDataUnsafe?.start_param ?? null
 }
 
 export function getTelegramLaunchPath(startParam: string | null): string | null {
@@ -25,4 +16,3 @@ export function getTelegramLaunchPath(startParam: string | null): string | null 
 
   return null
 }
-

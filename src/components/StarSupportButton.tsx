@@ -10,6 +10,7 @@ import {
   isStarSupportAmount,
   type StarSupportAmount,
 } from '../lib/db'
+import { hapticImpact, hapticNotification, openPlatformInvoice } from '../lib/platform'
 
 type StarButtonVariant = 'inline' | 'overlay' | 'soft'
 
@@ -19,14 +20,6 @@ interface StarSupportButtonProps {
   variant?: StarButtonVariant
   label?: string
   onTotalChange?: (total: number) => void
-}
-
-interface TelegramWebApp {
-  openInvoice?: (url: string, callback?: (status: string) => void) => void
-  HapticFeedback?: {
-    impactOccurred?: (style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft') => void
-    notificationOccurred?: (type: 'error' | 'success' | 'warning') => void
-  }
 }
 
 export function StarSupportButton({
@@ -57,7 +50,7 @@ export function StarSupportButton({
       return
     }
 
-    getTelegramWebApp()?.HapticFeedback?.impactOccurred?.('light')
+    hapticImpact('light')
     setMessage(null)
     setSheetOpen(true)
   }
@@ -95,10 +88,10 @@ export function StarSupportButton({
 
     try {
       const invoice = await createStarInvoice(momentId, amount)
-      const status = await openTelegramInvoice(invoice.invoiceLink)
+      const status = await openPlatformInvoice(invoice.invoiceLink)
 
       if (status === 'paid') {
-        getTelegramWebApp()?.HapticFeedback?.notificationOccurred?.('success')
+        hapticNotification('success')
         const nextTotal = await refreshTotalAfterPayment(amount)
         setMessage(
           nextTotal >= total + amount
@@ -126,7 +119,7 @@ export function StarSupportButton({
     } catch (error) {
       console.error('[Stars] invoice failed:', error)
       setMessage(t('stars.createFailed'))
-      getTelegramWebApp()?.HapticFeedback?.notificationOccurred?.('error')
+      hapticNotification('error')
     } finally {
       setPendingAmount(null)
     }
@@ -342,25 +335,4 @@ function getButtonStyle(variant: StarButtonVariant): CSSProperties {
 function formatStars(total: number): string {
   if (total >= 1000) return `${(total / 1000).toFixed(total >= 10000 ? 0 : 1)}k`
   return String(total)
-}
-
-function getTelegramWebApp(): TelegramWebApp | null {
-  try {
-    return ((window as unknown as { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp) ?? null
-  } catch {
-    return null
-  }
-}
-
-function openTelegramInvoice(invoiceLink: string): Promise<string> {
-  const tg = getTelegramWebApp()
-
-  if (typeof tg?.openInvoice === 'function') {
-    return new Promise(resolve => {
-      tg.openInvoice?.(invoiceLink, status => resolve(status))
-    })
-  }
-
-  window.open(invoiceLink, '_blank', 'noopener,noreferrer')
-  return Promise.resolve('opened')
 }

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { getTelegramUser } from '../lib/platform'
 
 export type AppLanguage = 'ru' | 'en'
 
@@ -7,10 +8,6 @@ interface LanguageContextValue {
   detectedLanguage: AppLanguage
   setLanguage: (language: AppLanguage) => void
   t: (key: string, params?: Record<string, string | number>) => string
-}
-
-type TelegramLanguageUser = {
-  language_code?: string
 }
 
 const STORAGE_KEY = 'antigram:language'
@@ -656,14 +653,7 @@ function normalizeLanguage(raw: string | null | undefined): AppLanguage {
 }
 
 function getTelegramLanguage(): string | null {
-  try {
-    const tg = (window as unknown as {
-      Telegram?: { WebApp?: { initDataUnsafe?: { user?: TelegramLanguageUser } } }
-    }).Telegram
-    return tg?.WebApp?.initDataUnsafe?.user?.language_code ?? null
-  } catch {
-    return null
-  }
+  return getTelegramUser()?.language_code ?? null
 }
 
 function getStoredLanguage(): AppLanguage | null {

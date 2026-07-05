@@ -22,6 +22,7 @@ import type { Moment, ReactionType, AlbumWithMoments } from '../lib/types'
 import { trackReactionAdded, trackMomentSaved, trackShareCardSent } from '../lib/analytics'
 import { shareMomentToChat } from '../lib/telegramShare'
 import { getMomentImageUrl } from '../lib/imageVariants'
+import { downloadOrOpenFile } from '../lib/platform'
 
 type ReactionCounts = Partial<Record<ReactionType, number>>
 
@@ -33,19 +34,7 @@ interface FeedState {
 }
 
 async function savePhoto(photoUrl: string): Promise<void> {
-  const tg = (window as any).Telegram?.WebApp
-  // Bot API 8.0+ native download
-  if (typeof tg?.downloadFile === 'function') {
-    tg.downloadFile(photoUrl, `antigram_${Date.now()}.jpg`)
-    return
-  }
-  // In Telegram: open link so user can long-press to save
-  if (typeof tg?.openLink === 'function') {
-    tg.openLink(photoUrl)
-    return
-  }
-  // Browser fallback: open in new tab
-  window.open(photoUrl, '_blank')
+  downloadOrOpenFile(photoUrl, `antigram_${Date.now()}.jpg`)
 }
 
 export function MomentFeedPage() {
