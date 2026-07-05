@@ -3,7 +3,7 @@ import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import type { Profile } from '../lib/types'
 import { getProfile } from '../lib/db'
-import { identify, reset } from '../lib/analytics'
+import { identify, reset, trackTelegramAuthStarted, trackTelegramAuthSucceeded } from '../lib/analytics'
 
 interface AuthContextValue {
   session: Session | null
@@ -67,8 +67,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const p = await getProfile(userId)
     setProfile(p)
     identify(userId, {
-      username: p?.username,
-      display_name: p?.display_name,
+      has_username: Boolean(p?.username),
+      has_display_name: Boolean(p?.display_name),
       is_telegram: isTelegramContext(),
     })
   }, [])
@@ -84,6 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     setTelegramAuthLoading(true)
     try {
+      trackTelegramAuthStarted()
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/telegram-auth`,
         {
@@ -122,6 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(data.session)
       setUser(data.session.user)
       await loadProfile(data.session.user.id)
+      trackTelegramAuthSucceeded()
     } catch (err) {
       console.error('[TG Auth] fetch exception:', err)
     }
