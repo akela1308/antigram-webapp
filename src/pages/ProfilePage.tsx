@@ -21,6 +21,7 @@ import {
 } from '../lib/db'
 import { EMOTIONS } from '../lib/types'
 import type { Profile, Moment, HighlightWithMoment, ReactionType } from '../lib/types'
+import { getMomentImageUrl } from '../lib/imageVariants'
 
 type ReactionPreview = { type: ReactionType }
 
@@ -127,12 +128,12 @@ export function ProfilePage() {
   const highlightItems = Array.from({ length: 5 }, (_, i) => {
     const highlight = highlights.find(h => h.position === i)
     return highlight?.moments
-      ? { momentId: highlight.moments.id, photoUrl: highlight.moments.photo_url }
+      ? { momentId: highlight.moments.id, photoUrl: getMomentImageUrl(highlight.moments, 'thumb') }
       : null
   })
   const fallbackItems = moments.slice(0, 5).map(moment => ({
     momentId: moment.id,
-    photoUrl: moment.photo_url,
+    photoUrl: getMomentImageUrl(moment, 'thumb'),
   }))
   const hasHighlights = highlightItems.some(Boolean)
   const filmStripItems = hasHighlights
@@ -240,7 +241,7 @@ export function ProfilePage() {
             >
               <div className="relative w-full overflow-hidden rounded-xl" style={{ paddingBottom: '100%' }}>
                 <img
-                  src={m.photo_url}
+                  src={getMomentImageUrl(m, 'thumb')}
                   alt=""
                   className="absolute inset-0 w-full h-full object-cover"
                   loading="lazy"

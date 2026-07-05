@@ -6,6 +6,7 @@ import { useLanguage } from '../contexts/LanguageContext'
 import type { MomentWithProfile } from '../lib/types'
 import type { ReactionType } from '../lib/types'
 import { EMOTIONS } from '../lib/types'
+import { getMomentImageUrl } from '../lib/imageVariants'
 
 type CustomMood = { emoji: string; label: string } | null
 
@@ -71,7 +72,7 @@ export function MomentCard({
         style={{ paddingBottom: '125%' }}
       >
         <img
-          src={moment.photo_url}
+          src={getMomentImageUrl(moment, 'feed')}
           alt={moment.caption ?? ''}
           className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-active:scale-95"
           loading="lazy"

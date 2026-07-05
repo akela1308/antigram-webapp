@@ -19,6 +19,7 @@ import {
 } from '../lib/db'
 import { trackShareCardSent } from '../lib/analytics'
 import { shareMomentToChat } from '../lib/telegramShare'
+import { getMomentImageUrl } from '../lib/imageVariants'
 import type { MomentWithProfile, ReactionType } from '../lib/types'
 
 export function MomentPage() {
@@ -88,7 +89,7 @@ export function MomentPage() {
     await shareMomentToChat({
       momentId: moment.id,
       caption: moment.caption,
-      photoUrl: moment.photo_url,
+      photoUrl: getMomentImageUrl(moment, 'full'),
       language,
     })
     trackShareCardSent('telegram_chat')
@@ -182,7 +183,7 @@ export function MomentPage() {
           <div className="absolute inset-0 skeleton" style={{ paddingBottom: '100%' }} />
         )}
         <img
-          src={moment.photo_url}
+          src={getMomentImageUrl(moment, 'full')}
           alt={moment.caption ?? ''}
           className="w-full"
           style={{ display: imgLoaded ? 'block' : 'block', opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.3s' }}

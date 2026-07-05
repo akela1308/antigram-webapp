@@ -9,6 +9,7 @@ import { formatRelativeTime, useLanguage } from '../contexts/LanguageContext'
 import { getFeed, getRandomMoments, getMomentsByEmotion, getFeedReactions, getMomentStarTotals, getUserReactionsForMoments, addReaction, removeReaction } from '../lib/db'
 import { EMOTIONS } from '../lib/types'
 import type { MomentWithProfile, ReactionType } from '../lib/types'
+import { getMomentImageUrl } from '../lib/imageVariants'
 
 type FilterValue = 'for_you' | ReactionType
 type CustomMood = { emoji: string; label: string } | null
@@ -319,7 +320,7 @@ function PhotoOfDayCard({
         {/* Photo section — own relative context so overlays position against the photo */}
         <div style={{ position: 'relative' }}>
           <img
-            src={moment.photo_url}
+            src={getMomentImageUrl(moment, 'feed')}
             alt={moment.caption ?? ''}
             style={{ width: '100%', aspectRatio: '4/5', objectFit: 'cover', display: 'block' }}
             loading="lazy"

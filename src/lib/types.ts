@@ -14,6 +14,7 @@ export interface Moment {
   id: string
   user_id: string
   photo_url: string
+  image_variants?: ImageVariants | null
   caption: string | null
   mood: string | null
   custom_mood_emoji: string | null
@@ -22,6 +23,10 @@ export interface Moment {
   is_public: boolean
   created_at: string
 }
+
+export type ImageVariantName = 'original' | 'full' | 'feed' | 'thumb'
+
+export type ImageVariants = Partial<Record<ImageVariantName, string>>
 
 export interface MomentWithProfile extends Moment {
   profiles: Profile
@@ -74,7 +79,7 @@ export interface NotificationItem {
   read: boolean
   created_at: string
   profiles: Profile | null
-  moments: { photo_url: string } | null
+  moments: { photo_url: string; image_variants?: ImageVariants | null } | null
 }
 
 export interface Highlight {
@@ -86,7 +91,7 @@ export interface Highlight {
 }
 
 export interface HighlightWithMoment extends Highlight {
-  moments: { photo_url: string; id: string } | null
+  moments: { photo_url: string; image_variants?: ImageVariants | null; id: string } | null
 }
 
 export interface Album {

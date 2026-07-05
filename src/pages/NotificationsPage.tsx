@@ -5,6 +5,7 @@ import { formatRelativeTime, useLanguage } from '../contexts/LanguageContext'
 import { EMOTIONS } from '../lib/types'
 import type { NotificationItem, Profile, ReactionType } from '../lib/types'
 import { getNotifications, markNotificationsRead } from '../lib/db'
+import { getMomentImageUrl } from '../lib/imageVariants'
 
 function getProfileName(profile: Profile | null, fallback: string): string {
   return profile?.display_name || profile?.username || fallback
@@ -210,7 +211,7 @@ export function NotificationsPage() {
 
                 {item.moments?.photo_url ? (
                   <img
-                    src={item.moments.photo_url}
+                    src={getMomentImageUrl(item.moments, 'thumb')}
                     alt=""
                     style={{ width: 48, height: 48, borderRadius: 8, objectFit: 'cover', display: 'block' }}
                   />

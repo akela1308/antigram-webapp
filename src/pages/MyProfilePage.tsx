@@ -32,6 +32,7 @@ import {
 import { EMOTIONS } from '../lib/types'
 import type { Moment, HighlightWithMoment, AlbumWithMoments, ReactionType, Profile } from '../lib/types'
 import type { SupportRequest } from '../lib/support'
+import { getMomentImageUrl } from '../lib/imageVariants'
 
 type ReactionPreview = { type: ReactionType }
 type TelegramUserInfo = {
@@ -168,7 +169,7 @@ export function MyProfilePage() {
           moment_id: momentId,
           position: slot,
           created_at: new Date().toISOString(),
-          moments: { id: momentId, photo_url: pickedMoment.photo_url },
+          moments: { id: momentId, photo_url: pickedMoment.photo_url, image_variants: pickedMoment.image_variants },
         }]
       })
     }
@@ -292,7 +293,7 @@ export function MyProfilePage() {
 
   const ringPhotos: (string | null)[] = Array.from({ length: 5 }, (_, i) => {
     const hl = highlights.find(h => h.position === i)
-    return hl?.moments?.photo_url ?? null
+    return hl?.moments ? getMomentImageUrl(hl.moments, 'thumb') : null
   })
 
   const gridRows = buildGridRows(moments)
@@ -540,7 +541,7 @@ export function MyProfilePage() {
                       border: '1px solid #2E1A0A',
                     }}
                   >
-                    <img src={m.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    <img src={getMomentImageUrl(m, 'thumb')} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                   </div>
                 ))}
                 {moments.length === 0 && (
@@ -770,7 +771,7 @@ function PhotoTile({
       onTouchMove={onLongPressEnd}
     >
       <img
-        src={moment.photo_url}
+        src={getMomentImageUrl(moment, 'thumb')}
         alt=""
         style={{
           width: '100%', height: '100%', objectFit: 'cover', display: 'block',

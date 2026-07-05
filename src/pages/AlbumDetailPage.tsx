@@ -13,6 +13,7 @@ import {
   updateAlbumTitle,
 } from '../lib/db'
 import type { Moment } from '../lib/types'
+import { getMomentImageUrl } from '../lib/imageVariants'
 
 export function AlbumDetailPage() {
   const { albumId } = useParams<{ albumId: string }>()
@@ -170,7 +171,7 @@ export function AlbumDetailPage() {
               onClick={() => setRemoveConfirmId(prev => prev === m.id ? null : m.id)}
             >
               <img
-                src={m.photo_url}
+                src={getMomentImageUrl(m, 'thumb')}
                 alt=""
                 style={{
                   width: '100%', height: '100%', objectFit: 'cover', display: 'block',
@@ -308,7 +309,7 @@ export function AlbumDetailPage() {
                       onClick={() => handleAddMoment(m.id)}
                       style={{ aspectRatio: '1', borderRadius: 8, overflow: 'hidden', cursor: 'pointer', border: '1px solid #2E1A0A' }}
                     >
-                      <img src={m.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                      <img src={getMomentImageUrl(m, 'thumb')} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                     </div>
                   ))}
                 </div>

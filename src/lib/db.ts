@@ -16,6 +16,7 @@ import type {
   StarInvoiceResponse,
   FollowProfile,
 } from './types'
+import { getMomentImageUrl } from './imageVariants'
 
 // ─── PROFILES ────────────────────────────────────────────────────────────────
 
@@ -134,6 +135,22 @@ function pickRandom<T>(items: T[]): T | null {
   return items[Math.floor(Math.random() * items.length)]
 }
 
+function pickedMomentImageUrl(moment: Moment | null, variant: 'thumb' | 'feed' | 'full'): string | null {
+  return moment ? getMomentImageUrl(moment, variant) : null
+}
+
+function isMissingImageVariantsError(error: unknown): boolean {
+  const maybeError = error as { code?: string; message?: string; details?: string; hint?: string } | null
+  if (!maybeError) return false
+
+  return [
+    maybeError.code,
+    maybeError.message,
+    maybeError.details,
+    maybeError.hint,
+  ].filter(Boolean).join(' ').includes('image_variants')
+}
+
 export async function getGlobalCategoryThumbnails(): Promise<CategoryThumbnailMap> {
   const [randomMoments, ...emotionMoments] = await Promise.all([
     getRandomMoments(24),
@@ -141,11 +158,11 @@ export async function getGlobalCategoryThumbnails(): Promise<CategoryThumbnailMa
   ])
 
   const thumbnails: CategoryThumbnailMap = {
-    for_you: pickRandom(randomMoments)?.photo_url ?? null,
+    for_you: pickedMomentImageUrl(pickRandom(randomMoments), 'thumb'),
   }
 
   CATEGORY_REACTION_TYPES.forEach((type, index) => {
-    thumbnails[type] = pickRandom(emotionMoments[index] ?? [])?.photo_url ?? null
+    thumbnails[type] = pickedMomentImageUrl(pickRandom(emotionMoments[index] ?? []), 'thumb')
   })
 
   return thumbnails
@@ -161,7 +178,7 @@ export async function getFollowingCategoryThumbnails(userId: string): Promise<Ca
 
   const thumbnails: CategoryThumbnailMap = {
     ...globalThumbnails,
-    for_you: pickRandom(feedMoments)?.photo_url ?? globalThumbnails.for_you ?? null,
+    for_you: pickedMomentImageUrl(pickRandom(feedMoments), 'thumb') ?? globalThumbnails.for_you ?? null,
   }
 
   const ids = feedMoments.map(moment => moment.id)
@@ -182,7 +199,7 @@ export async function getFollowingCategoryThumbnails(userId: string): Promise<Ca
       [...matchingMomentsByMood, ...matchingMomentsByReaction].map(moment => [moment.id, moment]),
     ).values()]
 
-    thumbnails[type] = pickRandom(uniqueMatchingMoments)?.photo_url ?? globalThumbnails[type] ?? null
+    thumbnails[type] = pickedMomentImageUrl(pickRandom(uniqueMatchingMoments), 'thumb') ?? globalThumbnails[type] ?? null
   }
 
   return thumbnails
@@ -549,18 +566,34 @@ export async function getComments(momentId: string): Promise<CommentWithProfile[
 // ─── NOTIFICATIONS ────────────────────────────────────────────────────────────
 
 export async function getNotifications(userId: string): Promise<NotificationItem[]> {
-  const { data, error } = await supabase
+  const result = await supabase
     .from('notifications')
-    .select('*, profiles:profiles!notifications_actor_id_fkey(*), moments(photo_url)')
+    .select('*, profiles:profiles!notifications_actor_id_fkey(*), moments(photo_url, image_variants)')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(50)
 
-  if (error) {
-    console.error('[Notifications] load failed:', error)
+  if (!result.error) return (result.data as NotificationItem[]) ?? []
+
+  if (isMissingImageVariantsError(result.error)) {
+    const legacyResult = await supabase
+      .from('notifications')
+      .select('*, profiles:profiles!notifications_actor_id_fkey(*), moments(photo_url)')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(50)
+
+    if (!legacyResult.error) return (legacyResult.data as NotificationItem[]) ?? []
+    console.error('[Notifications] legacy load failed:', legacyResult.error)
     return []
   }
-  return (data as NotificationItem[]) ?? []
+
+  if (result.error) {
+    console.error('[Notifications] load failed:', result.error)
+    return []
+  }
+
+  return []
 }
 
 export async function markNotificationsRead(userId: string): Promise<{ error: unknown }> {
@@ -589,12 +622,28 @@ export async function getUnreadNotificationsCount(userId: string): Promise<numbe
 // ── Highlights ────────────────────────────────────────────────────────────────
 
 export async function getHighlights(userId: string): Promise<HighlightWithMoment[]> {
-  const { data } = await supabase
+  const result = await supabase
     .from('highlights')
-    .select('*, moments(id, photo_url)')
+    .select('*, moments(id, photo_url, image_variants)')
     .eq('user_id', userId)
     .order('position')
-  return (data as HighlightWithMoment[]) ?? []
+
+  if (!result.error) return (result.data as HighlightWithMoment[]) ?? []
+
+  if (isMissingImageVariantsError(result.error)) {
+    const legacyResult = await supabase
+      .from('highlights')
+      .select('*, moments(id, photo_url)')
+      .eq('user_id', userId)
+      .order('position')
+
+    if (!legacyResult.error) return (legacyResult.data as HighlightWithMoment[]) ?? []
+    console.error('[Highlights] legacy load failed:', legacyResult.error)
+    return []
+  }
+
+  console.error('[Highlights] load failed:', result.error)
+  return []
 }
 
 export async function setHighlightAtPosition(
@@ -632,26 +681,48 @@ export async function getUserAlbums(userId: string): Promise<AlbumWithMoments[]>
 
   const albumRows = albums as Album[]
   const albumIds = albumRows.map(album => album.id)
-  const { data: albumMoments } = await supabase
+  type AlbumMomentRow = {
+    album_id: string
+    moments:
+      | { photo_url: string; image_variants?: Record<string, string> | null }
+      | { photo_url: string; image_variants?: Record<string, string> | null }[]
+      | null
+  }
+
+  const albumMomentsResult = await supabase
     .from('album_moments')
-    .select('album_id, moments(photo_url)')
+    .select('album_id, moments(photo_url, image_variants)')
     .in('album_id', albumIds)
     .order('added_at', { ascending: false })
+
+  let albumMoments = albumMomentsResult.data as AlbumMomentRow[] | null
+
+  if (albumMomentsResult.error && isMissingImageVariantsError(albumMomentsResult.error)) {
+    const legacyResult = await supabase
+      .from('album_moments')
+      .select('album_id, moments(photo_url)')
+      .in('album_id', albumIds)
+      .order('added_at', { ascending: false })
+
+    if (legacyResult.error) {
+      console.error('[Albums] legacy moments load failed:', legacyResult.error)
+    }
+    albumMoments = legacyResult.data as AlbumMomentRow[] | null
+  } else if (albumMomentsResult.error) {
+    console.error('[Albums] moments load failed:', albumMomentsResult.error)
+  }
 
   const stats: Record<string, { count: number; first_moment_url: string | null }> = {}
   for (const albumId of albumIds) {
     stats[albumId] = { count: 0, first_moment_url: null }
   }
 
-  for (const row of (albumMoments ?? []) as {
-    album_id: string
-    moments: { photo_url: string } | { photo_url: string }[] | null
-  }[]) {
+  for (const row of albumMoments ?? []) {
     const albumStats = stats[row.album_id]
     if (!albumStats) continue
     const moment = Array.isArray(row.moments) ? row.moments[0] : row.moments
     albumStats.count += 1
-    albumStats.first_moment_url ??= moment?.photo_url ?? null
+    albumStats.first_moment_url ??= moment ? getMomentImageUrl(moment as Moment, 'thumb') : null
   }
 
   return albumRows.map(album => ({

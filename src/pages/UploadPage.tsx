@@ -11,6 +11,8 @@ import { trackPhotoPosted, trackFilterApplied, trackShareCardOpened, trackShareC
 import { addReaction, getTodaysMomentCount } from '../lib/db'
 import { getDailyFrameLimit } from '../lib/premium'
 import { shareMomentToChat, shareMomentToStory, canShareMomentToStory } from '../lib/telegramShare'
+import { createResizedJpegBlob, MOMENT_IMAGE_VARIANTS } from '../lib/imageVariants'
+import type { ImageVariants } from '../lib/types'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -40,6 +42,75 @@ function getMomentExportCanvas(source: HTMLCanvasElement): HTMLCanvasElement {
   outputCtx.drawImage(source, 0, 0, output.width, output.height)
 
   return output
+}
+
+async function uploadMomentImages(userId: string, source: Blob): Promise<{ photoUrl: string; variants: ImageVariants }> {
+  const stamp = Date.now()
+  const originalPath = `${userId}/${stamp}/original.jpg`
+
+  const { error: originalError } = await supabase.storage
+    .from('moments')
+    .upload(originalPath, source, { contentType: 'image/jpeg' })
+  if (originalError) throw new Error(originalError.message)
+
+  const { data: { publicUrl: originalUrl } } = supabase.storage.from('moments').getPublicUrl(originalPath)
+  const variants: ImageVariants = {
+    original: originalUrl,
+    full: originalUrl,
+  }
+
+  await Promise.all((['thumb', 'feed'] as const).map(async variant => {
+    const config = MOMENT_IMAGE_VARIANTS[variant]
+    const blob = await createResizedJpegBlob(source, config.maxSide, config.quality)
+    const path = `${userId}/${stamp}/${variant}.jpg`
+
+    const { error } = await supabase.storage
+      .from('moments')
+      .upload(path, blob, { contentType: 'image/jpeg' })
+    if (error) throw new Error(error.message)
+
+    const { data: { publicUrl } } = supabase.storage.from('moments').getPublicUrl(path)
+    variants[variant] = publicUrl
+  }))
+
+  return { photoUrl: originalUrl, variants }
+}
+
+async function insertMomentWithImageVariants(payload: {
+  user_id: string
+  photo_url: string
+  image_variants: ImageVariants
+  caption: string | null
+  mood: ReactionType | null
+  custom_mood_emoji: string | null
+  custom_mood_label: string | null
+  film_preset_id: string | null
+  is_public: boolean
+  visibility: 'public'
+}) {
+  const insert = async (momentPayload: Omit<typeof payload, 'image_variants'> | typeof payload) =>
+    supabase.from('moments').insert(momentPayload).select('id').single()
+
+  const result = await insert(payload)
+  if (!result.error) return result.data
+
+  const columnErrorText = [
+    result.error.code,
+    result.error.message,
+    result.error.details,
+    result.error.hint,
+  ].filter(Boolean).join(' ')
+
+  if (!columnErrorText.includes('image_variants')) {
+    throw new Error(result.error.message)
+  }
+
+  const { image_variants: _imageVariants, ...legacyPayload } = payload
+  const legacyResult = await insert(legacyPayload)
+  if (legacyResult.error) throw new Error(legacyResult.error.message)
+
+  console.warn('[Upload] moments.image_variants is not available yet; saved moment without variants')
+  return legacyResult.data
 }
 
 // ── Grain ─────────────────────────────────────────────────────────────────────
@@ -513,16 +584,11 @@ export function UploadPage() {
         setPhase('preview')
         return
       }
-      const fileName = `${user.id}/${Date.now()}.jpg`
-      const { error: upErr } = await supabase.storage
-        .from('moments')
-        .upload(fileName, photoBlob, { contentType: 'image/jpeg' })
-      if (upErr) throw new Error(upErr.message)
-
-      const { data: { publicUrl } } = supabase.storage.from('moments').getPublicUrl(fileName)
-      const { data: insertedMoment, error: insErr } = await supabase.from('moments').insert({
+      const { photoUrl, variants } = await uploadMomentImages(user.id, photoBlob)
+      const insertedMoment = await insertMomentWithImageVariants({
         user_id:          user.id,
-        photo_url:        publicUrl,
+        photo_url:        photoUrl,
+        image_variants:   variants,
         caption:          caption.trim() || null,
         mood:             mood ?? null,
         custom_mood_emoji: mood === 'custom' ? customMoodEmoji || null : null,
@@ -531,9 +597,7 @@ export function UploadPage() {
         is_public:        true,
         visibility:       'public',
       })
-        .select('id')
-        .single()
-      if (insErr) throw new Error(insErr.message)
+
       if (insertedMoment?.id) {
         const { error: reactionErr } = await addReaction(insertedMoment.id, user.id, mood)
         if (reactionErr) console.error('[Upload] initial reaction failed:', reactionErr)
@@ -544,7 +608,7 @@ export function UploadPage() {
       if (insertedMoment?.id) {
         setPublishedMoment({
           id: insertedMoment.id,
-          photoUrl: publicUrl,
+          photoUrl,
           caption: caption.trim() || null,
         })
         trackShareCardOpened('post_success')

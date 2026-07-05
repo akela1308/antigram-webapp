@@ -19,6 +19,7 @@ import { EMOTIONS } from '../lib/types'
 import type { Moment, ReactionType, AlbumWithMoments } from '../lib/types'
 import { trackReactionAdded, trackMomentSaved, trackShareCardSent } from '../lib/analytics'
 import { shareMomentToChat } from '../lib/telegramShare'
+import { getMomentImageUrl } from '../lib/imageVariants'
 
 type ReactionCounts = Partial<Record<ReactionType, number>>
 
@@ -261,7 +262,7 @@ export function MomentFeedPage() {
                       shareMomentToChat({
                         momentId: menuMoment.id,
                         caption: menuMoment.caption,
-                        photoUrl: menuMoment.photo_url,
+                        photoUrl: getMomentImageUrl(menuMoment, 'full'),
                         language,
                       })
                         .then(() => {
@@ -421,7 +422,7 @@ function ShotCard({ moment: m, cardRef, reactionCounts, myReaction, starTotal, o
       {/* Photo with "..." button */}
       <div style={{ position: 'relative' }}>
         <img
-          src={m.photo_url}
+          src={getMomentImageUrl(m, 'full')}
           alt={m.caption ?? ''}
           style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', display: 'block' }}
           loading="lazy"
