@@ -1,22 +1,4 @@
-type TelegramWebApp = {
-  isVersionAtLeast?: (version: string) => boolean
-  openTelegramLink?: (url: string) => void
-  openLink?: (url: string) => void
-  shareToStory?: (
-    mediaUrl: string,
-    params?: {
-      text?: string
-      widget_link?: {
-        url: string
-        name?: string
-      }
-    },
-  ) => void
-  HapticFeedback?: {
-    impactOccurred?: (style: 'light' | 'medium' | 'heavy') => void
-    notificationOccurred?: (type: 'error' | 'success' | 'warning') => void
-  }
-}
+import { getTelegramWebApp, hapticImpact, openTelegramLink } from './platform'
 
 type ShareLanguage = 'ru' | 'en'
 
@@ -25,10 +7,6 @@ interface MomentShareParams {
   photoUrl?: string | null
   caption?: string | null
   language: ShareLanguage
-}
-
-function getTelegramWebApp(): TelegramWebApp | null {
-  return (window as unknown as { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp ?? null
 }
 
 function cleanTelegramName(value: string | undefined): string {
@@ -78,10 +56,10 @@ export async function shareMomentToChat({ momentId, caption, language }: MomentS
   const telegramShareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`
   const tg = getTelegramWebApp()
 
-  tg?.HapticFeedback?.impactOccurred?.('light')
+  hapticImpact('light')
 
   if (typeof tg?.openTelegramLink === 'function') {
-    tg.openTelegramLink(telegramShareUrl)
+    openTelegramLink(telegramShareUrl)
     return
   }
 
@@ -101,7 +79,7 @@ export async function shareMomentToStory(params: MomentShareParams): Promise<voi
     const url = buildMomentUrl(momentId)
     const text = buildMomentShareText(caption, language).slice(0, 200)
 
-    tg.HapticFeedback?.impactOccurred?.('light')
+    hapticImpact('light')
     tg.shareToStory(photoUrl, {
       text,
       widget_link: {

@@ -2,6 +2,12 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useLanguage } from '../contexts/LanguageContext'
 import { usePlayer } from '../contexts/PlayerContext'
+import {
+  getPlatformCloudStorageItem,
+  getPlatformStorageItem,
+  setPlatformStorageItem,
+  setVerticalSwipesEnabled,
+} from '../lib/platform'
 
 const PLAYER_ASSETS = {
   play: `${import.meta.env.BASE_URL}player/play.png`,
@@ -18,22 +24,6 @@ const PLAYER_VIEWPORT_MARGIN = 8
 const DRAG_THRESHOLD = 6
 
 type PlayerPosition = { x: number; y: number }
-type TelegramWebApp = {
-  CloudStorage?: {
-    getItem?: (key: string, callback: (error: string | null, value: string | null) => void) => void
-    setItem?: (key: string, value: string, callback?: (error: string | null, success?: boolean) => void) => void
-  }
-  disableVerticalSwipes?: () => void
-  enableVerticalSwipes?: () => void
-}
-
-function getTelegramWebApp(): TelegramWebApp | null {
-  try {
-    return (window as unknown as { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp ?? null
-  } catch {
-    return null
-  }
-}
 
 function parsePosition(value: string | null): PlayerPosition | null {
   if (!value) return null
@@ -48,54 +38,15 @@ function parsePosition(value: string | null): PlayerPosition | null {
 }
 
 function getStoredPosition(): PlayerPosition | null {
-  if (typeof window === 'undefined') return null
-
-  try {
-    return parsePosition(window.localStorage.getItem(PLAYER_POSITION_KEY))
-  } catch {
-    return null
-  }
+  return parsePosition(getPlatformStorageItem(PLAYER_POSITION_KEY))
 }
 
 function storePosition(position: PlayerPosition) {
-  const serialized = JSON.stringify(position)
-
-  try {
-    window.localStorage.setItem(PLAYER_POSITION_KEY, serialized)
-  } catch {
-    // Position persistence is a comfort feature; dragging should keep working without it.
-  }
-
-  try {
-    getTelegramWebApp()?.CloudStorage?.setItem?.(PLAYER_POSITION_KEY, serialized)
-  } catch {
-    // CloudStorage is available only inside supported Telegram clients.
-  }
+  setPlatformStorageItem(PLAYER_POSITION_KEY, JSON.stringify(position))
 }
 
 function getCloudStoredPosition(): Promise<PlayerPosition | null> {
-  const storage = getTelegramWebApp()?.CloudStorage
-  if (!storage?.getItem) return Promise.resolve(null)
-
-  return new Promise(resolve => {
-    try {
-      storage.getItem?.(PLAYER_POSITION_KEY, (_error, value) => {
-        resolve(parsePosition(value))
-      })
-    } catch {
-      resolve(null)
-    }
-  })
-}
-
-function setTelegramVerticalSwipes(enabled: boolean) {
-  try {
-    const tg = getTelegramWebApp()
-    if (enabled) tg?.enableVerticalSwipes?.()
-    else tg?.disableVerticalSwipes?.()
-  } catch {
-    // Older Telegram clients simply do not support this API.
-  }
+  return getPlatformCloudStorageItem(PLAYER_POSITION_KEY).then(parsePosition)
 }
 
 function getViewportSize() {
@@ -214,11 +165,7 @@ export function MiniPlayer() {
 
       const nextPosition = clampPosition(stored, element)
       setPosition(nextPosition)
-      try {
-        window.localStorage.setItem(PLAYER_POSITION_KEY, JSON.stringify(nextPosition))
-      } catch {
-        // Local mirror is optional; CloudStorage remains the source of truth here.
-      }
+      storePosition(nextPosition)
     })
 
     return () => {
@@ -228,7 +175,7 @@ export function MiniPlayer() {
 
   useEffect(() => {
     return () => {
-      setTelegramVerticalSwipes(true)
+      setVerticalSwipesEnabled(true)
     }
   }, [])
 
@@ -278,7 +225,7 @@ export function MiniPlayer() {
     }
 
     setPosition(origin)
-    setTelegramVerticalSwipes(false)
+    setVerticalSwipesEnabled(false)
     element.setPointerCapture?.(event.pointerId)
   }
 
@@ -308,7 +255,7 @@ export function MiniPlayer() {
     playerRef.current?.releasePointerCapture?.(event.pointerId)
     dragRef.current = null
     setIsDragging(false)
-    setTelegramVerticalSwipes(true)
+    setVerticalSwipesEnabled(true)
 
     if (drag.moved) {
       suppressClickRef.current = true
