@@ -5,6 +5,7 @@ import type {
   Moment,
   MomentWithProfile,
   ReactionType,
+  MomentReactionSummary,
   CommentWithProfile,
   Album,
   AlbumWithMoments,
@@ -151,6 +152,18 @@ function isMissingImageVariantsError(error: unknown): boolean {
   ].filter(Boolean).join(' ').includes('image_variants')
 }
 
+function isMissingRpcError(error: unknown, functionName: string): boolean {
+  const maybeError = error as { code?: string; message?: string; details?: string; hint?: string } | null
+  if (!maybeError) return false
+
+  return [
+    maybeError.code,
+    maybeError.message,
+    maybeError.details,
+    maybeError.hint,
+  ].filter(Boolean).join(' ').includes(functionName)
+}
+
 export async function getGlobalCategoryThumbnails(): Promise<CategoryThumbnailMap> {
   const [randomMoments, ...emotionMoments] = await Promise.all([
     getRandomMoments(24),
@@ -247,6 +260,116 @@ export async function getUserReactionsForMoments(
     .eq('user_id', userId)
     .in('moment_id', momentIds)
   return (data as { moment_id: string; type: ReactionType }[]) ?? []
+}
+
+type ReactionSummaryRpcRow = {
+  moment_id: string
+  counts: Record<string, number> | null
+  top_type: ReactionType | null
+  top_count: number | null
+  my_reaction: ReactionType | null
+}
+
+function normalizeReactionSummary(row: ReactionSummaryRpcRow): MomentReactionSummary {
+  const counts: Partial<Record<ReactionType, number>> = {}
+  for (const [type, count] of Object.entries(row.counts ?? {})) {
+    if (isReactionType(type) && typeof count === 'number' && count > 0) {
+      counts[type] = count
+    }
+  }
+
+  return {
+    moment_id: row.moment_id,
+    counts,
+    top_type: row.top_type,
+    top_count: row.top_count ?? 0,
+    my_reaction: row.my_reaction,
+  }
+}
+
+function isReactionType(value: string): value is ReactionType {
+  return ['warm', 'nostalgic', 'calm', 'wow', 'relatable', 'custom'].includes(value)
+}
+
+export async function getMomentReactionSummaries(
+  momentIds: string[],
+  userId?: string,
+): Promise<MomentReactionSummary[]> {
+  const uniqueIds = [...new Set(momentIds)]
+  if (uniqueIds.length === 0) return []
+
+  const { data, error } = await supabase.rpc('get_moment_reaction_summaries', {
+    p_moment_ids: uniqueIds,
+  })
+
+  if (!error && data) {
+    return (data as ReactionSummaryRpcRow[]).map(normalizeReactionSummary)
+  }
+
+  if (error && !isMissingRpcError(error, 'get_moment_reaction_summaries')) {
+    console.error('[Reactions] summary RPC failed:', error)
+  }
+
+  const [reactions, myReactions] = await Promise.all([
+    getFeedReactions(uniqueIds),
+    userId ? getUserReactionsForMoments(userId, uniqueIds) : Promise.resolve([]),
+  ])
+  const summaries = new Map<string, MomentReactionSummary>()
+  for (const id of uniqueIds) {
+    summaries.set(id, { moment_id: id, counts: {}, top_type: null, top_count: 0, my_reaction: null })
+  }
+
+  for (const reaction of reactions) {
+    const summary = summaries.get(reaction.moment_id)
+    if (!summary) continue
+    summary.counts[reaction.type] = (summary.counts[reaction.type] ?? 0) + 1
+  }
+
+  for (const summary of summaries.values()) {
+    const top = (Object.entries(summary.counts) as [ReactionType, number][])
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]
+    if (top) {
+      summary.top_type = top[0]
+      summary.top_count = top[1]
+    }
+  }
+
+  for (const reaction of myReactions) {
+    const summary = summaries.get(reaction.moment_id)
+    if (summary) summary.my_reaction = reaction.type
+  }
+
+  return [...summaries.values()]
+}
+
+export function buildReactionListMapFromSummaries(
+  summaries: MomentReactionSummary[],
+): Record<string, { type: ReactionType }[]> {
+  const map: Record<string, { type: ReactionType }[]> = {}
+  for (const summary of summaries) {
+    const reactions: { type: ReactionType }[] = []
+    for (const [type, count] of Object.entries(summary.counts) as [ReactionType, number][]) {
+      for (let i = 0; i < count; i += 1) reactions.push({ type })
+    }
+    map[summary.moment_id] = reactions
+  }
+  return map
+}
+
+export function buildReactionCountMapFromSummaries(
+  summaries: MomentReactionSummary[],
+): Record<string, Partial<Record<ReactionType, number>>> {
+  const map: Record<string, Partial<Record<ReactionType, number>>> = {}
+  for (const summary of summaries) map[summary.moment_id] = summary.counts
+  return map
+}
+
+export function buildUserReactionMapFromSummaries(
+  summaries: MomentReactionSummary[],
+): Record<string, ReactionType | null> {
+  const map: Record<string, ReactionType | null> = {}
+  for (const summary of summaries) map[summary.moment_id] = summary.my_reaction
+  return map
 }
 
 export async function getReactions(
@@ -606,6 +729,12 @@ export async function markNotificationsRead(userId: string): Promise<{ error: un
 }
 
 export async function getUnreadNotificationsCount(userId: string): Promise<number> {
+  const { data: rpcData, error: rpcError } = await supabase.rpc('get_unread_notification_count')
+  if (!rpcError && typeof rpcData === 'number') return rpcData
+  if (rpcError && !isMissingRpcError(rpcError, 'get_unread_notification_count')) {
+    console.error('[Notifications] unread count RPC failed:', rpcError)
+  }
+
   const { count, error } = await supabase
     .from('notifications')
     .select('*', { count: 'exact', head: true })

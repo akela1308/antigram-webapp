@@ -19,7 +19,8 @@ import {
   updateProfile,
   getMomentStarTotals,
   getProfileStarTotal,
-  getFeedReactions,
+  getMomentReactionSummaries,
+  buildReactionListMapFromSummaries,
 } from '../lib/db'
 import {
   sendSupportRequest,
@@ -111,13 +112,8 @@ export function MyProfilePage() {
     setStarTotal(stars)
     setMomentStarTotals(m.length > 0 ? await getMomentStarTotals(m.map(moment => moment.id)) : {})
     if (m.length > 0) {
-      const reactions = await getFeedReactions(m.map(moment => moment.id))
-      const reactionMap: Record<string, ReactionPreview[]> = {}
-      for (const reaction of reactions) {
-        if (!reactionMap[reaction.moment_id]) reactionMap[reaction.moment_id] = []
-        reactionMap[reaction.moment_id].push({ type: reaction.type })
-      }
-      setMomentReactions(reactionMap)
+      const reactionSummaries = await getMomentReactionSummaries(m.map(moment => moment.id), user.id)
+      setMomentReactions(buildReactionListMapFromSummaries(reactionSummaries))
     } else {
       setMomentReactions({})
     }
@@ -212,13 +208,8 @@ export function MyProfilePage() {
     setMoments(m)
     setMomentStarTotals(m.length > 0 ? await getMomentStarTotals(m.map(moment => moment.id)) : {})
     if (m.length > 0) {
-      const reactions = await getFeedReactions(m.map(moment => moment.id))
-      const reactionMap: Record<string, ReactionPreview[]> = {}
-      for (const reaction of reactions) {
-        if (!reactionMap[reaction.moment_id]) reactionMap[reaction.moment_id] = []
-        reactionMap[reaction.moment_id].push({ type: reaction.type })
-      }
-      setMomentReactions(reactionMap)
+      const reactionSummaries = await getMomentReactionSummaries(m.map(moment => moment.id), user!.id)
+      setMomentReactions(buildReactionListMapFromSummaries(reactionSummaries))
     } else {
       setMomentReactions({})
     }

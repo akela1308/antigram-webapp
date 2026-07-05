@@ -17,7 +17,8 @@ import {
   getHighlights,
   getMomentStarTotals,
   getProfileStarTotal,
-  getFeedReactions,
+  getMomentReactionSummaries,
+  buildReactionListMapFromSummaries,
 } from '../lib/db'
 import { EMOTIONS } from '../lib/types'
 import type { Profile, Moment, HighlightWithMoment, ReactionType } from '../lib/types'
@@ -65,13 +66,8 @@ export function ProfilePage() {
     setStarTotal(stars)
     setMomentStarTotals(m.length > 0 ? await getMomentStarTotals(m.map(moment => moment.id)) : {})
     if (m.length > 0) {
-      const reactions = await getFeedReactions(m.map(moment => moment.id))
-      const reactionMap: Record<string, ReactionPreview[]> = {}
-      for (const reaction of reactions) {
-        if (!reactionMap[reaction.moment_id]) reactionMap[reaction.moment_id] = []
-        reactionMap[reaction.moment_id].push({ type: reaction.type })
-      }
-      setMomentReactions(reactionMap)
+      const reactionSummaries = await getMomentReactionSummaries(m.map(moment => moment.id), user?.id)
+      setMomentReactions(buildReactionListMapFromSummaries(reactionSummaries))
     } else {
       setMomentReactions({})
     }

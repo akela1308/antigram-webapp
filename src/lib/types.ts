@@ -42,6 +42,14 @@ export interface Reaction {
 
 export type ReactionType = 'warm' | 'nostalgic' | 'calm' | 'wow' | 'relatable' | 'custom'
 
+export interface MomentReactionSummary {
+  moment_id: string
+  counts: Partial<Record<ReactionType, number>>
+  top_type: ReactionType | null
+  top_count: number
+  my_reaction: ReactionType | null
+}
+
 export interface Follow {
   follower_id: string
   following_id: string

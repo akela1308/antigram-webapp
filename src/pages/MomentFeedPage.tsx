@@ -4,9 +4,10 @@ import { StarSupportButton } from '../components/StarSupportButton'
 import { useAuth } from '../contexts/AuthContext'
 import { formatRelativeTime, useLanguage } from '../contexts/LanguageContext'
 import {
-  getFeedReactions,
-  getUserReactionsForMoments,
   getMomentStarTotals,
+  getMomentReactionSummaries,
+  buildReactionCountMapFromSummaries,
+  buildUserReactionMapFromSummaries,
   addReaction,
   removeReaction,
   deleteMoment,
@@ -80,25 +81,13 @@ export function MomentFeedPage() {
     if (localMoments.length === 0) return
     const ids = localMoments.map(m => m.id)
 
-    getFeedReactions(ids).then(data => {
-      const counts: Record<string, ReactionCounts> = {}
-      for (const r of data) {
-        if (!counts[r.moment_id]) counts[r.moment_id] = {}
-        counts[r.moment_id][r.type] = (counts[r.moment_id][r.type] ?? 0) + 1
-      }
-      setReactionCounts(counts)
+    getMomentReactionSummaries(ids, user?.id).then(summaries => {
+      setReactionCounts(buildReactionCountMapFromSummaries(summaries))
+      setMyReactions(buildUserReactionMapFromSummaries(summaries))
     })
 
     getMomentStarTotals(ids).then(setStarTotals)
-
-    if (user) {
-      getUserReactionsForMoments(user.id, ids).then(data => {
-        const mine: Record<string, ReactionType | null> = {}
-        for (const r of data) mine[r.moment_id] = r.type
-        setMyReactions(mine)
-      })
-    }
-  }, [user, localMoments])
+  }, [user?.id, localMoments])
 
   const showToast = useCallback((msg: string) => {
     setToast(msg)

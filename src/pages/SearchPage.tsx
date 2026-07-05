@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, Children } from 'react'
 import { CategoryFilmStrip } from '../components/CategoryFilmStrip'
 import { MomentCard } from '../components/MomentCard'
 import { MomentCardSkeleton } from '../components/Skeleton'
-import { searchUsers, getRandomMoments, getMomentsByEmotion, getFeedReactions, getMomentStarTotals, getUserReactionsForMoments, addReaction } from '../lib/db'
+import { searchUsers, getRandomMoments, getMomentsByEmotion, getMomentStarTotals, getMomentReactionSummaries, buildReactionListMapFromSummaries, buildUserReactionMapFromSummaries, addReaction } from '../lib/db'
 import type { MomentWithProfile, ReactionType } from '../lib/types'
 import type { Profile } from '../lib/types'
 import { useNavigate } from 'react-router-dom'
@@ -47,21 +47,13 @@ export function SearchPage() {
 
     if (data.length > 0) {
       const ids = data.map(m => m.id)
-      const [reactions, stars, userRxs] = await Promise.all([
-        getFeedReactions(ids),
+      const [reactionSummaries, stars] = await Promise.all([
+        getMomentReactionSummaries(ids, user?.id),
         getMomentStarTotals(ids),
-        user ? getUserReactionsForMoments(user.id, ids) : Promise.resolve([]),
       ])
-      const map: ReactionsMap = {}
-      for (const r of reactions) {
-        if (!map[r.moment_id]) map[r.moment_id] = []
-        map[r.moment_id].push({ type: r.type })
-      }
-      setReactionsMap(map)
+      setReactionsMap(buildReactionListMapFromSummaries(reactionSummaries))
       setStarTotals(stars)
-      const userMap: Record<string, ReactionType | null> = {}
-      for (const r of userRxs) { userMap[r.moment_id] = r.type }
-      setUserReactionsMap(userMap)
+      setUserReactionsMap(buildUserReactionMapFromSummaries(reactionSummaries))
     } else {
       setReactionsMap({})
       setStarTotals({})
