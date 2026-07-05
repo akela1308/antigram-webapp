@@ -17,6 +17,7 @@ import type {
   StarInvoiceResponse,
   FollowProfile,
 } from './types'
+import { EMOTIONS } from './types'
 import { getMomentImageUrl } from './imageVariants'
 
 // ─── PROFILES ────────────────────────────────────────────────────────────────
@@ -39,15 +40,49 @@ export async function updateProfile(
 }
 
 export async function searchUsers(query: string): Promise<Profile[]> {
+  const q = query.trim().replace(/[,%]/g, ' ')
+  if (q.length < 2) return []
+
   const { data } = await supabase
     .from('profiles')
     .select('*')
-    .or(`username.ilike.%${query}%,display_name.ilike.%${query}%`)
+    .or(`username.ilike.%${q}%,display_name.ilike.%${q}%`)
     .limit(30)
   return (data as Profile[]) ?? []
 }
 
 // ─── MOMENTS ─────────────────────────────────────────────────────────────────
+
+export async function searchMoments(query: string, limit = 24): Promise<MomentWithProfile[]> {
+  const q = query.trim()
+  if (q.length < 2) return []
+
+  const lower = q.toLowerCase()
+  const moodMatches = EMOTIONS
+    .filter(emotion => emotion.type.includes(lower) || emotion.label.toLowerCase().includes(lower))
+    .map(emotion => emotion.type)
+  const pattern = `%${q.replace(/[,%]/g, ' ')}%`
+  const filters = [
+    `caption.ilike.${pattern}`,
+    `custom_mood_label.ilike.${pattern}`,
+    ...moodMatches.map(mood => `mood.eq.${mood}`),
+  ]
+
+  const { data, error } = await supabase
+    .from('moments')
+    .select('*, profiles(*)')
+    .eq('is_public', true)
+    .or(filters.join(','))
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) {
+    console.error('[Search] moments failed:', error)
+    return []
+  }
+
+  return (data as MomentWithProfile[]) ?? []
+}
 
 export async function getFeed(userId: string, limit = 20): Promise<MomentWithProfile[]> {
   const { data: following } = await supabase

@@ -2,12 +2,13 @@ import { useState, useEffect, useCallback, Children } from 'react'
 import { CategoryFilmStrip } from '../components/CategoryFilmStrip'
 import { MomentCard } from '../components/MomentCard'
 import { MomentCardSkeleton } from '../components/Skeleton'
-import { searchUsers, getRandomMoments, getMomentsByEmotion, getMomentStarTotals, getMomentReactionSummaries, buildReactionListMapFromSummaries, buildUserReactionMapFromSummaries, addReaction } from '../lib/db'
+import { searchUsers, searchMoments, getRandomMoments, getMomentsByEmotion, getMomentStarTotals, getMomentReactionSummaries, buildReactionListMapFromSummaries, buildUserReactionMapFromSummaries, addReaction } from '../lib/db'
 import type { MomentWithProfile, ReactionType } from '../lib/types'
 import type { Profile } from '../lib/types'
 import { useNavigate } from 'react-router-dom'
 import { useLanguage } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'
+import { trackSearchResultOpened, trackSearchSubmitted } from '../lib/analytics'
 
 type FilterValue = 'for_you' | ReactionType
 
@@ -21,6 +22,7 @@ export function SearchPage() {
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
   const [userResults, setUserResults] = useState<Profile[]>([])
+  const [momentResults, setMomentResults] = useState<MomentWithProfile[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
 
   const [filter, setFilter] = useState<FilterValue>('for_you')
@@ -94,16 +96,51 @@ export function SearchPage() {
     if (!isSearching) loadFeed()
   }, [filter, isSearching, loadFeed])
 
-  // User search
+  // Global search
   useEffect(() => {
-    if (!isSearching) { setUserResults([]); return }
+    if (!isSearching) {
+      setUserResults([])
+      setMomentResults([])
+      return
+    }
+
     let cancelled = false
     setSearchLoading(true)
-    searchUsers(query.trim()).then(data => {
-      if (!cancelled) { setUserResults(data); setSearchLoading(false) }
-    })
+    const searchQuery = query.trim()
+    trackSearchSubmitted('global')
+
+    ;(async () => {
+      const [users, foundMoments] = await Promise.all([
+        searchUsers(searchQuery),
+        searchMoments(searchQuery, 24),
+      ])
+      if (cancelled) return
+
+      setUserResults(users)
+      setMomentResults(foundMoments)
+
+      if (foundMoments.length > 0) {
+        const ids = foundMoments.map(moment => moment.id)
+        const [reactionSummaries, stars] = await Promise.all([
+          getMomentReactionSummaries(ids, user?.id),
+          getMomentStarTotals(ids),
+        ])
+        if (cancelled) return
+
+        setReactionsMap(buildReactionListMapFromSummaries(reactionSummaries))
+        setUserReactionsMap(buildUserReactionMapFromSummaries(reactionSummaries))
+        setStarTotals(stars)
+      } else {
+        setReactionsMap({})
+        setUserReactionsMap({})
+        setStarTotals({})
+      }
+
+      setSearchLoading(false)
+    })()
+
     return () => { cancelled = true }
-  }, [query, isSearching])
+  }, [query, isSearching, user?.id])
 
   return (
     <div className="flex flex-col" style={{ minHeight: '100dvh', paddingTop: 'var(--tg-top, 56px)' }}>
@@ -139,7 +176,7 @@ export function SearchPage() {
               type="text"
               value={query}
               onChange={e => setQuery(e.target.value)}
-              placeholder={t('common.searchPeople')}
+              placeholder={t('common.searchAntigram')}
               style={{
                 flex: 1, background: 'none', border: 'none', outline: 'none',
                 color: 'var(--text)', fontSize: 14, fontFamily: 'inherit',
@@ -174,19 +211,47 @@ export function SearchPage() {
             </div>
           )}
 
-          {!searchLoading && userResults.length === 0 && (
+          {!searchLoading && userResults.length === 0 && momentResults.length === 0 && (
             <div style={{ padding: '48px 24px', textAlign: 'center' }}>
               <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>{t('common.notFound')}</p>
             </div>
           )}
 
-          {userResults.map(profile => (
-            <UserRow
-              key={profile.id}
-              profile={profile}
-              onPress={() => navigate(`/profile/${profile.id}`)}
-            />
-          ))}
+          {!searchLoading && userResults.length > 0 && (
+            <section>
+              <SearchSectionTitle>{t('search.people')}</SearchSectionTitle>
+              {userResults.map(profile => (
+                <UserRow
+                  key={profile.id}
+                  profile={profile}
+                  onPress={() => {
+                    trackSearchResultOpened('profile')
+                    navigate(`/profile/${profile.id}`)
+                  }}
+                />
+              ))}
+            </section>
+          )}
+
+          {!searchLoading && momentResults.length > 0 && (
+            <section style={{ padding: '10px 12px 96px' }}>
+              <SearchSectionTitle>{t('search.moments')}</SearchSectionTitle>
+              <PhotoGrid>
+                {momentResults.map(moment => (
+                  <MomentCard
+                    key={moment.id}
+                    moment={moment}
+                    reactions={reactionsMap[moment.id] ?? []}
+                    starTotal={starTotals[moment.id] ?? 0}
+                    onStarTotalChange={(momentId, total) => setStarTotals(prev => ({ ...prev, [momentId]: total }))}
+                    userReaction={userReactionsMap[moment.id] ?? null}
+                    onReact={user ? handleReact : undefined}
+                    directTopReaction
+                  />
+                ))}
+              </PhotoGrid>
+            </section>
+          )}
         </div>
       ) : (
         <div style={{ flex: 1, padding: '8px 12px 96px' }}>
@@ -218,6 +283,14 @@ export function SearchPage() {
         </div>
       )}
     </div>
+  )
+}
+
+function SearchSectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 800, letterSpacing: 0.5, textTransform: 'uppercase', margin: '12px 16px 8px' }}>
+      {children}
+    </h2>
   )
 }
 

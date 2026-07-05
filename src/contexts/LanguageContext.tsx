@@ -32,6 +32,7 @@ const translations: Record<AppLanguage, Record<string, string>> = {
     'common.signingIn': 'Входим...',
     'common.search': 'Поиск',
     'common.searchPeople': 'Поиск людей...',
+    'common.searchAntigram': 'Поиск людей и моментов...',
     'common.notFound': 'Ничего не найдено',
     'common.error': 'Произошла ошибка',
     'common.done': 'Готово',
@@ -78,6 +79,8 @@ const translations: Record<AppLanguage, Record<string, string>> = {
 
     'explore.title': 'Подборки',
     'explore.emptyEmotion': 'Нет постов с такой эмоцией.',
+    'search.people': 'Люди',
+    'search.moments': 'Моменты',
 
     'notifications.title': 'Уведомления',
     'notifications.signIn': 'Войдите, чтобы видеть уведомления',
@@ -287,6 +290,7 @@ const translations: Record<AppLanguage, Record<string, string>> = {
     'common.signingIn': 'Signing in...',
     'common.search': 'Search',
     'common.searchPeople': 'Search people...',
+    'common.searchAntigram': 'Search people and moments...',
     'common.notFound': 'Nothing found',
     'common.error': 'Something went wrong',
     'common.done': 'Done',
@@ -333,6 +337,8 @@ const translations: Record<AppLanguage, Record<string, string>> = {
 
     'explore.title': 'Collections',
     'explore.emptyEmotion': 'No posts with this emotion.',
+    'search.people': 'People',
+    'search.moments': 'Moments',
 
     'notifications.title': 'Notifications',
     'notifications.signIn': 'Sign in to see notifications',
