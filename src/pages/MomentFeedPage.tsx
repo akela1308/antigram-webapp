@@ -17,7 +17,8 @@ import {
 } from '../lib/db'
 import { EMOTIONS } from '../lib/types'
 import type { Moment, ReactionType, AlbumWithMoments } from '../lib/types'
-import { trackReactionAdded, trackMomentSaved } from '../lib/analytics'
+import { trackReactionAdded, trackMomentSaved, trackShareCardSent } from '../lib/analytics'
+import { shareMomentToChat } from '../lib/telegramShare'
 
 type ReactionCounts = Partial<Record<ReactionType, number>>
 
@@ -44,20 +45,11 @@ async function savePhoto(photoUrl: string): Promise<void> {
   window.open(photoUrl, '_blank')
 }
 
-function sharePhoto(momentId: string) {
-  const url = `${window.location.origin}/moment/${momentId}`
-  if (navigator.share) {
-    navigator.share({ url }).catch(() => {})
-  } else {
-    navigator.clipboard?.writeText(url).catch(() => {})
-  }
-}
-
 export function MomentFeedPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, profile: myProfile } = useAuth()
-  const { t } = useLanguage()
+  const { language, t } = useLanguage()
   const isAdmin = myProfile?.is_admin === true
   const state = location.state as FeedState | null
 
@@ -264,7 +256,21 @@ export function MomentFeedPage() {
                   <MenuBtn
                     label={t('moment.share')}
                     icon="→"
-                    onClick={() => { sharePhoto(menuMomentId!); showToast(t('moment.linkCopied')); setMenuMomentId(null) }}
+                    onClick={() => {
+                      if (!menuMoment) return
+                      shareMomentToChat({
+                        momentId: menuMoment.id,
+                        caption: menuMoment.caption,
+                        photoUrl: menuMoment.photo_url,
+                        language,
+                      })
+                        .then(() => {
+                          trackShareCardSent('telegram_chat')
+                          showToast(t('moment.shareSent'))
+                        })
+                        .catch(() => showToast(t('moment.linkCopied')))
+                      setMenuMomentId(null)
+                    }}
                   />
                 </>
               )

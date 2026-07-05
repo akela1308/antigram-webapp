@@ -7,9 +7,10 @@ import { EMOTIONS } from '../lib/types'
 import { FILM_PRESETS } from '../lib/filmPresets'
 import type { FilmPreset, AlgoType, GrainConfig, FlareType } from '../lib/filmPresets'
 import type { ReactionType } from '../lib/types'
-import { trackPhotoPosted, trackFilterApplied } from '../lib/analytics'
+import { trackPhotoPosted, trackFilterApplied, trackShareCardOpened, trackShareCardSent } from '../lib/analytics'
 import { addReaction, getTodaysMomentCount } from '../lib/db'
 import { getDailyFrameLimit } from '../lib/premium'
+import { shareMomentToChat, shareMomentToStory, canShareMomentToStory } from '../lib/telegramShare'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -280,7 +281,7 @@ function getTelegramWebApp(): TelegramWebApp | null {
 
 export function UploadPage() {
   const { user } = useAuth()
-  const { t } = useLanguage()
+  const { language, t } = useLanguage()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -316,6 +317,7 @@ export function UploadPage() {
   const [error, setError]               = useState<string | null>(null)
   const [todayCount, setTodayCount]     = useState<number | null>(null)
   const [limitMsg, setLimitMsg]         = useState(false)
+  const [publishedMoment, setPublishedMoment] = useState<{ id: string; photoUrl: string; caption: string | null } | null>(null)
   const [viewportHeight, setViewportHeight] = useState(() =>
     typeof window === 'undefined' ? 720 : window.innerHeight,
   )
@@ -539,8 +541,15 @@ export function UploadPage() {
 
       trackPhotoPosted(preset.id)
       setTodayCount(prev => (prev ?? 0) + 1)
+      if (insertedMoment?.id) {
+        setPublishedMoment({
+          id: insertedMoment.id,
+          photoUrl: publicUrl,
+          caption: caption.trim() || null,
+        })
+        trackShareCardOpened('post_success')
+      }
       setPhase('success')
-      setTimeout(() => navigate('/'), 2600)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       if (msg.includes('daily_frame_limit_exceeded')) {
@@ -581,7 +590,30 @@ export function UploadPage() {
   }
 
   if (phase === 'success') {
-    return <DevelopingScreen previewUrl={previewUrl} preset={preset} />
+    return (
+      <DevelopingScreen
+        previewUrl={previewUrl}
+        preset={preset}
+        canShareStory={Boolean(publishedMoment) && canShareMomentToStory()}
+        onShareChat={
+          publishedMoment
+            ? async () => {
+                await shareMomentToChat({ ...publishedMoment, momentId: publishedMoment.id, language })
+                trackShareCardSent('telegram_chat')
+              }
+            : undefined
+        }
+        onShareStory={
+          publishedMoment
+            ? async () => {
+                await shareMomentToStory({ ...publishedMoment, momentId: publishedMoment.id, language })
+                trackShareCardSent(canShareMomentToStory() ? 'telegram_story' : 'telegram_chat_fallback')
+              }
+            : undefined
+        }
+        onOpenFeed={() => navigate('/')}
+      />
+    )
   }
 
   // ── PREVIEW phase ─────────────────────────────────────────────────────────
@@ -1396,7 +1428,21 @@ function CaptureFeedback() {
   )
 }
 
-function DevelopingScreen({ previewUrl, preset }: { previewUrl: string | null; preset: FilmPreset }) {
+function DevelopingScreen({
+  previewUrl,
+  preset,
+  canShareStory,
+  onShareChat,
+  onShareStory,
+  onOpenFeed,
+}: {
+  previewUrl: string | null
+  preset: FilmPreset
+  canShareStory: boolean
+  onShareChat?: () => void | Promise<void>
+  onShareStory?: () => void | Promise<void>
+  onOpenFeed: () => void
+}) {
   const { t } = useLanguage()
 
   return (
@@ -1545,22 +1591,71 @@ function DevelopingScreen({ previewUrl, preset }: { previewUrl: string | null; p
             </span>
           </div>
           <h1 style={{ color: '#F3E0C1', fontSize: 24, lineHeight: 1.1, fontWeight: 800, margin: '4px 0 0', fontFamily: 'Georgia, serif' }}>
-            {t('camera.developing')}
+            {t('camera.shareTitle')}
           </h1>
           <p style={{ color: 'rgba(232,196,144,0.58)', fontSize: 14, lineHeight: 1.5, margin: 0, maxWidth: 280 }}>
-            {t('camera.developingHint')}
+            {t('camera.shareHint')}
           </p>
-          <div
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: canShareStory ? '1fr 1fr' : '1fr',
+            gap: 10,
+            width: 'min(84vw, 330px)',
+            marginTop: 12,
+          }}>
+            <button
+              type="button"
+              onClick={() => void onShareChat?.()}
+              disabled={!onShareChat}
+              style={{
+                minHeight: 48,
+                borderRadius: 999,
+                border: '1px solid rgba(232,196,144,0.22)',
+                background: 'linear-gradient(180deg, rgba(234,169,72,0.96), rgba(174,102,32,0.96))',
+                color: '#1E1207',
+                fontSize: 14,
+                fontWeight: 900,
+                boxShadow: '0 16px 34px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,244,217,0.45)',
+                opacity: onShareChat ? 1 : 0.48,
+              }}
+            >
+              {t('camera.shareChat')}
+            </button>
+            {canShareStory && (
+              <button
+                type="button"
+                onClick={() => void onShareStory?.()}
+                disabled={!onShareStory}
+                style={{
+                  minHeight: 48,
+                  borderRadius: 999,
+                  border: '1px solid rgba(232,196,144,0.24)',
+                  background: 'rgba(25,17,10,0.76)',
+                  color: '#F3E0C1',
+                  fontSize: 14,
+                  fontWeight: 800,
+                  boxShadow: 'inset 0 1px 0 rgba(255,244,217,0.08)',
+                  opacity: onShareStory ? 1 : 0.48,
+                }}
+              >
+                {t('camera.shareStory')}
+              </button>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={onOpenFeed}
             style={{
-              width: 108,
-              height: 3,
-              borderRadius: 3,
-              marginTop: 8,
-              background: 'linear-gradient(90deg, transparent, rgba(201,132,62,0.95), transparent)',
-              transformOrigin: 'center',
-              animation: 'antigram-develop-pulse 1.15s ease-in-out infinite',
+              marginTop: 3,
+              border: 'none',
+              background: 'transparent',
+              color: 'rgba(232,196,144,0.62)',
+              fontSize: 13,
+              fontWeight: 700,
             }}
-          />
+          >
+            {t('camera.openFeed')}
+          </button>
         </div>
       </div>
     </div>

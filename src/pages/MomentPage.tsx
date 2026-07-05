@@ -17,6 +17,8 @@ import {
   unsaveMoment,
   deleteMoment,
 } from '../lib/db'
+import { trackShareCardSent } from '../lib/analytics'
+import { shareMomentToChat } from '../lib/telegramShare'
 import type { MomentWithProfile, ReactionType } from '../lib/types'
 
 export function MomentPage() {
@@ -81,6 +83,17 @@ export function MomentPage() {
     }
   }
 
+  const handleShare = async () => {
+    if (!moment) return
+    await shareMomentToChat({
+      momentId: moment.id,
+      caption: moment.caption,
+      photoUrl: moment.photo_url,
+      language,
+    })
+    trackShareCardSent('telegram_chat')
+  }
+
   if (loading) {
     return (
       <div className="flex flex-col" style={{ minHeight: '100dvh', paddingTop: 'var(--tg-top, 56px)' }}>
@@ -138,6 +151,14 @@ export function MomentPage() {
           </div>
         </Link>
         <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+          <button
+            onClick={() => void handleShare()}
+            className="p-1"
+            aria-label={t('moment.share')}
+            style={{ color: 'var(--text-muted)', fontSize: 18, lineHeight: 1 }}
+          >
+            ↗
+          </button>
           {user && moment && user.id === moment.user_id && (
             <button
               onClick={() => setShowDeleteConfirm(true)}
