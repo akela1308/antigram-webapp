@@ -15,6 +15,7 @@ import {
   getBlockRelationship,
   blockUser,
   unblockUser,
+  reportUser,
   getFollowersCount,
   getFollowingCount,
   getHighlights,
@@ -49,6 +50,8 @@ export function ProfilePage() {
   const [blockRelationship, setBlockRelationship] = useState({ hasBlocked: false, blockedBy: false })
   const [blockLoading, setBlockLoading] = useState(false)
   const [blockError, setBlockError] = useState<string | null>(null)
+  const [reportLoading, setReportLoading] = useState(false)
+  const [reportMessage, setReportMessage] = useState<string | null>(null)
 
   const targetId = userId ?? ''
   const isOwnProfile = user?.id === targetId
@@ -57,6 +60,7 @@ export function ProfilePage() {
     if (!targetId) return
     setLoading(true)
     setBlockError(null)
+    setReportMessage(null)
 
     const [p, fc, fgc, stars, relation] = await Promise.all([
       getProfile(targetId),
@@ -158,6 +162,23 @@ export function ProfilePage() {
     setBlockLoading(false)
   }
 
+  const handleReportProfile = async () => {
+    if (!user || !targetId || isOwnProfile) return
+
+    setReportLoading(true)
+    setReportMessage(null)
+    const { error } = await reportUser(targetId, user.id)
+    setReportLoading(false)
+
+    if (error) {
+      console.error('[Report] profile failed:', error)
+      setReportMessage(t('profile.reportFailed'))
+      return
+    }
+
+    setReportMessage(t('profile.reportSent'))
+  }
+
   if (loading) {
     return (
       <div className="flex flex-col" style={{ minHeight: '100dvh', paddingTop: 'var(--tg-top, 56px)' }}>
@@ -255,7 +276,7 @@ export function ProfilePage() {
 
         {/* Follow / block controls */}
         {user && !isOwnProfile && (
-          <div className="mt-2 flex items-center justify-center gap-2">
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
             {!profileRestricted && (
               <button
                 onClick={handleFollow}
@@ -284,11 +305,33 @@ export function ProfilePage() {
             >
               {blockRelationship.hasBlocked ? t('profile.unblock') : t('profile.block')}
             </button>
+            <button
+              onClick={handleReportProfile}
+              disabled={reportLoading}
+              className="px-5 py-2.5 rounded-xl font-semibold text-sm transition-all"
+              style={{
+                background: 'transparent',
+                color: 'var(--text-muted)',
+                border: '1px solid var(--border)',
+                opacity: reportLoading ? 0.6 : 1,
+              }}
+            >
+              {t('profile.report')}
+            </button>
           </div>
         )}
 
         {blockError && (
           <p className="text-xs text-center" style={{ color: '#e05a5a', margin: 0 }}>{blockError}</p>
+        )}
+
+        {reportMessage && (
+          <p
+            className="text-xs text-center"
+            style={{ color: reportMessage === t('profile.reportSent') ? 'var(--amber)' : '#e05a5a', margin: 0 }}
+          >
+            {reportMessage}
+          </p>
         )}
 
         {profileRestricted && (

@@ -16,6 +16,8 @@ import type {
   PremiumSubscription,
   StarInvoiceResponse,
   FollowProfile,
+  ReportStatus,
+  ModerationReport,
 } from './types'
 import { EMOTIONS } from './types'
 import { getMomentImageUrl } from './imageVariants'
@@ -1104,14 +1106,143 @@ export async function reportMoment(
   momentId: string,
   reporterId: string,
   reason = 'reported',
+  reportedUserId?: string | null,
 ): Promise<{ error: unknown }> {
   const { error } = await supabase
     .from('reports')
-    .insert({ reporter_id: reporterId, reported_moment_id: momentId, reason })
+    .insert({
+      reporter_id: reporterId,
+      reported_moment_id: momentId,
+      reported_user_id: reportedUserId ?? null,
+      reason,
+    })
+  return { error }
+}
+
+export async function reportUser(
+  reportedUserId: string,
+  reporterId: string,
+  reason = 'profile_reported',
+): Promise<{ error: unknown }> {
+  if (!reportedUserId || !reporterId || reportedUserId === reporterId) {
+    return { error: new Error('Cannot report this user') }
+  }
+
+  const { error } = await supabase
+    .from('reports')
+    .insert({ reporter_id: reporterId, reported_user_id: reportedUserId, reason })
   return { error }
 }
 
 // ── Admin ─────────────────────────────────────────────────────────────────────
+
+type RawModerationReport = {
+  id: string
+  reporter_id: string
+  reported_moment_id: string | null
+  reported_user_id: string | null
+  reason: string
+  status: ReportStatus
+  admin_note: string | null
+  reviewed_by: string | null
+  reviewed_at: string | null
+  created_at: string
+}
+
+export async function getModerationReports(status: ReportStatus | 'all' = 'open'): Promise<ModerationReport[]> {
+  let query = supabase
+    .from('reports')
+    .select('id, reporter_id, reported_moment_id, reported_user_id, reason, status, admin_note, reviewed_by, reviewed_at, created_at')
+    .order('created_at', { ascending: false })
+    .limit(100)
+
+  if (status !== 'all') query = query.eq('status', status)
+
+  const { data, error } = await query
+  if (error) {
+    console.error('[Moderation] reports load failed:', error)
+    return []
+  }
+
+  const reports = (data as RawModerationReport[] | null) ?? []
+  if (reports.length === 0) return []
+
+  const profileIds = new Set<string>()
+  const momentIds = new Set<string>()
+  for (const report of reports) {
+    profileIds.add(report.reporter_id)
+    if (report.reported_user_id) profileIds.add(report.reported_user_id)
+    if (report.reported_moment_id) momentIds.add(report.reported_moment_id)
+  }
+
+  const [{ data: profiles }, { data: moments }] = await Promise.all([
+    profileIds.size > 0
+      ? supabase.from('profiles').select('*').in('id', Array.from(profileIds))
+      : Promise.resolve({ data: [] }),
+    momentIds.size > 0
+      ? supabase.from('moments').select('*, profiles(*)').in('id', Array.from(momentIds))
+      : Promise.resolve({ data: [] }),
+  ])
+
+  const profileMap = new Map(((profiles as Profile[] | null) ?? []).map(profile => [profile.id, profile]))
+  const momentMap = new Map(((moments as MomentWithProfile[] | null) ?? []).map(moment => [moment.id, moment]))
+
+  return reports.map(report => ({
+    ...report,
+    reporter: profileMap.get(report.reporter_id) ?? null,
+    reported_user: report.reported_user_id ? profileMap.get(report.reported_user_id) ?? null : null,
+    reported_moment: report.reported_moment_id ? momentMap.get(report.reported_moment_id) ?? null : null,
+  }))
+}
+
+async function recordAdminAudit(
+  adminId: string,
+  action: string,
+  payload: {
+    targetUserId?: string | null
+    targetMomentId?: string | null
+    reportId?: string | null
+    metadata?: Record<string, unknown>
+  } = {},
+): Promise<void> {
+  const { error } = await supabase
+    .from('admin_audit_log')
+    .insert({
+      admin_id: adminId,
+      action,
+      target_user_id: payload.targetUserId ?? null,
+      target_moment_id: payload.targetMomentId ?? null,
+      report_id: payload.reportId ?? null,
+      metadata: payload.metadata ?? {},
+    })
+
+  if (error && !isMissingTableError(error, 'admin_audit_log')) {
+    console.error('[Moderation] audit log write failed:', error)
+  }
+}
+
+export async function updateReportStatus(
+  reportId: string,
+  adminId: string,
+  status: ReportStatus,
+  adminNote?: string,
+): Promise<{ error: unknown }> {
+  const { error } = await supabase
+    .from('reports')
+    .update({
+      status,
+      admin_note: adminNote ?? null,
+      reviewed_by: adminId,
+      reviewed_at: new Date().toISOString(),
+    })
+    .eq('id', reportId)
+
+  if (!error) {
+    await recordAdminAudit(adminId, `report_${status}`, { reportId, metadata: { adminNote } })
+  }
+
+  return { error }
+}
 
 export async function adminShadowBanUser(userId: string): Promise<{ error: unknown }> {
   const { error } = await supabase
@@ -1121,12 +1252,38 @@ export async function adminShadowBanUser(userId: string): Promise<{ error: unkno
   return { error }
 }
 
+export async function adminShadowBanUserFromReport(
+  userId: string,
+  adminId: string,
+  reportId?: string | null,
+): Promise<{ error: unknown }> {
+  const result = await adminShadowBanUser(userId)
+  if (!result.error) {
+    await recordAdminAudit(adminId, 'shadow_ban_user', { targetUserId: userId, reportId })
+    if (reportId) await updateReportStatus(reportId, adminId, 'actioned', 'Shadow banned user')
+  }
+  return result
+}
+
 export async function adminUnbanUser(userId: string): Promise<{ error: unknown }> {
   const { error } = await supabase
     .from('profiles')
     .update({ is_banned: false })
     .eq('id', userId)
   return { error }
+}
+
+export async function adminDeleteMomentFromReport(
+  momentId: string,
+  adminId: string,
+  reportId?: string | null,
+): Promise<{ error: unknown }> {
+  const result = await deleteMoment(momentId)
+  if (!result.error) {
+    await recordAdminAudit(adminId, 'delete_moment', { targetMomentId: momentId, reportId })
+    if (reportId) await updateReportStatus(reportId, adminId, 'actioned', 'Deleted moment')
+  }
+  return result
 }
 
 export async function addComment(

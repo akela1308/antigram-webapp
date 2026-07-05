@@ -1124,28 +1124,37 @@ function SettingsSheet({
             {t('settings.help')}
           </button>
           {profile.is_admin && (
-            <button
-              type="button"
-              onClick={onSupportInboxPress}
-              style={{ ...linkButtonStyle, color: 'var(--amber)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}
-            >
-              <span>{t('settings.supportInbox')}</span>
-              <span style={{
-                minWidth: 26,
-                height: 22,
-                padding: '0 8px',
-                borderRadius: 999,
-                background: supportInboxCount > 0 ? 'var(--amber)' : '#2E1A0A',
-                color: supportInboxCount > 0 ? '#140E0A' : 'var(--text-muted)',
-                fontSize: 12,
-                fontWeight: 800,
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-                {supportInboxCount}
-              </span>
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={onSupportInboxPress}
+                style={{ ...linkButtonStyle, color: 'var(--amber)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}
+              >
+                <span>{t('settings.supportInbox')}</span>
+                <span style={{
+                  minWidth: 26,
+                  height: 22,
+                  padding: '0 8px',
+                  borderRadius: 999,
+                  background: supportInboxCount > 0 ? 'var(--amber)' : '#2E1A0A',
+                  color: supportInboxCount > 0 ? '#140E0A' : 'var(--text-muted)',
+                  fontSize: 12,
+                  fontWeight: 800,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  {supportInboxCount}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onNavigate('/admin/moderation')}
+                style={{ ...linkButtonStyle, color: 'var(--amber)' }}
+              >
+                {t('settings.moderation')}
+              </button>
+            </>
           )}
           <button
             type="button"

@@ -149,6 +149,35 @@ export interface PremiumSubscription {
   updated_at: string
 }
 
+export type ReportStatus = 'open' | 'reviewed' | 'dismissed' | 'actioned'
+
+export interface ModerationReport {
+  id: string
+  reporter_id: string
+  reported_moment_id: string | null
+  reported_user_id: string | null
+  reason: string
+  status: ReportStatus
+  admin_note: string | null
+  reviewed_by: string | null
+  reviewed_at: string | null
+  created_at: string
+  reporter: Profile | null
+  reported_user: Profile | null
+  reported_moment: MomentWithProfile | null
+}
+
+export interface AdminAuditLogItem {
+  id: string
+  admin_id: string
+  action: string
+  target_user_id: string | null
+  target_moment_id: string | null
+  report_id: string | null
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
 export const EMOTIONS = [
   { type: 'warm' as ReactionType,      emoji: '🔥', label: 'Тепло'      },
   { type: 'nostalgic' as ReactionType, emoji: '🌅', label: 'Ностальгия' },

@@ -103,3 +103,11 @@ Acceptance criteria:
 - cannot block yourself;
 - RLS protects the block table;
 - app works gracefully before/after SQL migration.
+
+Follow-up shipped in the same P0 direction:
+
+- profile reports;
+- moment reports linked to the reported author;
+- admin moderation queue MVP;
+- admin audit log for moderation actions;
+- admin actions for closing reports, deleting reported moments, and shadow banning reported users.

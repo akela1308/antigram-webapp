@@ -144,7 +144,8 @@ export function MomentFeedPage() {
       return
     }
 
-    const { error } = await reportMoment(momentId, user.id)
+    const moment = localMoments.find(m => m.id === momentId)
+    const { error } = await reportMoment(momentId, user.id, 'reported', moment?.user_id)
     setMenuMomentId(null)
     if (error) {
       console.error('[Report] failed:', error)

@@ -18,6 +18,7 @@ import { MiniPlayer } from './components/MiniPlayer'
 import { PrivacyPage } from './pages/PrivacyPage'
 import { TermsPage } from './pages/TermsPage'
 import { PremiumPage } from './pages/PremiumPage'
+import { ModerationPage } from './pages/ModerationPage'
 import { trackSessionStart } from './lib/analytics'
 import { getTelegramLaunchPath, getTelegramStartParam } from './lib/telegramLaunch'
 
@@ -87,6 +88,7 @@ export function App() {
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/premium" element={<PremiumPage />} />
+        <Route path="/admin/moderation" element={<ModerationPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       {!hideNav && <BottomNav />}

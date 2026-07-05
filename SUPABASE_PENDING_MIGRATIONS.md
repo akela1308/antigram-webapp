@@ -31,6 +31,12 @@ Supabase CLI сейчас подвисает на DB connection (`Initialising l
    - включает RLS: читать могут только участники блокировки;
    - блокировать/разблокировать пользователь может только от своего имени.
 
+6. `supabase/migrations/202607050006_moderation_queue.sql`
+   - расширяет/создает `reports` для жалоб на кадры и профили;
+   - добавляет статусы модерации `open/reviewed/dismissed/actioned`;
+   - добавляет `admin_audit_log`;
+   - разрешает админам удалять кадры через RLS policy.
+
 ## Почему приложение не должно упасть до применения
 
 - Image variants имеют fallback на старый `photo_url`.
@@ -40,6 +46,7 @@ Supabase CLI сейчас подвисает на DB connection (`Initialising l
 - Reaction aggregate helper откатывается на старые queries, если RPC еще нет.
 - Unread notification count откатывается на старый count query, если RPC еще нет.
 - Block helpers мягко пропускают фильтрацию, если `blocked_users` еще нет.
+- Moderation UI покажет пустую очередь/ошибку действия, если `reports` еще не расширена.
 
 ## Проверка после применения
 
@@ -73,4 +80,19 @@ select exists (
   where table_schema = 'public'
     and table_name = 'blocked_users'
 ) as has_blocked_users;
+```
+
+```sql
+select
+  exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'reports'
+      and column_name = 'reported_user_id'
+  ) as has_reported_user_id,
+  exists (
+    select 1 from information_schema.tables
+    where table_schema = 'public'
+      and table_name = 'admin_audit_log'
+  ) as has_admin_audit_log;
 ```
