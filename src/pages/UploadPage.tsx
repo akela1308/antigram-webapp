@@ -79,6 +79,33 @@ function triangleRandom(): number {
   return (Math.random() + Math.random()) / 2
 }
 
+function getGraphemes(value: string): string[] {
+  const Segmenter = (Intl as typeof Intl & {
+    Segmenter?: new (
+      locale: string | undefined,
+      options: { granularity: 'grapheme' }
+    ) => { segment: (input: string) => Iterable<{ segment: string }> }
+  }).Segmenter
+
+  if (!Segmenter) return Array.from(value)
+
+  return Array.from(new Segmenter(undefined, { granularity: 'grapheme' }).segment(value), part => part.segment)
+}
+
+function isEmojiGrapheme(value: string): boolean {
+  return /\p{Extended_Pictographic}/u.test(value)
+    || /^[\u{1F1E6}-\u{1F1FF}]{2}$/u.test(value)
+    || /^[0-9#*]\uFE0F?\u20E3$/u.test(value)
+}
+
+function getFirstEmoji(value: string): string {
+  for (const grapheme of getGraphemes(value.trim())) {
+    if (isEmojiGrapheme(grapheme)) return grapheme
+  }
+
+  return ''
+}
+
 function getMomentExportCanvas(source: HTMLCanvasElement): HTMLCanvasElement {
   const maxSide = Math.max(source.width, source.height)
   if (maxSide <= MOMENT_EXPORT_MAX_SIZE) return source
@@ -393,6 +420,7 @@ export function UploadPage() {
   const canvasRef  = useRef<HTMLCanvasElement>(null)
   const streamRef  = useRef<MediaStream | null>(null)
   const captureLockRef = useRef(false)
+  const emojiInputRef = useRef<HTMLInputElement>(null)
 
   // Read film preset from router state (set by FilmPicker sheet in BottomNav)
   const loadedFilmId = (location.state as { filmId?: string } | null)?.filmId
@@ -440,6 +468,21 @@ export function UploadPage() {
   const loadedFilmName = preset.id === 'none' ? t('common.noFilter') : preset.name
   const activeEmojiCategory =
     EMOJI_CATEGORIES.find(category => category.id === emojiCategoryId) ?? EMOJI_CATEGORIES[0]
+
+  function openSystemEmojiInput() {
+    hapticImpact('light')
+    emojiInputRef.current?.focus()
+  }
+
+  function handleSystemEmojiInput(value: string) {
+    const emoji = getFirstEmoji(value)
+    if (emoji) {
+      setDraftEmoji(emoji)
+    }
+    if (emojiInputRef.current) {
+      emojiInputRef.current.value = ''
+    }
+  }
 
   useEffect(() => {
     const updateViewportHeight = () => setViewportHeight(window.innerHeight)
@@ -961,13 +1004,55 @@ export function UploadPage() {
 
               {/* Label input */}
               <div style={{ display: 'flex', gap: 10, marginBottom: 12, alignItems: 'center' }}>
-                <div style={{
-                  width: 54, height: 50, borderRadius: 10, flexShrink: 0,
-                  background: '#1A1208', border: '1px solid #2E2218',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 24,
-                }}>
+                <div
+                  onClick={openSystemEmojiInput}
+                  style={{
+                    position: 'relative',
+                    width: 54, height: 50, borderRadius: 10, flexShrink: 0,
+                    background: '#1A1208', border: '1px solid #2E2218',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 24,
+                    overflow: 'hidden',
+                    cursor: 'pointer',
+                  }}>
                   {draftEmoji || '✦'}
+                  <input
+                    ref={emojiInputRef}
+                    onChange={e => handleSystemEmojiInput(e.currentTarget.value)}
+                    onInput={e => handleSystemEmojiInput(e.currentTarget.value)}
+                    onPaste={e => {
+                      const emoji = getFirstEmoji(e.clipboardData.getData('text'))
+                      if (!emoji) return
+                      e.preventDefault()
+                      setDraftEmoji(emoji)
+                      if (emojiInputRef.current) {
+                        emojiInputRef.current.value = ''
+                      }
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' || e.key === 'Escape') {
+                        e.currentTarget.blur()
+                      }
+                    }}
+                    inputMode="text"
+                    enterKeyHint="done"
+                    autoCapitalize="off"
+                    autoComplete="off"
+                    spellCheck={false}
+                    aria-label={t('camera.customEmotionHint')}
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      width: '100%',
+                      height: '100%',
+                      opacity: 0.01,
+                      border: 'none',
+                      background: 'transparent',
+                      color: 'transparent',
+                      caretColor: 'transparent',
+                      zIndex: 1,
+                    }}
+                  />
                 </div>
                 <input
                   value={draftLabel}
