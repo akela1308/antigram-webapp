@@ -68,7 +68,7 @@ function buildGridRows(moments: Moment[]): GridRow[] {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function MyProfilePage() {
-  const { user, profile, loading: authLoading, signOut, isTelegram, telegramUser, loginWithTelegram, telegramAuthLoading } = useAuth()
+  const { user, profile, loading: authLoading, signOut, isTelegram, telegramUser, loginWithTelegram, telegramAuthLoading, linkEmailPassword } = useAuth()
   const navigate = useNavigate()
   const { t } = useLanguage()
 
@@ -616,6 +616,7 @@ export function MyProfilePage() {
         <SettingsSheet
           profile={profile}
           userId={user.id}
+          authEmail={user.email ?? null}
           isTelegram={isTelegram}
           onClose={() => setShowSettings(false)}
           onNavigate={(path) => {
@@ -630,6 +631,7 @@ export function MyProfilePage() {
           showSignOutConfirm={showSignOutConfirm}
           setShowSignOutConfirm={setShowSignOutConfirm}
           handleSignOut={handleSignOut}
+          onLinkEmailPassword={linkEmailPassword}
         />
       )}
 
@@ -971,12 +973,14 @@ function AlbumCard({ cover, placeholder, placeholderBg, title, subtitle, isPriva
 // ── SettingsSheet ─────────────────────────────────────────────────────────────
 
 function SettingsSheet({
-  profile, userId, isTelegram,
+  profile, userId, authEmail, isTelegram,
   onClose, onNavigate, onSupportPress, onSupportInboxPress, supportInboxCount, onSaved,
   showSignOutConfirm, setShowSignOutConfirm, handleSignOut,
+  onLinkEmailPassword,
 }: {
   profile: Profile
   userId: string
+  authEmail: string | null
   isTelegram: boolean
   onClose: () => void
   onNavigate: (path: string) => void
@@ -988,6 +992,7 @@ function SettingsSheet({
   showSignOutConfirm: boolean
   setShowSignOutConfirm: (v: boolean) => void
   handleSignOut: () => void
+  onLinkEmailPassword: (email: string, password: string) => Promise<{ error: unknown }>
 }) {
   const { language, detectedLanguage, setLanguage, t } = useLanguage()
   const [displayName, setDisplayName] = useState(profile.display_name ?? '')
@@ -995,6 +1000,10 @@ function SettingsSheet({
   const [website, setWebsite]         = useState(profile.website ?? '')
   const [bio, setBio]                 = useState(profile.bio ?? '')
   const [saving, setSaving]           = useState(false)
+  const [loginEmail, setLoginEmail] = useState(authEmail?.endsWith('@antigram.internal') ? '' : authEmail ?? '')
+  const [loginPassword, setLoginPassword] = useState('')
+  const [linkingLogin, setLinkingLogin] = useState(false)
+  const [loginMessage, setLoginMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const handleSave = async () => {
     setSaving(true)
@@ -1006,6 +1015,27 @@ function SettingsSheet({
     })
     setSaving(false)
     if (!error) { onSaved(); onClose() }
+  }
+
+  const handleLinkLogin = async () => {
+    setLoginMessage(null)
+    if (!loginEmail.trim() || loginPassword.length < 6) {
+      setLoginMessage({ type: 'error', text: t('settings.loginPasswordHint') })
+      return
+    }
+
+    setLinkingLogin(true)
+    const { error } = await onLinkEmailPassword(loginEmail.trim(), loginPassword)
+    setLinkingLogin(false)
+    setLoginPassword('')
+
+    if (error) {
+      const message = (error as { message?: string })?.message ?? t('settings.loginLinkFailed')
+      setLoginMessage({ type: 'error', text: message })
+      return
+    }
+
+    setLoginMessage({ type: 'success', text: t('settings.loginLinked') })
   }
 
   const sheetStyle: React.CSSProperties = {
@@ -1100,21 +1130,48 @@ function SettingsSheet({
           </div>
 
           {/* Account */}
-          {!isTelegram && (
-            <>
-              <p style={sectionTitleStyle}>{t('settings.account')}</p>
-              <button
-                style={{
-                  width: '100%', padding: '12px 14px', borderRadius: 12,
-                  background: 'transparent', border: '1px solid #2E1A0A',
-                  color: 'var(--amber)', fontSize: 14, fontWeight: 600, cursor: 'pointer',
-                  textAlign: 'left',
-                }}
-              >
-                {t('settings.changePassword')}
-              </button>
-            </>
+          <p style={sectionTitleStyle}>{t('settings.account')}</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.45, margin: '0 0 8px' }}>
+            {isTelegram ? t('settings.loginPasswordTelegramHint') : t('settings.loginPasswordEmailHint')}
+          </p>
+          <p style={labelStyle}>{t('settings.loginEmail')}</p>
+          <input
+            style={inputStyle}
+            value={loginEmail}
+            onChange={e => setLoginEmail(e.target.value)}
+            placeholder="email@example.com"
+            type="email"
+            autoComplete="email"
+          />
+          <p style={labelStyle}>{t('settings.loginPassword')}</p>
+          <input
+            style={inputStyle}
+            value={loginPassword}
+            onChange={e => setLoginPassword(e.target.value)}
+            placeholder={t('auth.passwordPlaceholder')}
+            type="password"
+            minLength={6}
+            autoComplete="new-password"
+          />
+          {loginMessage && (
+            <p style={{ color: loginMessage.type === 'success' ? 'var(--amber)' : '#e05a5a', fontSize: 12, lineHeight: 1.4, margin: '8px 0 0' }}>
+              {loginMessage.text}
+            </p>
           )}
+          <button
+            type="button"
+            onClick={handleLinkLogin}
+            disabled={linkingLogin}
+            style={{
+              width: '100%', padding: '12px 14px', borderRadius: 12,
+              background: 'transparent', border: '1px solid #2E1A0A',
+              color: 'var(--amber)', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+              textAlign: 'left', marginTop: 8,
+              opacity: linkingLogin ? 0.6 : 1,
+            }}
+          >
+            {linkingLogin ? t('common.saving') : t('settings.linkLogin')}
+          </button>
 
           <p style={sectionTitleStyle}>{t('settings.rulesSupport')}</p>
           <button

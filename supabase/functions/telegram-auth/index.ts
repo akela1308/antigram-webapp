@@ -26,6 +26,8 @@ interface TelegramAuthResult {
   error?: string
 }
 
+type SupabaseAdmin = ReturnType<typeof createClient>
+
 function hexToBytes(hex: string): Uint8Array | null {
   const normalized = hex.trim().toLowerCase()
   if (normalized.length % 2 !== 0 || !/^[0-9a-f]+$/.test(normalized)) return null
@@ -110,6 +112,46 @@ async function verifyTelegramInitData(initData: string, botToken: string): Promi
   }
 }
 
+async function createSessionForEmail(admin: SupabaseAdmin, email: string) {
+  const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
+    type: 'magiclink',
+    email,
+  })
+
+  const tokenHash = linkData?.properties?.hashed_token
+  if (linkError || !tokenHash) {
+    return { session: null, error: linkError ?? new Error('Magic link token missing') }
+  }
+
+  const { data, error } = await admin.auth.verifyOtp({
+    token_hash: tokenHash,
+    type: 'magiclink',
+  })
+
+  return { session: data.session ?? null, error }
+}
+
+async function upsertTelegramIdentity(
+  admin: SupabaseAdmin,
+  userId: string,
+  tgUser: TelegramUser,
+) {
+  await admin
+    .from('account_identities')
+    .upsert({
+      user_id: userId,
+      provider: 'telegram',
+      external_id: String(tgUser.id),
+      metadata: {
+        username: tgUser.username ?? null,
+        first_name: tgUser.first_name,
+        last_name: tgUser.last_name ?? null,
+        photo_url: tgUser.photo_url ?? null,
+      },
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'provider,external_id' })
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -151,6 +193,41 @@ Deno.serve(async (req) => {
     const password = `tg_${tgUser.id}_${BOT_TOKEN.slice(0, 8)}`
     const displayName = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(' ')
 
+    // Preferred path: stable identity lookup. This keeps Telegram login working
+    // even after a user links a real email/password to the same auth account.
+    const { data: linkedIdentity } = await supabaseAdmin
+      .from('account_identities')
+      .select('user_id')
+      .eq('provider', 'telegram')
+      .eq('external_id', String(tgUser.id))
+      .maybeSingle()
+
+    if (linkedIdentity?.user_id) {
+      const { data: linkedUser, error: linkedUserError } = await supabaseAdmin.auth.admin.getUserById(linkedIdentity.user_id)
+      const linkedEmail = linkedUser?.user?.email
+      if (!linkedUserError && linkedEmail) {
+        const sessionResult = await createSessionForEmail(supabaseAdmin, linkedEmail)
+        if (sessionResult.session) {
+          const profileUpdate: Record<string, string | null> = {
+            display_name: displayName,
+            username: tgUser.username ?? null,
+          }
+          if (tgUser.photo_url) profileUpdate.avatar_url = tgUser.photo_url
+          await supabaseAdmin.from('profiles').update(profileUpdate).eq('id', linkedIdentity.user_id)
+          await upsertTelegramIdentity(supabaseAdmin, linkedIdentity.user_id, tgUser)
+
+          return new Response(
+            JSON.stringify({
+              access_token: sessionResult.session.access_token,
+              refresh_token: sessionResult.session.refresh_token,
+              user_id: linkedIdentity.user_id,
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          )
+        }
+      }
+    }
+
     // Try sign in first (fast path for returning users)
     const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
       email,
@@ -167,6 +244,7 @@ Deno.serve(async (req) => {
         profileUpdate.avatar_url = tgUser.photo_url
       }
       await supabaseAdmin.from('profiles').update(profileUpdate).eq('id', signInData.session.user.id)
+      await upsertTelegramIdentity(supabaseAdmin, signInData.session.user.id, tgUser)
 
       return new Response(
         JSON.stringify({
@@ -205,6 +283,7 @@ Deno.serve(async (req) => {
       username: tgUser.username ?? null,
       avatar_url: tgUser.photo_url ?? null,
     })
+    await upsertTelegramIdentity(supabaseAdmin, newUser.user.id, tgUser)
 
     // Sign in to get session tokens
     const { data: newSignIn, error: newSignInError } = await supabaseAdmin.auth.signInWithPassword({

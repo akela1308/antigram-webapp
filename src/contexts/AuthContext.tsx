@@ -15,6 +15,7 @@ interface AuthContextValue {
   telegramAuthLoading: boolean
   signIn: (email: string, password: string) => Promise<{ error: unknown }>
   signUp: (email: string, password: string, displayName: string) => Promise<{ error: unknown }>
+  linkEmailPassword: (email: string, password: string) => Promise<{ error: unknown }>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
   loginWithTelegram: () => Promise<void>
@@ -198,6 +199,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error }
   }
 
+  const linkEmailPassword = async (email: string, password: string): Promise<{ error: unknown }> => {
+    const { error } = await supabase.functions.invoke('link-email-auth', {
+      body: { email, password },
+    })
+    if (!error) {
+      const { data } = await supabase.auth.refreshSession()
+      if (data.session) {
+        setSession(data.session)
+        setUser(data.session.user)
+      }
+    }
+    return { error }
+  }
+
   const signOut = async () => {
     await supabase.auth.signOut()
     reset()
@@ -218,6 +233,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         telegramAuthLoading,
         signIn,
         signUp,
+        linkEmailPassword,
         signOut,
         refreshProfile,
         loginWithTelegram: authenticateTelegram,

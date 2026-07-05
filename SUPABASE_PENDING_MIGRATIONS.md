@@ -42,6 +42,11 @@ Supabase CLI сейчас подвисает на DB connection (`Initialising l
    - добавляет unique на `user_id + moment_id`;
    - включает RLS: читать/сохранять/убирать сохранение может только владелец.
 
+8. `supabase/migrations/202607050008_account_identities.sql`
+   - добавляет `account_identities`;
+   - хранит привязки `telegram/email/google/apple` к одному `user_id`;
+   - позволяет Telegram-входу работать после привязки реального email/пароля.
+
 ## Почему приложение не должно упасть до применения
 
 - Image variants имеют fallback на старый `photo_url`.
@@ -53,6 +58,7 @@ Supabase CLI сейчас подвисает на DB connection (`Initialising l
 - Block helpers мягко пропускают фильтрацию, если `blocked_users` еще нет.
 - Moderation UI покажет пустую очередь/ошибку действия, если `reports` еще не расширена.
 - Saved album будет пустым или покажет ошибку сохранения, если `saved_moments`/RLS еще не применены.
+- Email/password linking будет недоступен, если `account_identities` еще не применена.
 
 ## Проверка после применения
 
@@ -110,4 +116,13 @@ select exists (
   where table_schema = 'public'
     and table_name = 'saved_moments'
 ) as has_saved_moments;
+```
+
+```sql
+select exists (
+  select 1
+  from information_schema.tables
+  where table_schema = 'public'
+    and table_name = 'account_identities'
+) as has_account_identities;
 ```
