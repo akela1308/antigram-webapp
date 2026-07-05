@@ -36,12 +36,12 @@ export function FeedPage() {
     if (filter === 'for_you') {
       if (user) {
         data = await getFeed(user.id, 40)
-        if (data.length === 0) data = await getRandomMoments(40)
+        if (data.length === 0) data = await getRandomMoments(40, user.id)
       } else {
         data = await getRandomMoments(40)
       }
     } else {
-      data = await getMomentsByEmotion(filter as ReactionType, 40)
+      data = await getMomentsByEmotion(filter as ReactionType, 40, user?.id)
     }
 
     setMoments(data)

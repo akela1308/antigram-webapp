@@ -15,6 +15,7 @@ import {
   addMomentToAlbum,
   adminShadowBanUser,
   reportMoment,
+  blockUser,
 } from '../lib/db'
 import { EMOTIONS } from '../lib/types'
 import type { Moment, ReactionType, AlbumWithMoments } from '../lib/types'
@@ -154,6 +155,31 @@ export function MomentFeedPage() {
     showToast(t('moment.reportSent'))
   }
 
+  async function handleBlockAuthor(momentId: string) {
+    if (!user) {
+      setMenuMomentId(null)
+      showToast(t('moment.blockSignIn'))
+      return
+    }
+
+    const moment = localMoments.find(m => m.id === momentId)
+    if (!moment || moment.user_id === user.id) {
+      setMenuMomentId(null)
+      return
+    }
+
+    const { error } = await blockUser(user.id, moment.user_id)
+    setMenuMomentId(null)
+    if (error) {
+      console.error('[Blocks] block author failed:', error)
+      showToast(t('moment.blockFailed'))
+      return
+    }
+
+    setLocalMoments(prev => prev.filter(m => m.user_id !== moment.user_id))
+    showToast(t('moment.userBlocked'))
+  }
+
   async function handleAddToAlbum(momentId: string) {
     if (!user) return
     setMenuMomentId(null)
@@ -287,6 +313,18 @@ export function MomentFeedPage() {
                   danger
                   onClick={() => handleReport(menuMomentId)}
                 />
+                {(() => {
+                  const menuMoment = localMoments.find(m => m.id === menuMomentId)
+                  if (!user || !menuMoment || menuMoment.user_id === user.id) return null
+                  return (
+                    <MenuBtn
+                      label={t('moment.blockUser')}
+                      icon="×"
+                      danger
+                      onClick={() => handleBlockAuthor(menuMomentId)}
+                    />
+                  )
+                })()}
                 {isAdmin && (() => {
                   const menuMoment = localMoments.find(m => m.id === menuMomentId)
                   return (

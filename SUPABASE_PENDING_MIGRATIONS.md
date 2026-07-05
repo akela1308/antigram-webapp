@@ -26,6 +26,11 @@ Supabase CLI сейчас подвисает на DB connection (`Initialising l
    - добавляет `get_moment_reaction_summaries(uuid[])`;
    - добавляет `get_unread_notification_count()`.
 
+5. `supabase/migrations/202607050005_blocked_users.sql`
+   - добавляет таблицу `blocked_users`;
+   - включает RLS: читать могут только участники блокировки;
+   - блокировать/разблокировать пользователь может только от своего имени.
+
 ## Почему приложение не должно упасть до применения
 
 - Image variants имеют fallback на старый `photo_url`.
@@ -34,6 +39,7 @@ Supabase CLI сейчас подвисает на DB connection (`Initialising l
 - Stars webhook логирование мягко пропускает новые таблицы/колонки, если миграция еще не применена.
 - Reaction aggregate helper откатывается на старые queries, если RPC еще нет.
 - Unread notification count откатывается на старый count query, если RPC еще нет.
+- Block helpers мягко пропускают фильтрацию, если `blocked_users` еще нет.
 
 ## Проверка после применения
 
@@ -58,4 +64,13 @@ from pg_policies
 where schemaname = 'storage'
   and tablename = 'objects'
   and policyname = 'Moments uploads must stay in own folder';
+```
+
+```sql
+select exists (
+  select 1
+  from information_schema.tables
+  where table_schema = 'public'
+    and table_name = 'blocked_users'
+) as has_blocked_users;
 ```

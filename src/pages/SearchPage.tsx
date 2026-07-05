@@ -40,9 +40,9 @@ export function SearchPage() {
     let data: MomentWithProfile[] = []
 
     if (filter === 'for_you') {
-      data = await getRandomMoments(60)
+      data = await getRandomMoments(60, user?.id)
     } else {
-      data = await getMomentsByEmotion(filter as ReactionType, 60)
+      data = await getMomentsByEmotion(filter as ReactionType, 60, user?.id)
     }
 
     setMoments(data)
@@ -111,8 +111,8 @@ export function SearchPage() {
 
     ;(async () => {
       const [users, foundMoments] = await Promise.all([
-        searchUsers(searchQuery),
-        searchMoments(searchQuery, 24),
+        searchUsers(searchQuery, user?.id),
+        searchMoments(searchQuery, 24, user?.id),
       ])
       if (cancelled) return
 

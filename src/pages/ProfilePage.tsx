@@ -12,6 +12,9 @@ import {
   isFollowing,
   followUser,
   unfollowUser,
+  getBlockRelationship,
+  blockUser,
+  unblockUser,
   getFollowersCount,
   getFollowingCount,
   getHighlights,
@@ -43,6 +46,9 @@ export function ProfilePage() {
   const [momentReactions, setMomentReactions] = useState<Record<string, ReactionPreview[]>>({})
   const [loading, setLoading] = useState(true)
   const [followLoading, setFollowLoading] = useState(false)
+  const [blockRelationship, setBlockRelationship] = useState({ hasBlocked: false, blockedBy: false })
+  const [blockLoading, setBlockLoading] = useState(false)
+  const [blockError, setBlockError] = useState<string | null>(null)
 
   const targetId = userId ?? ''
   const isOwnProfile = user?.id === targetId
@@ -50,20 +56,33 @@ export function ProfilePage() {
   const load = useCallback(async () => {
     if (!targetId) return
     setLoading(true)
-    const [p, m, fc, fgc, hl, stars] = await Promise.all([
+    setBlockError(null)
+
+    const [p, fc, fgc, stars, relation] = await Promise.all([
       getProfile(targetId),
-      getUserMoments(targetId),
       getFollowersCount(targetId),
       getFollowingCount(targetId),
-      getHighlights(targetId),
       getProfileStarTotal(targetId),
+      user && !isOwnProfile
+        ? getBlockRelationship(user.id, targetId)
+        : Promise.resolve({ hasBlocked: false, blockedBy: false }),
     ])
+
+    const contentHidden = relation.hasBlocked || relation.blockedBy
+    const [m, hl] = contentHidden
+      ? [[], []] as [Moment[], HighlightWithMoment[]]
+      : await Promise.all([
+        getUserMoments(targetId),
+        getHighlights(targetId),
+      ])
+
     setProfile(p)
     setMoments(m)
     setFollowersCount(fc)
     setFollowingCount(fgc)
     setHighlights(hl)
     setStarTotal(stars)
+    setBlockRelationship(relation)
     setMomentStarTotals(m.length > 0 ? await getMomentStarTotals(m.map(moment => moment.id)) : {})
     if (m.length > 0) {
       const reactionSummaries = await getMomentReactionSummaries(m.map(moment => moment.id), user?.id)
@@ -73,8 +92,10 @@ export function ProfilePage() {
     }
 
     if (user && !isOwnProfile) {
-      const f = await isFollowing(user.id, targetId)
+      const f = contentHidden ? false : await isFollowing(user.id, targetId)
       setFollowing(f)
+    } else {
+      setFollowing(false)
     }
     setLoading(false)
   }, [targetId, user, isOwnProfile])
@@ -94,6 +115,47 @@ export function ProfilePage() {
       setFollowersCount(c => c + 1)
     }
     setFollowLoading(false)
+  }
+
+  const handleBlockToggle = async () => {
+    if (!user || !targetId || isOwnProfile) return
+
+    setBlockLoading(true)
+    setBlockError(null)
+
+    if (blockRelationship.hasBlocked) {
+      const { error } = await unblockUser(user.id, targetId)
+      setBlockLoading(false)
+      if (error) {
+        console.error('[Blocks] unblock failed:', error)
+        setBlockError(t('profile.unblockFailed'))
+        return
+      }
+      setBlockRelationship(prev => ({ ...prev, hasBlocked: false }))
+      await load()
+      return
+    }
+
+    const { error } = await blockUser(user.id, targetId)
+    if (error) {
+      console.error('[Blocks] block failed:', error)
+      setBlockLoading(false)
+      setBlockError(t('profile.blockFailed'))
+      return
+    }
+
+    if (following) {
+      await unfollowUser(user.id, targetId)
+      setFollowing(false)
+      setFollowersCount(c => Math.max(0, c - 1))
+    }
+
+    setBlockRelationship(prev => ({ ...prev, hasBlocked: true }))
+    setMoments([])
+    setHighlights([])
+    setMomentStarTotals({})
+    setMomentReactions({})
+    setBlockLoading(false)
   }
 
   if (loading) {
@@ -120,6 +182,7 @@ export function ProfilePage() {
   }
 
   const displayName = profile.display_name ?? profile.username ?? t('common.anonymous')
+  const profileRestricted = !isOwnProfile && (blockRelationship.hasBlocked || blockRelationship.blockedBy)
 
   const highlightItems = Array.from({ length: 5 }, (_, i) => {
     const highlight = highlights.find(h => h.position === i)
@@ -190,21 +253,51 @@ export function ProfilePage() {
           <Stat label={t('profile.following')} value={followingCount} />
         </div>
 
-        {/* Follow button */}
+        {/* Follow / block controls */}
         {user && !isOwnProfile && (
-          <button
-            onClick={handleFollow}
-            disabled={followLoading}
-            className="mt-2 px-8 py-2.5 rounded-xl font-semibold text-sm transition-all"
-            style={{
-              background: following ? 'transparent' : 'var(--amber)',
-              color: following ? 'var(--amber)' : '#140E0A',
-              border: following ? '1px solid var(--amber)' : 'none',
-              opacity: followLoading ? 0.6 : 1,
-            }}
+          <div className="mt-2 flex items-center justify-center gap-2">
+            {!profileRestricted && (
+              <button
+                onClick={handleFollow}
+                disabled={followLoading}
+                className="px-7 py-2.5 rounded-xl font-semibold text-sm transition-all"
+                style={{
+                  background: following ? 'transparent' : 'var(--amber)',
+                  color: following ? 'var(--amber)' : '#140E0A',
+                  border: following ? '1px solid var(--amber)' : 'none',
+                  opacity: followLoading ? 0.6 : 1,
+                }}
+              >
+                {following ? t('profile.unfollow') : t('profile.follow')}
+              </button>
+            )}
+            <button
+              onClick={handleBlockToggle}
+              disabled={blockLoading}
+              className="px-7 py-2.5 rounded-xl font-semibold text-sm transition-all"
+              style={{
+                background: blockRelationship.hasBlocked ? 'rgba(201,132,62,0.1)' : 'transparent',
+                color: blockRelationship.hasBlocked ? 'var(--amber)' : '#e05a5a',
+                border: blockRelationship.hasBlocked ? '1px solid var(--border)' : '1px solid rgba(224,90,90,0.45)',
+                opacity: blockLoading ? 0.6 : 1,
+              }}
+            >
+              {blockRelationship.hasBlocked ? t('profile.unblock') : t('profile.block')}
+            </button>
+          </div>
+        )}
+
+        {blockError && (
+          <p className="text-xs text-center" style={{ color: '#e05a5a', margin: 0 }}>{blockError}</p>
+        )}
+
+        {profileRestricted && (
+          <p
+            className="text-sm text-center leading-relaxed"
+            style={{ color: 'var(--text-muted)', maxWidth: 280, margin: 0 }}
           >
-            {following ? t('profile.unfollow') : t('profile.follow')}
-          </button>
+            {blockRelationship.hasBlocked ? t('profile.blocked') : t('profile.blockedBy')}
+          </p>
         )}
 
         {isOwnProfile && (
@@ -223,7 +316,14 @@ export function ProfilePage() {
 
       {/* Moments grid */}
       <div className="grid grid-cols-2 gap-2 px-3 pb-28">
-        {moments.length === 0 ? (
+        {profileRestricted ? (
+          <div className="col-span-2 flex flex-col items-center py-16 gap-2">
+            <span style={{ fontSize: 34 }}>×</span>
+            <p className="text-sm text-center" style={{ color: 'var(--text-muted)' }}>
+              {blockRelationship.hasBlocked ? t('profile.blocked') : t('profile.blockedBy')}
+            </p>
+          </div>
+        ) : moments.length === 0 ? (
           <div className="col-span-2 flex flex-col items-center py-16 gap-2">
             <span style={{ fontSize: 40 }}>📷</span>
             <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('profile.noMoments')}</p>

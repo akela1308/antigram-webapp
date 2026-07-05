@@ -7,6 +7,7 @@ This document turns the July 2026 product research and the current architecture 
 Primary inputs:
 
 - `/Users/maksimilin/Desktop/ANTIGRAM/Исследования/Antigram в июле 2026.docx`
+- `/Users/maksimilin/Downloads/Antigram глубинное исследование аудитории, рынка и мультиплатформенного запуска.docx`
 - `ANTIGRAM_ARCHITECTURE_DEEP_DIVE.md`
 - `CLAUDE.md`
 
@@ -34,7 +35,7 @@ Antigram should become a `mood-first film diary inside Telegram`, not another In
 
 The technical direction is equally clear:
 
-Before adding complex social mechanics, Antigram must harden its media pipeline, security model, payment/webhook reliability, server-side aggregation, search/discovery layer, analytics, and moderation. After that foundation, the best product bets are Mood Channels, Contact Sheet Profile, Film Roll of the Day, Telegram Share Cards, Weekly Bot Recap, Group/Friend Rolls, Seasonal Film Drops, and Supporter Wall.
+Before adding complex social mechanics, Antigram must harden its media pipeline, security model, payment/webhook reliability, server-side aggregation, search/discovery layer, analytics, identity, entitlements, and moderation. After that foundation, the best product bets are Mood Channels, Contact Sheet Profile, Film Roll of the Day, Telegram Share Cards, Weekly Bot Recap, Group/Friend Rolls, Seasonal Film Drops, and Supporter Wall.
 
 The correct order:
 
@@ -43,9 +44,10 @@ The correct order:
 3. Move fragile client-side aggregation into SQL/RPC surfaces.
 4. Expand discovery from profile search to moment/mood search.
 5. Add Telegram-native sharing and referral loops.
-6. Make profile and mood surfaces iconic.
-7. Add ritual features like Film Roll of the Day.
-8. Add monetization that feels aesthetic and supportive, not extractive.
+6. Add trust & safety primitives before wider Android/public launch.
+7. Make profile and mood surfaces iconic.
+8. Add ritual features like Film Roll of the Day.
+9. Add monetization that feels aesthetic and supportive, not extractive.
 
 ---
 
@@ -133,6 +135,8 @@ The first implementation wave must reduce operational risk:
 5. Search v1 for moments, moods, albums, and users.
 6. PostHog event taxonomy.
 7. Telegram share cards with referral attribution.
+8. Trust & safety basics: user blocking, report-user flow, moderation queue, admin audit trail.
+9. Identity and entitlement foundations for Android/iOS readiness.
 
 ### P1: Product Differentiation
 
@@ -143,7 +147,8 @@ After P0 is stable:
 3. Soft Reaction Prompts.
 4. Weekly Bot Recap.
 5. Premium Film Club MVP.
-6. Moderation queue and admin review.
+6. Shared / Couple / Group Rolls.
+7. Weekly Contact Sheet and recap sharing.
 
 ### P2: Signature Bets
 
@@ -1414,4 +1419,3 @@ For code changes:
 Weekly Meaningful Photo Connections: unique weekly moments where a photo creates a warm social response through reaction, save, comment, follow, tip, share, or roll participation.
 
 This is better than raw DAU or posts/day because Antigram is not about maximum content volume. It is about meaningful visual-emotional connection.
-

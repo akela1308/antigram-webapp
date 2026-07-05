@@ -28,9 +28,9 @@ export function ExplorePage() {
     let data: MomentWithProfile[] = []
 
     if (filter === 'for_you') {
-      data = await getRandomMoments(60)
+      data = await getRandomMoments(60, user?.id)
     } else {
-      data = await getMomentsByEmotion(filter as ReactionType, 60)
+      data = await getMomentsByEmotion(filter as ReactionType, 60, user?.id)
     }
 
     setMoments(data)

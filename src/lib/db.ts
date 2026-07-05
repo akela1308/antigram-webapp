@@ -20,6 +20,55 @@ import type {
 import { EMOTIONS } from './types'
 import { getMomentImageUrl } from './imageVariants'
 
+type BlockRelationshipRow = {
+  blocker_id: string
+  blocked_id: string
+}
+
+function isMissingTableError(error: unknown, tableName: string): boolean {
+  const maybeError = error as { code?: string; message?: string; details?: string; hint?: string } | null
+  if (!maybeError) return false
+
+  return [
+    maybeError.code,
+    maybeError.message,
+    maybeError.details,
+    maybeError.hint,
+  ].filter(Boolean).join(' ').includes(tableName)
+}
+
+async function getHiddenUserIdsForViewer(viewerId?: string | null): Promise<Set<string>> {
+  const hiddenUserIds = new Set<string>()
+  if (!viewerId) return hiddenUserIds
+
+  const { data, error } = await supabase
+    .from('blocked_users')
+    .select('blocker_id, blocked_id')
+    .or(`blocker_id.eq.${viewerId},blocked_id.eq.${viewerId}`)
+
+  if (error) {
+    if (!isMissingTableError(error, 'blocked_users')) {
+      console.error('[Blocks] failed to load hidden users:', error)
+    }
+    return hiddenUserIds
+  }
+
+  for (const row of ((data as BlockRelationshipRow[] | null) ?? [])) {
+    if (row.blocker_id === viewerId) hiddenUserIds.add(row.blocked_id)
+    if (row.blocked_id === viewerId) hiddenUserIds.add(row.blocker_id)
+  }
+
+  return hiddenUserIds
+}
+
+function filterHiddenMoments<T extends { user_id: string }>(
+  moments: T[],
+  hiddenUserIds: Set<string>,
+): T[] {
+  if (hiddenUserIds.size === 0) return moments
+  return moments.filter(moment => !hiddenUserIds.has(moment.user_id))
+}
+
 // ─── PROFILES ────────────────────────────────────────────────────────────────
 
 export async function getProfile(userId: string): Promise<Profile | null> {
@@ -39,21 +88,32 @@ export async function updateProfile(
   return { error }
 }
 
-export async function searchUsers(query: string): Promise<Profile[]> {
+export async function searchUsers(query: string, viewerId?: string | null): Promise<Profile[]> {
   const q = query.trim().replace(/[,%]/g, ' ')
   if (q.length < 2) return []
 
-  const { data } = await supabase
-    .from('profiles')
-    .select('*')
-    .or(`username.ilike.%${q}%,display_name.ilike.%${q}%`)
-    .limit(30)
-  return (data as Profile[]) ?? []
+  const [hiddenUserIds, { data }] = await Promise.all([
+    getHiddenUserIdsForViewer(viewerId),
+    supabase
+      .from('profiles')
+      .select('*')
+      .or(`username.ilike.%${q}%,display_name.ilike.%${q}%`)
+      .limit(30),
+  ])
+
+  const profiles = (data as Profile[]) ?? []
+  return hiddenUserIds.size === 0
+    ? profiles
+    : profiles.filter(profile => !hiddenUserIds.has(profile.id))
 }
 
 // ─── MOMENTS ─────────────────────────────────────────────────────────────────
 
-export async function searchMoments(query: string, limit = 24): Promise<MomentWithProfile[]> {
+export async function searchMoments(
+  query: string,
+  limit = 24,
+  viewerId?: string | null,
+): Promise<MomentWithProfile[]> {
   const q = query.trim()
   if (q.length < 2) return []
 
@@ -68,31 +128,41 @@ export async function searchMoments(query: string, limit = 24): Promise<MomentWi
     ...moodMatches.map(mood => `mood.eq.${mood}`),
   ]
 
-  const { data, error } = await supabase
-    .from('moments')
-    .select('*, profiles(*)')
-    .eq('is_public', true)
-    .or(filters.join(','))
-    .order('created_at', { ascending: false })
-    .limit(limit)
+  const [hiddenUserIds, { data, error }] = await Promise.all([
+    getHiddenUserIdsForViewer(viewerId),
+    supabase
+      .from('moments')
+      .select('*, profiles(*)')
+      .eq('is_public', true)
+      .or(filters.join(','))
+      .order('created_at', { ascending: false })
+      .limit(limit),
+  ])
 
   if (error) {
     console.error('[Search] moments failed:', error)
     return []
   }
 
-  return (data as MomentWithProfile[]) ?? []
+  return filterHiddenMoments((data as MomentWithProfile[]) ?? [], hiddenUserIds)
 }
 
 export async function getFeed(userId: string, limit = 20): Promise<MomentWithProfile[]> {
-  const { data: following } = await supabase
-    .from('follows')
-    .select('following_id')
-    .eq('follower_id', userId)
+  const [hiddenUserIds, { data: following }] = await Promise.all([
+    getHiddenUserIdsForViewer(userId),
+    supabase
+      .from('follows')
+      .select('following_id')
+      .eq('follower_id', userId),
+  ])
 
   if (!following || following.length === 0) return []
 
-  const followingIds = (following as { following_id: string }[]).map(f => f.following_id)
+  const followingIds = (following as { following_id: string }[])
+    .map(f => f.following_id)
+    .filter(id => !hiddenUserIds.has(id))
+
+  if (followingIds.length === 0) return []
 
   const { data } = await supabase
     .from('moments')
@@ -104,23 +174,32 @@ export async function getFeed(userId: string, limit = 20): Promise<MomentWithPro
   return (data as MomentWithProfile[]) ?? []
 }
 
-export async function getRandomMoments(limit: number): Promise<MomentWithProfile[]> {
-  const { data } = await supabase
-    .from('moments')
-    .select('*, profiles(*)')
-    .eq('is_public', true)
-    .order('created_at', { ascending: false })
-    .limit(limit * 3)
+export async function getRandomMoments(
+  limit: number,
+  viewerId?: string | null,
+): Promise<MomentWithProfile[]> {
+  const [hiddenUserIds, { data }] = await Promise.all([
+    getHiddenUserIdsForViewer(viewerId),
+    supabase
+      .from('moments')
+      .select('*, profiles(*)')
+      .eq('is_public', true)
+      .order('created_at', { ascending: false })
+      .limit(limit * 4),
+  ])
   if (!data || data.length === 0) return []
-  const shuffled = [...data].sort(() => Math.random() - 0.5)
+  const visibleMoments = filterHiddenMoments(data as MomentWithProfile[], hiddenUserIds)
+  const shuffled = [...visibleMoments].sort(() => Math.random() - 0.5)
   return (shuffled.slice(0, limit) as MomentWithProfile[])
 }
 
 export async function getMomentsByEmotion(
   emotion: ReactionType,
   limit = 30,
+  viewerId?: string | null,
 ): Promise<MomentWithProfile[]> {
-  const [{ data: reactionData }, { data: moodData }] = await Promise.all([
+  const [hiddenUserIds, { data: reactionData }, { data: moodData }] = await Promise.all([
+    getHiddenUserIdsForViewer(viewerId),
     supabase
       .from('reactions')
       .select('moment_id')
@@ -157,7 +236,8 @@ export async function getMomentsByEmotion(
 
   if (!data) return []
 
-  const momentMap = new Map((data as MomentWithProfile[]).map(m => [m.id, m]))
+  const visibleMoments = filterHiddenMoments(data as MomentWithProfile[], hiddenUserIds)
+  const momentMap = new Map(visibleMoments.map(m => [m.id, m]))
   return sortedIds.map(id => momentMap.get(id)).filter(Boolean) as MomentWithProfile[]
 }
 
@@ -592,6 +672,63 @@ export async function isFollowing(
   return !!data
 }
 
+// ─── BLOCKS ──────────────────────────────────────────────────────────────────
+
+export async function getBlockRelationship(
+  viewerId: string,
+  targetId: string,
+): Promise<{ hasBlocked: boolean; blockedBy: boolean }> {
+  const empty = { hasBlocked: false, blockedBy: false }
+  if (!viewerId || !targetId || viewerId === targetId) return empty
+
+  const { data, error } = await supabase
+    .from('blocked_users')
+    .select('blocker_id, blocked_id')
+    .or(`and(blocker_id.eq.${viewerId},blocked_id.eq.${targetId}),and(blocker_id.eq.${targetId},blocked_id.eq.${viewerId})`)
+
+  if (error) {
+    if (!isMissingTableError(error, 'blocked_users')) {
+      console.error('[Blocks] relationship load failed:', error)
+    }
+    return empty
+  }
+
+  const rows = (data as BlockRelationshipRow[] | null) ?? []
+  return {
+    hasBlocked: rows.some(row => row.blocker_id === viewerId && row.blocked_id === targetId),
+    blockedBy: rows.some(row => row.blocker_id === targetId && row.blocked_id === viewerId),
+  }
+}
+
+export async function blockUser(
+  blockerId: string,
+  blockedId: string,
+): Promise<{ error: unknown }> {
+  if (!blockerId || !blockedId || blockerId === blockedId) {
+    return { error: new Error('Cannot block this user') }
+  }
+
+  const { error } = await supabase
+    .from('blocked_users')
+    .insert({ blocker_id: blockerId, blocked_id: blockedId })
+
+  const maybeError = error as { code?: string } | null
+  return { error: maybeError?.code === '23505' ? null : error }
+}
+
+export async function unblockUser(
+  blockerId: string,
+  blockedId: string,
+): Promise<{ error: unknown }> {
+  const { error } = await supabase
+    .from('blocked_users')
+    .delete()
+    .eq('blocker_id', blockerId)
+    .eq('blocked_id', blockedId)
+
+  return { error }
+}
+
 export async function getFollowersCount(userId: string): Promise<number> {
   const { count } = await supabase
     .from('follows')
@@ -609,13 +746,17 @@ export async function getFollowingCount(userId: string): Promise<number> {
 }
 
 export async function getFollowers(userId: string): Promise<FollowProfile[]> {
-  const { data: follows } = await supabase
-    .from('follows')
-    .select('follower_id, created_at')
-    .eq('following_id', userId)
-    .order('created_at', { ascending: false })
+  const [hiddenUserIds, { data: follows }] = await Promise.all([
+    getHiddenUserIdsForViewer(userId),
+    supabase
+      .from('follows')
+      .select('follower_id, created_at')
+      .eq('following_id', userId)
+      .order('created_at', { ascending: false }),
+  ])
 
-  const rows = (follows as { follower_id: string; created_at: string }[] | null) ?? []
+  const rows = ((follows as { follower_id: string; created_at: string }[] | null) ?? [])
+    .filter(row => !hiddenUserIds.has(row.follower_id))
   if (rows.length === 0) return []
 
   const ids = rows.map(row => row.follower_id)
@@ -634,13 +775,17 @@ export async function getFollowers(userId: string): Promise<FollowProfile[]> {
 }
 
 export async function getFollowing(userId: string): Promise<FollowProfile[]> {
-  const { data: follows } = await supabase
-    .from('follows')
-    .select('following_id, created_at')
-    .eq('follower_id', userId)
-    .order('created_at', { ascending: false })
+  const [hiddenUserIds, { data: follows }] = await Promise.all([
+    getHiddenUserIdsForViewer(userId),
+    supabase
+      .from('follows')
+      .select('following_id, created_at')
+      .eq('follower_id', userId)
+      .order('created_at', { ascending: false }),
+  ])
 
-  const rows = (follows as { following_id: string; created_at: string }[] | null) ?? []
+  const rows = ((follows as { following_id: string; created_at: string }[] | null) ?? [])
+    .filter(row => !hiddenUserIds.has(row.following_id))
   if (rows.length === 0) return []
 
   const ids = rows.map(row => row.following_id)
