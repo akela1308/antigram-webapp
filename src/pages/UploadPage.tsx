@@ -19,6 +19,16 @@ import { hapticImpact, withBackButton } from '../lib/platform'
 
 const MOMENT_EXPORT_MAX_SIZE = 1600
 const MOMENT_EXPORT_QUALITY = 0.85
+const QUICK_CUSTOM_EMOJIS = [
+  '😄', '😂', '🥰', '😍', '🤩', '😎', '🥺',
+  '😢', '😭', '😤', '🤬', '😰', '😱', '🤯',
+  '😴', '🥱', '😅', '😬', '🙄', '😏', '😒',
+  '😔', '🥹', '🫠', '🤭', '🫶', '💀', '🔥',
+  '💫', '✨', '💖', '💔', '💘', '🌅', '🌙',
+  '🌊', '🌿', '🍂', '☕', '🎧', '🎭', '📸',
+  '🎞️', '🪩', '🤍', '🖤', '❤️', '💛', '💚',
+  '💙', '💜', '⭐', '✦',
+]
 
 function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v))
@@ -26,6 +36,33 @@ function clamp(v: number, lo: number, hi: number): number {
 
 function triangleRandom(): number {
   return (Math.random() + Math.random()) / 2
+}
+
+function getGraphemes(value: string): string[] {
+  const Segmenter = (Intl as typeof Intl & {
+    Segmenter?: new (
+      locale: string | undefined,
+      options: { granularity: 'grapheme' }
+    ) => { segment: (input: string) => Iterable<{ segment: string }> }
+  }).Segmenter
+
+  if (!Segmenter) return Array.from(value)
+
+  return Array.from(new Segmenter(undefined, { granularity: 'grapheme' }).segment(value), part => part.segment)
+}
+
+function isEmojiGrapheme(value: string): boolean {
+  return /\p{Extended_Pictographic}/u.test(value)
+    || /^[\u{1F1E6}-\u{1F1FF}]{2}$/u.test(value)
+    || /^[0-9#*]\uFE0F?\u20E3$/u.test(value)
+}
+
+function getFirstEmoji(value: string): string {
+  for (const grapheme of getGraphemes(value.trim())) {
+    if (isEmojiGrapheme(grapheme)) return grapheme
+  }
+
+  return ''
 }
 
 function getMomentExportCanvas(source: HTMLCanvasElement): HTMLCanvasElement {
@@ -837,9 +874,44 @@ export function UploadPage() {
                 </button>
               </div>
 
-              {/* Emoji grid — no keyboard needed */}
+              <div style={{ marginBottom: 10 }}>
+                <p style={{ color: '#6E6258', fontSize: 12, fontWeight: 700, margin: '0 0 6px' }}>
+                  {t('camera.customEmojiInput')}
+                </p>
+                <input
+                  value={draftEmoji}
+                  onChange={e => setDraftEmoji(getFirstEmoji(e.target.value))}
+                  onPaste={e => {
+                    const emoji = getFirstEmoji(e.clipboardData.getData('text'))
+                    if (!emoji) return
+                    e.preventDefault()
+                    setDraftEmoji(emoji)
+                  }}
+                  placeholder={t('camera.customEmojiPlaceholder')}
+                  enterKeyHint="done"
+                  autoComplete="off"
+                  spellCheck={false}
+                  style={{
+                    width: '100%',
+                    padding: '12px 14px',
+                    borderRadius: 10,
+                    background: '#1A1208',
+                    color: '#fff',
+                    border: '1px solid #2E2218',
+                    fontSize: 20,
+                    outline: 'none',
+                    fontFamily: 'inherit',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+
+              {/* Emoji grid — fast cross-platform picks */}
+              <p style={{ color: '#6E6258', fontSize: 12, fontWeight: 700, margin: '0 0 6px' }}>
+                {t('camera.quickEmoji')}
+              </p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-                {['😄','😂','🥰','😍','🤩','😎','🥺','😢','😭','😤','🤬','😰','😱','🤯','😴','🥱','😅','😬','🙄','😏','😒','😔','💀','🔥','💫','✨','💖','💔','🌅','🌙','🎭','📸','🤍','🖤','✦'].map(emoji => (
+                {QUICK_CUSTOM_EMOJIS.map(emoji => (
                   <button
                     key={emoji}
                     onClick={() => setDraftEmoji(emoji)}
