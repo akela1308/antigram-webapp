@@ -70,6 +70,10 @@ interface CompletePaymentResult {
 
 type BotLanguage = 'ru' | 'en'
 type BotTextKey = 'fallback' | 'what' | 'upload' | 'support' | 'welcome'
+type AuthorNotificationResult =
+  | { status: 'sent' }
+  | { status: 'failed'; error: string }
+  | { status: 'skipped'; error: string }
 
 const BOT_TEXT: Record<BotLanguage, Record<BotTextKey, string>> = {
   ru: {
@@ -156,6 +160,10 @@ Deno.serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: { autoRefreshToken: false, persistSession: false },
     })
+    const webhookEventId = await recordWebhookEvent(admin, update).catch(error => {
+      console.error('[Stars] webhook event record failed:', error)
+      return null
+    })
 
     // ── bot menu / onboarding ──────────────────────────────────────────────────
     if (update.callback_query) {
@@ -200,9 +208,15 @@ Deno.serve(async (req) => {
 
       // Notify author — awaited but never fails the webhook
       if (result && !result.already_paid) {
-        await notifyAuthor(admin, result, update.message?.from).catch(err => {
+        const notification = await notifyAuthor(admin, result, update.message?.from).catch(err => {
           console.error('[Stars] author notification failed:', err)
+          return { status: 'failed', error: String(err) } as AuthorNotificationResult
         })
+        await recordAuthorNotification(admin, result.payment_id, notification)
+      }
+
+      if (webhookEventId && result?.payment_id) {
+        await linkWebhookEventToPayment(admin, webhookEventId, result.payment_id)
       }
 
       return json({ ok: true })
@@ -351,12 +365,12 @@ async function notifyAuthor(
   admin: ReturnType<typeof createClient>,
   payment: CompletePaymentResult,
   payer?: TelegramUser,
-): Promise<void> {
+): Promise<AuthorNotificationResult> {
   // Get author's Telegram ID from auth.users metadata
   const { data: authorUserData, error: userErr } = await admin.auth.admin.getUserById(payment.author_id)
   if (userErr || !authorUserData?.user) {
     console.error('[Stars] could not fetch author user:', userErr)
-    return
+    return { status: 'failed', error: userErr?.message ?? 'author_user_not_found' }
   }
 
   const meta = authorUserData.user.user_metadata as Record<string, unknown> | undefined
@@ -371,11 +385,13 @@ async function notifyAuthor(
 
   if (!authorTelegramId) {
     console.error('[Stars] author has no Telegram ID, skipping notification')
-    return
+    return { status: 'skipped', error: 'author_has_no_telegram_id' }
   }
 
   // Don't notify if author == payer
-  if (payer?.id && authorTelegramId === payer.id) return
+  if (payer?.id && authorTelegramId === payer.id) {
+    return { status: 'skipped', error: 'author_is_payer' }
+  }
 
   // Build payer display name
   let payerName = 'кто-то'
@@ -393,12 +409,17 @@ async function notifyAuthor(
     `${payerName} поддержал твой кадр в Antigram.\n\n` +
     `Stars увеличивают твой рейтинг в приложении.`
 
-  await telegramApi('sendMessage', {
+  const sent = await telegramApi('sendMessage', {
     chat_id: authorTelegramId,
     text,
   })
 
+  if (!sent.ok) {
+    return { status: 'failed', error: sent.error ?? 'telegram_send_failed' }
+  }
+
   console.log(`[Stars] notified author ${authorTelegramId} — ${payment.amount} Stars from ${payerName}`)
+  return { status: 'sent' }
 }
 
 function starWordForm(n: number): string {
@@ -438,12 +459,118 @@ async function handlePreCheckout(
 
   if (!ok) {
     console.error('[Stars] pre_checkout rejected:', { query, error, payment })
+    return
   }
+
+  await admin
+    .from('star_payments')
+    .update({ pre_checkout_seen_at: new Date().toISOString() })
+    .eq('id', payment.id)
+    .then(({ error: updateError }) => {
+      if (updateError && !isMissingColumnError(updateError, 'pre_checkout_seen_at')) {
+        console.error('[Stars] pre_checkout marker failed:', updateError)
+      }
+    })
+}
+
+async function recordWebhookEvent(
+  admin: ReturnType<typeof createClient>,
+  update: TelegramUpdate,
+): Promise<string | null> {
+  const payload = {
+    update_id: update.update_id ?? null,
+    update_type: getWebhookUpdateType(update),
+    invoice_payload: getWebhookInvoicePayload(update),
+    processing_status: 'handled',
+    raw_update: update,
+  }
+
+  const query = update.update_id
+    ? admin.from('star_webhook_events').upsert(payload, { onConflict: 'update_id' })
+    : admin.from('star_webhook_events').insert(payload)
+
+  const { data, error } = await query.select('id').maybeSingle()
+  if (error) {
+    if (!isMissingTableOrColumnError(error, 'star_webhook_events')) {
+      console.error('[Stars] webhook ledger insert failed:', error)
+    }
+    return null
+  }
+
+  return (data as { id?: string } | null)?.id ?? null
+}
+
+async function linkWebhookEventToPayment(
+  admin: ReturnType<typeof createClient>,
+  eventId: string,
+  paymentId: string,
+) {
+  const { error } = await admin
+    .from('star_webhook_events')
+    .update({ payment_id: paymentId, processing_status: 'handled' })
+    .eq('id', eventId)
+
+  if (error && !isMissingTableOrColumnError(error, 'star_webhook_events')) {
+    console.error('[Stars] webhook ledger payment link failed:', error)
+  }
+}
+
+async function recordAuthorNotification(
+  admin: ReturnType<typeof createClient>,
+  paymentId: string,
+  notification: AuthorNotificationResult,
+) {
+  const { error } = await admin
+    .from('star_payments')
+    .update({
+      author_notification_status: notification.status,
+      author_notification_error: notification.status === 'sent' ? null : notification.error,
+      author_notified_at: notification.status === 'sent' ? new Date().toISOString() : null,
+    })
+    .eq('id', paymentId)
+
+  if (error && !isMissingColumnError(error, 'author_notification_status')) {
+    console.error('[Stars] author notification marker failed:', error)
+  }
+}
+
+function getWebhookUpdateType(update: TelegramUpdate): 'pre_checkout_query' | 'successful_payment' | 'callback_query' | 'bot_message' | 'unknown' {
+  if (update.pre_checkout_query) return 'pre_checkout_query'
+  if (update.message?.successful_payment) return 'successful_payment'
+  if (update.callback_query) return 'callback_query'
+  if (update.message?.text) return 'bot_message'
+  return 'unknown'
+}
+
+function getWebhookInvoicePayload(update: TelegramUpdate): string | null {
+  return update.pre_checkout_query?.invoice_payload
+    ?? update.message?.successful_payment?.invoice_payload
+    ?? null
+}
+
+function isMissingTableOrColumnError(error: unknown, name: string): boolean {
+  const text = getErrorText(error)
+  return text.includes(name) || text.includes('Could not find the table')
+}
+
+function isMissingColumnError(error: unknown, column: string): boolean {
+  return getErrorText(error).includes(column)
+}
+
+function getErrorText(error: unknown): string {
+  const maybeError = error as { code?: string; message?: string; details?: string; hint?: string } | null
+  if (!maybeError) return ''
+  return [
+    maybeError.code,
+    maybeError.message,
+    maybeError.details,
+    maybeError.hint,
+  ].filter(Boolean).join(' ')
 }
 
 // ── helpers ─────────────────────────────────────────────────────────────────────
 
-async function telegramApi(method: string, payload: Record<string, unknown>) {
+async function telegramApi(method: string, payload: Record<string, unknown>): Promise<{ ok: boolean; error?: string }> {
   const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/${method}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -453,7 +580,10 @@ async function telegramApi(method: string, payload: Record<string, unknown>) {
   if (!res.ok) {
     const body = await res.text()
     console.error(`[Stars] Telegram ${method} failed:`, body)
+    return { ok: false, error: body }
   }
+
+  return { ok: true }
 }
 
 function json(body: Record<string, unknown>, status = 200) {
