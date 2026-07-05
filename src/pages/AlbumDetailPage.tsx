@@ -5,14 +5,16 @@ import { useAuth } from '../contexts/AuthContext'
 import { useLanguage } from '../contexts/LanguageContext'
 import {
   getAlbumMoments,
+  getSavedMoments,
   getUserMoments,
   getMomentStarTotals,
   addMomentToAlbum,
   removeMomentFromAlbum,
+  unsaveMoment,
   deleteAlbum,
   updateAlbumTitle,
 } from '../lib/db'
-import type { Moment } from '../lib/types'
+import type { Moment, MomentWithProfile } from '../lib/types'
 import { getMomentImageUrl } from '../lib/imageVariants'
 
 export function AlbumDetailPage() {
@@ -21,7 +23,8 @@ export function AlbumDetailPage() {
   const location = useLocation()
   const { user } = useAuth()
   const { t } = useLanguage()
-  const state = location.state as { albumTitle?: string; userId?: string } | null
+  const state = location.state as { albumTitle?: string; userId?: string; isSavedAlbum?: boolean } | null
+  const isSavedAlbum = albumId === 'saved' || state?.isSavedAlbum === true
 
   const [albumMoments, setAlbumMoments] = useState<Moment[]>([])
   const [allMoments, setAllMoments] = useState<Moment[]>([])
@@ -39,14 +42,14 @@ export function AlbumDetailPage() {
     if (!albumId) return
     setLoading(true)
     const [am, um] = await Promise.all([
-      getAlbumMoments(albumId),
-      user ? getUserMoments(user.id) : Promise.resolve([]),
+      isSavedAlbum && user ? getSavedMoments(user.id) : getAlbumMoments(albumId),
+      user && !isSavedAlbum ? getUserMoments(user.id) : Promise.resolve([]),
     ])
-    setAlbumMoments(am)
+    setAlbumMoments(am as MomentWithProfile[])
     setAllMoments(um)
     setMomentStarTotals(am.length > 0 ? await getMomentStarTotals(am.map(moment => moment.id)) : {})
     setLoading(false)
-  }, [albumId, user])
+  }, [albumId, isSavedAlbum, user])
 
   useEffect(() => { load() }, [load])
 
@@ -74,10 +77,14 @@ export function AlbumDetailPage() {
   }
 
   const handleRemoveMoment = async (momentId: string) => {
-    if (!albumId) return
-    await removeMomentFromAlbum(albumId, momentId)
+    if (!albumId || !user) return
+    if (isSavedAlbum) {
+      await unsaveMoment(user.id, momentId)
+    } else {
+      await removeMomentFromAlbum(albumId, momentId)
+    }
     setRemoveConfirmId(null)
-    const am = await getAlbumMoments(albumId)
+    const am = isSavedAlbum ? await getSavedMoments(user.id) : await getAlbumMoments(albumId)
     setAlbumMoments(am)
     setMomentStarTotals(am.length > 0 ? await getMomentStarTotals(am.map(moment => moment.id)) : {})
   }
@@ -106,12 +113,13 @@ export function AlbumDetailPage() {
         <h2 style={{ color: 'var(--text)', fontSize: 17, fontWeight: 700, margin: 0, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {albumTitle.startsWith('#') ? albumTitle : `#${albumTitle}`}
         </h2>
-        <button
-          onClick={() => setShowMenu(prev => !prev)}
-          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 22, cursor: 'pointer', padding: '0 4px', position: 'relative' }}
-        >
-          ⋯
-          {showMenu && (
+        {!isSavedAlbum && (
+          <button
+            onClick={() => setShowMenu(prev => !prev)}
+            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 22, cursor: 'pointer', padding: '0 4px', position: 'relative' }}
+          >
+            ⋯
+            {showMenu && (
             <div style={{
               position: 'absolute', top: 32, right: 0,
               background: '#1A1208', border: '1px solid #2E1A0A',
@@ -132,12 +140,14 @@ export function AlbumDetailPage() {
                 {t('albums.deleteAlbum')}
               </button>
             </div>
-          )}
-        </button>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Add button */}
-      <div style={{ padding: '12px 16px' }}>
+      {!isSavedAlbum && (
+        <div style={{ padding: '12px 16px' }}>
         <button
           onClick={() => setShowAddPicker(true)}
           style={{
@@ -148,7 +158,8 @@ export function AlbumDetailPage() {
         >
           {t('albums.addPhoto')}
         </button>
-      </div>
+        </div>
+      )}
 
       {/* Grid */}
       {loading ? (
@@ -168,7 +179,14 @@ export function AlbumDetailPage() {
             <div
               key={m.id}
               style={{ position: 'relative', aspectRatio: '1', overflow: 'hidden', cursor: 'pointer' }}
-              onClick={() => setRemoveConfirmId(prev => prev === m.id ? null : m.id)}
+              onClick={() => {
+                if (isSavedAlbum) {
+                  const startIndex = albumMoments.findIndex(moment => moment.id === m.id)
+                  navigate('/moment-feed', { state: { moments: albumMoments, startIndex, isOwner: false, userId: user?.id } })
+                  return
+                }
+                setRemoveConfirmId(prev => prev === m.id ? null : m.id)
+              }}
             >
               <img
                 src={getMomentImageUrl(m, 'thumb')}
@@ -185,7 +203,7 @@ export function AlbumDetailPage() {
                 compact
                 style={{ position: 'absolute', right: 5, bottom: 5 }}
               />
-              {removeConfirmId === m.id && (
+              {!isSavedAlbum && removeConfirmId === m.id && (
                 <div style={{
                   position: 'absolute', inset: 0,
                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,

@@ -21,6 +21,7 @@ import {
   getProfileStarTotal,
   getMomentReactionSummaries,
   buildReactionListMapFromSummaries,
+  getSavedMoments,
 } from '../lib/db'
 import {
   sendSupportRequest,
@@ -74,6 +75,7 @@ export function MyProfilePage() {
   const [moments, setMoments] = useState<Moment[]>([])
   const [highlights, setHighlights] = useState<HighlightWithMoment[]>([])
   const [albums, setAlbums] = useState<AlbumWithMoments[]>([])
+  const [savedMoments, setSavedMoments] = useState<Moment[]>([])
   const [followersCount, setFollowersCount] = useState(0)
   const [followingCount, setFollowingCount] = useState(0)
   const [starTotal, setStarTotal] = useState(0)
@@ -96,10 +98,11 @@ export function MyProfilePage() {
   const load = useCallback(async () => {
     if (!user) { setLoading(false); return }
     setLoading(true)
-    const [m, hl, al, fc, fgc, stars] = await Promise.all([
+    const [m, hl, al, saved, fc, fgc, stars] = await Promise.all([
       getUserMoments(user.id),
       getHighlights(user.id),
       getUserAlbums(user.id),
+      getSavedMoments(user.id),
       getFollowersCount(user.id),
       getFollowingCount(user.id),
       getProfileStarTotal(user.id),
@@ -107,6 +110,7 @@ export function MyProfilePage() {
     setMoments(m)
     setHighlights(hl)
     setAlbums(al)
+    setSavedMoments(saved)
     setFollowersCount(fc)
     setFollowingCount(fgc)
     setStarTotal(stars)
@@ -480,7 +484,10 @@ export function MyProfilePage() {
         <div style={{ padding: '8px 8px 112px' }}>
           <AlbumsGrid
             albums={albums}
+            savedCount={savedMoments.length}
+            savedCover={savedMoments[0] ? getMomentImageUrl(savedMoments[0], 'thumb') : null}
             onCreatePress={() => setShowCreateAlbum(true)}
+            onSavedPress={() => navigate('/album/saved', { state: { albumTitle: t('profile.saved'), userId: user.id, isSavedAlbum: true } })}
             onAlbumPress={album => navigate(`/album/${album.id}`, { state: { albumTitle: album.title, userId: user.id } })}
           />
         </div>
@@ -860,9 +867,12 @@ function getTopReaction(moment: Moment, reactions: ReactionPreview[], t: (key: s
 
 // ── AlbumsGrid ────────────────────────────────────────────────────────────────
 
-function AlbumsGrid({ albums, onCreatePress, onAlbumPress }: {
+function AlbumsGrid({ albums, savedCount, savedCover, onCreatePress, onSavedPress, onAlbumPress }: {
   albums: AlbumWithMoments[]
+  savedCount: number
+  savedCover: string | null
   onCreatePress: () => void
+  onSavedPress: () => void
   onAlbumPress: (album: AlbumWithMoments) => void
 }) {
   const { t } = useLanguage()
@@ -870,12 +880,12 @@ function AlbumsGrid({ albums, onCreatePress, onAlbumPress }: {
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
       {/* Saved card */}
       <AlbumCard
-        cover={null}
-        placeholder={<span style={{ fontSize: 28, color: 'var(--amber)' }}>⌂</span>}
+        cover={savedCover}
+        placeholder={<BookmarkAlbumIcon />}
         placeholderBg="rgba(201,146,42,0.12)"
         title={t('profile.saved')}
-        subtitle=""
-        onClick={() => {}}
+        subtitle={savedCount > 0 ? t('profile.framesCount', { count: savedCount }) : ''}
+        onClick={onSavedPress}
       />
 
       {/* User albums */}
@@ -903,6 +913,14 @@ function AlbumsGrid({ albums, onCreatePress, onAlbumPress }: {
         onClick={onCreatePress}
       />
     </div>
+  )
+}
+
+function BookmarkAlbumIcon() {
+  return (
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+    </svg>
   )
 }
 

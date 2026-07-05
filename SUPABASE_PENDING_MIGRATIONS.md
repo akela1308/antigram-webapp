@@ -37,6 +37,11 @@ Supabase CLI сейчас подвисает на DB connection (`Initialising l
    - добавляет `admin_audit_log`;
    - разрешает админам удалять кадры через RLS policy.
 
+7. `supabase/migrations/202607050007_saved_moments_policies.sql`
+   - создает/фиксирует таблицу `saved_moments`;
+   - добавляет unique на `user_id + moment_id`;
+   - включает RLS: читать/сохранять/убирать сохранение может только владелец.
+
 ## Почему приложение не должно упасть до применения
 
 - Image variants имеют fallback на старый `photo_url`.
@@ -47,6 +52,7 @@ Supabase CLI сейчас подвисает на DB connection (`Initialising l
 - Unread notification count откатывается на старый count query, если RPC еще нет.
 - Block helpers мягко пропускают фильтрацию, если `blocked_users` еще нет.
 - Moderation UI покажет пустую очередь/ошибку действия, если `reports` еще не расширена.
+- Saved album будет пустым или покажет ошибку сохранения, если `saved_moments`/RLS еще не применены.
 
 ## Проверка после применения
 
@@ -95,4 +101,13 @@ select
     where table_schema = 'public'
       and table_name = 'admin_audit_log'
   ) as has_admin_audit_log;
+```
+
+```sql
+select exists (
+  select 1
+  from information_schema.tables
+  where table_schema = 'public'
+    and table_name = 'saved_moments'
+) as has_saved_moments;
 ```

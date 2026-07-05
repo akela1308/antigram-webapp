@@ -814,7 +814,9 @@ export async function saveMoment(
   const { error } = await supabase
     .from('saved_moments')
     .insert({ user_id: userId, moment_id: momentId })
-  return { error }
+
+  const maybeError = error as { code?: string } | null
+  return { error: maybeError?.code === '23505' ? null : error }
 }
 
 export async function unsaveMoment(
@@ -835,6 +837,23 @@ export async function getSavedMomentIds(userId: string): Promise<string[]> {
     .select('moment_id')
     .eq('user_id', userId)
   return (data as { moment_id: string }[])?.map(r => r.moment_id) ?? []
+}
+
+export async function getSavedMoments(userId: string): Promise<MomentWithProfile[]> {
+  const { data, error } = await supabase
+    .from('saved_moments')
+    .select('saved_at, moments(*, profiles(*))')
+    .eq('user_id', userId)
+    .order('saved_at', { ascending: false })
+
+  if (error) {
+    console.error('[Saved] moments load failed:', error)
+    return []
+  }
+
+  return ((data ?? []) as { moments: MomentWithProfile | MomentWithProfile[] | null }[])
+    .map(row => Array.isArray(row.moments) ? row.moments[0] : row.moments)
+    .filter(Boolean) as MomentWithProfile[]
 }
 
 export async function isMomentSaved(userId: string, momentId: string): Promise<boolean> {

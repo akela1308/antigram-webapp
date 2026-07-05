@@ -36,6 +36,7 @@ export function MomentPage() {
   const [loading, setLoading] = useState(true)
   const [imgLoaded, setImgLoaded] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     if (!id) return
@@ -76,10 +77,22 @@ export function MomentPage() {
   const handleSave = async () => {
     if (!user || !id) return
     if (saved) {
-      await unsaveMoment(user.id, id)
+      const { error } = await unsaveMoment(user.id, id)
+      if (error) {
+        console.error('[Saved] unsave failed:', error)
+        setToast(t('profile.saveError'))
+        setTimeout(() => setToast(null), 1800)
+        return
+      }
       setSaved(false)
     } else {
-      await saveMoment(user.id, id)
+      const { error } = await saveMoment(user.id, id)
+      if (error) {
+        console.error('[Saved] save failed:', error)
+        setToast(t('profile.saveError'))
+        setTimeout(() => setToast(null), 1800)
+        return
+      }
       setSaved(true)
     }
   }
@@ -273,6 +286,18 @@ export function MomentPage() {
             </button>
           </div>
         </>
+      )}
+
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: 100, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 300, background: '#1A1208', border: '1px solid var(--amber)',
+          color: 'var(--amber)', fontSize: 13, fontWeight: 600,
+          padding: '8px 18px', borderRadius: 20, whiteSpace: 'nowrap',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+        }}>
+          {toast}
+        </div>
       )}
     </div>
   )
