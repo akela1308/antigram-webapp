@@ -1,18 +1,50 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useLanguage } from '../contexts/LanguageContext'
 
+type AuthMode = 'login' | 'register' | 'forgot' | 'reset'
+
 export function AuthPage() {
-  const { signIn, signUp, isTelegram, telegramUser, loginWithTelegram, telegramAuthLoading } = useAuth()
+  const {
+    signIn,
+    signUp,
+    isTelegram,
+    telegramUser,
+    loginWithTelegram,
+    telegramAuthLoading,
+    sendPasswordReset,
+    updatePassword,
+    setRecoverySessionFromUrl,
+  } = useAuth()
   const { t } = useLanguage()
   const navigate = useNavigate()
-  const [mode, setMode] = useState<'login' | 'register'>('login')
+  const [mode, setMode] = useState<AuthMode>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    const isRecovery = params.get('mode') === 'recovery'
+      || params.get('type') === 'recovery'
+      || hashParams.get('type') === 'recovery'
+      || Boolean(params.get('code'))
+
+    if (!isRecovery) return
+
+    setMode('reset')
+    setLoading(true)
+    setRecoverySessionFromUrl().then(ok => {
+      if (!ok) setError(t('auth.resetLinkInvalid'))
+      setLoading(false)
+    })
+  }, [setRecoverySessionFromUrl, t])
 
   const handleTelegramLogin = async () => {
     await loginWithTelegram()
@@ -22,12 +54,43 @@ export function AuthPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+    setMessage(null)
     setLoading(true)
 
-    const result =
-      mode === 'login'
-        ? await signIn(email, password)
-        : await signUp(email, password, displayName)
+    if (mode === 'forgot') {
+      const result = await sendPasswordReset(email)
+      setLoading(false)
+      if (result.error) {
+        const err = result.error as { message?: string }
+        setError(err?.message ?? t('common.error'))
+      } else {
+        setMessage(t('auth.resetEmailSent'))
+      }
+      return
+    }
+
+    if (mode === 'reset') {
+      if (password.length < 6 || password !== confirmPassword) {
+        setLoading(false)
+        setError(t('auth.passwordMismatch'))
+        return
+      }
+
+      const result = await updatePassword(password)
+      setLoading(false)
+      if (result.error) {
+        const err = result.error as { message?: string }
+        setError(err?.message ?? t('common.error'))
+      } else {
+        setMessage(t('auth.passwordUpdated'))
+        navigate('/', { replace: true })
+      }
+      return
+    }
+
+    const result = mode === 'login'
+      ? await signIn(email, password)
+      : await signUp(email, password, displayName)
 
     setLoading(false)
 
@@ -37,6 +100,14 @@ export function AuthPage() {
     } else {
       navigate('/')
     }
+  }
+
+  const switchMode = (nextMode: AuthMode) => {
+    setMode(nextMode)
+    setError(null)
+    setMessage(null)
+    setPassword('')
+    setConfirmPassword('')
   }
 
   const tgName = telegramUser
@@ -122,45 +193,73 @@ export function AuthPage() {
           </div>
         )}
 
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs" style={{ color: 'var(--text-muted)' }}>Email</label>
-          <input
-            type="email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            placeholder="email@example.com"
-            required
-            autoComplete="email"
-            className="w-full px-4 py-3 rounded-xl text-sm outline-none"
-            style={{
-              background: 'var(--bg-warm)',
-              border: '1px solid var(--border)',
-              color: 'var(--text)',
-            }}
-          />
-        </div>
+        {mode !== 'reset' && (
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs" style={{ color: 'var(--text-muted)' }}>Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="email@example.com"
+              required
+              autoComplete="email"
+              className="w-full px-4 py-3 rounded-xl text-sm outline-none"
+              style={{
+                background: 'var(--bg-warm)',
+                border: '1px solid var(--border)',
+                color: 'var(--text)',
+              }}
+            />
+          </div>
+        )}
 
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('auth.password')}</label>
-          <input
-            type="password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            placeholder={t('auth.passwordPlaceholder')}
-            required
-            minLength={6}
-            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-            className="w-full px-4 py-3 rounded-xl text-sm outline-none"
-            style={{
-              background: 'var(--bg-warm)',
-              border: '1px solid var(--border)',
-              color: 'var(--text)',
-            }}
-          />
-        </div>
+        {mode !== 'forgot' && (
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs" style={{ color: 'var(--text-muted)' }}>{mode === 'reset' ? t('auth.newPassword') : t('auth.password')}</label>
+            <input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder={t('auth.passwordPlaceholder')}
+              required
+              minLength={6}
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              className="w-full px-4 py-3 rounded-xl text-sm outline-none"
+              style={{
+                background: 'var(--bg-warm)',
+                border: '1px solid var(--border)',
+                color: 'var(--text)',
+              }}
+            />
+          </div>
+        )}
+
+        {mode === 'reset' && (
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('auth.confirmPassword')}</label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={e => setConfirmPassword(e.target.value)}
+              placeholder={t('auth.passwordPlaceholder')}
+              required
+              minLength={6}
+              autoComplete="new-password"
+              className="w-full px-4 py-3 rounded-xl text-sm outline-none"
+              style={{
+                background: 'var(--bg-warm)',
+                border: '1px solid var(--border)',
+                color: 'var(--text)',
+              }}
+            />
+          </div>
+        )}
 
         {error && (
           <p className="text-sm text-center" style={{ color: '#E06060' }}>{error}</p>
+        )}
+        {message && (
+          <p className="text-sm text-center" style={{ color: 'var(--amber)', lineHeight: 1.45 }}>{message}</p>
         )}
 
         <button
@@ -174,17 +273,36 @@ export function AuthPage() {
             opacity: loading ? 0.6 : 1,
           }}
         >
-          {loading ? '...' : mode === 'login' ? t('auth.emailLogin') : t('auth.createAccount')}
+          {loading ? '...' : mode === 'login'
+            ? t('auth.emailLogin')
+            : mode === 'register'
+              ? t('auth.createAccount')
+              : mode === 'forgot'
+                ? t('auth.sendResetLink')
+                : t('auth.updatePassword')}
         </button>
 
-        <button
-          type="button"
-          onClick={() => { setMode(m => m === 'login' ? 'register' : 'login'); setError(null) }}
-          className="text-sm text-center py-1"
-          style={{ color: 'var(--text-muted)' }}
-        >
-          {mode === 'login' ? t('auth.noAccount') : t('auth.hasAccount')}
-        </button>
+        {mode === 'login' && (
+          <button
+            type="button"
+            onClick={() => switchMode('forgot')}
+            className="text-sm text-center py-1"
+            style={{ color: 'var(--amber)' }}
+          >
+            {t('auth.forgotPassword')}
+          </button>
+        )}
+
+        {mode !== 'reset' && (
+          <button
+            type="button"
+            onClick={() => switchMode(mode === 'login' ? 'register' : 'login')}
+            className="text-sm text-center py-1"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            {mode === 'login' ? t('auth.noAccount') : t('auth.hasAccount')}
+          </button>
+        )}
       </form>
 
       <p className="text-xs text-center mt-8 max-w-xs" style={{ color: 'var(--text-muted)', lineHeight: 1.5 }}>

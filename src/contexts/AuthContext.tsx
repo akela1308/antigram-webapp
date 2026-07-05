@@ -16,6 +16,9 @@ interface AuthContextValue {
   signIn: (email: string, password: string) => Promise<{ error: unknown }>
   signUp: (email: string, password: string, displayName: string) => Promise<{ error: unknown }>
   linkEmailPassword: (email: string, password: string) => Promise<{ error: unknown }>
+  sendPasswordReset: (email: string) => Promise<{ error: unknown }>
+  updatePassword: (password: string) => Promise<{ error: unknown }>
+  setRecoverySessionFromUrl: () => Promise<boolean>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
   loginWithTelegram: () => Promise<void>
@@ -81,6 +84,11 @@ async function ensureEmailIdentity(userId: string, email: string | null | undefi
   if (error) {
     console.error('[Auth] email identity sync failed:', error)
   }
+}
+
+function getPasswordRecoveryRedirectUrl(): string {
+  if (typeof window === 'undefined') return '/auth?mode=recovery'
+  return `${window.location.origin}/auth?mode=recovery`
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -231,6 +239,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error }
   }
 
+  const sendPasswordReset = useCallback(async (email: string): Promise<{ error: unknown }> => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+      redirectTo: getPasswordRecoveryRedirectUrl(),
+    })
+    return { error }
+  }, [])
+
+  const updatePassword = useCallback(async (password: string): Promise<{ error: unknown }> => {
+    const { error, data } = await supabase.auth.updateUser({ password })
+    if (!error && data.user) {
+      setUser(data.user)
+      if (data.user.email) await ensureEmailIdentity(data.user.id, data.user.email)
+    }
+    return { error }
+  }, [])
+
+  const setRecoverySessionFromUrl = useCallback(async (): Promise<boolean> => {
+    if (typeof window === 'undefined') return false
+
+    const url = new URL(window.location.href)
+    const code = url.searchParams.get('code')
+    const hashParams = new URLSearchParams(url.hash.replace(/^#/, ''))
+    const accessToken = hashParams.get('access_token')
+    const refreshToken = hashParams.get('refresh_token')
+
+    if (code) {
+      const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+      if (error || !data.session) {
+        console.error('[Auth] recovery code exchange failed:', error)
+        return false
+      }
+      setSession(data.session)
+      setUser(data.session.user)
+      await loadProfile(data.session.user.id)
+      window.history.replaceState(null, '', '/auth?mode=recovery')
+      return true
+    }
+
+    if (accessToken && refreshToken) {
+      const { data, error } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      })
+      if (error || !data.session) {
+        console.error('[Auth] recovery session set failed:', error)
+        return false
+      }
+      setSession(data.session)
+      setUser(data.session.user)
+      await loadProfile(data.session.user.id)
+      window.history.replaceState(null, '', '/auth?mode=recovery')
+      return true
+    }
+
+    const { data: { session: existingSession } } = await supabase.auth.getSession()
+    return Boolean(existingSession)
+  }, [loadProfile])
+
   const linkEmailPassword = async (email: string, password: string): Promise<{ error: unknown }> => {
     const { error } = await supabase.functions.invoke('link-email-auth', {
       body: { email, password },
@@ -266,6 +332,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signIn,
         signUp,
         linkEmailPassword,
+        sendPasswordReset,
+        updatePassword,
+        setRecoverySessionFromUrl,
         signOut,
         refreshProfile,
         loginWithTelegram: authenticateTelegram,
