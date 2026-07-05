@@ -196,6 +196,8 @@ export function AlbumDetailPage() {
                   filter: removeConfirmId === m.id ? 'brightness(0.4)' : undefined,
                   transition: 'filter 0.15s',
                 }}
+                loading="lazy"
+                decoding="async"
                 draggable={false}
               />
               <StarCountPill
@@ -327,7 +329,13 @@ export function AlbumDetailPage() {
                       onClick={() => handleAddMoment(m.id)}
                       style={{ aspectRatio: '1', borderRadius: 8, overflow: 'hidden', cursor: 'pointer', border: '1px solid #2E1A0A' }}
                     >
-                      <img src={getMomentImageUrl(m, 'thumb')} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                      <img
+                        src={getMomentImageUrl(m, 'thumb')}
+                        alt=""
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        loading="lazy"
+                        decoding="async"
+                      />
                     </div>
                   ))}
                 </div>

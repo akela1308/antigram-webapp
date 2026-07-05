@@ -385,6 +385,7 @@ export function ProfilePage() {
                   alt=""
                   className="absolute inset-0 w-full h-full object-cover"
                   loading="lazy"
+                  decoding="async"
                 />
                 <ReactionPreviewPill
                   moment={m}

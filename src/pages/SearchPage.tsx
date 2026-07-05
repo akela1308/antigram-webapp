@@ -310,6 +310,8 @@ function UserRow({ profile, onPress }: { profile: Profile; onPress: () => void }
           src={profile.avatar_url}
           alt={name}
           style={{ width: 44, height: 44, borderRadius: 22, objectFit: 'cover', flexShrink: 0 }}
+          loading="lazy"
+          decoding="async"
         />
       ) : (
         <div

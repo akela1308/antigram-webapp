@@ -262,6 +262,7 @@ function ReportCard({ report, language, busy, t, onReview, onDismiss, onDeleteMo
             alt=""
             style={{ width: 56, height: 56, borderRadius: 10, objectFit: 'cover' }}
             loading="lazy"
+            decoding="async"
           />
           <div style={{ minWidth: 0 }}>
             <p style={{ margin: 0, color: 'var(--amber)', fontSize: 13, fontWeight: 800 }}>{t('moderation.openMoment')}</p>

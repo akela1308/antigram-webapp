@@ -168,6 +168,7 @@ export function FeedPage() {
                 src={profile.avatar_url}
                 alt={displayName}
                 style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+                decoding="async"
               />
             ) : (
               <div
@@ -316,6 +317,7 @@ function PhotoOfDayCard({
             alt={moment.caption ?? ''}
             style={{ width: '100%', aspectRatio: '4/5', objectFit: 'cover', display: 'block' }}
             loading="lazy"
+            decoding="async"
           />
           {/* Gradient overlay */}
           <div

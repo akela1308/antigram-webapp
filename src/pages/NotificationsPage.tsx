@@ -157,6 +157,8 @@ export function NotificationsPage() {
                       src={item.profiles.avatar_url}
                       alt=""
                       style={{ width: 44, height: 44, borderRadius: 22, objectFit: 'cover', display: 'block' }}
+                      loading="lazy"
+                      decoding="async"
                     />
                   ) : (
                     <div
@@ -214,6 +216,8 @@ export function NotificationsPage() {
                     src={getMomentImageUrl(item.moments, 'thumb')}
                     alt=""
                     style={{ width: 48, height: 48, borderRadius: 8, objectFit: 'cover', display: 'block' }}
+                    loading="lazy"
+                    decoding="async"
                   />
                 ) : (
                   <div

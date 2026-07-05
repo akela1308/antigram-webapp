@@ -76,6 +76,7 @@ export function MomentCard({
           alt={moment.caption ?? ''}
           className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-active:scale-95"
           loading="lazy"
+          decoding="async"
         />
         {showReactionPicker && onReact && (
           <div

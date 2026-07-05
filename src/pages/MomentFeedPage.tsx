@@ -254,7 +254,7 @@ export function MomentFeedPage() {
                     label={t('moment.download')}
                     icon="↓"
                     onClick={() => {
-                      if (menuMoment) savePhoto(menuMoment.photo_url).then(() => showToast(t('moment.openingPhoto'))).catch(() => {})
+                      if (menuMoment) savePhoto(getMomentImageUrl(menuMoment, 'original')).then(() => showToast(t('moment.openingPhoto'))).catch(() => {})
                       trackMomentSaved()
                       setMenuMomentId(null)
                     }}
@@ -380,7 +380,13 @@ export function MomentFeedPage() {
                     }}
                   >
                     {al.first_moment_url ? (
-                      <img src={al.first_moment_url} alt="" style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
+                      <img
+                        src={al.first_moment_url}
+                        alt=""
+                        style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }}
+                        loading="lazy"
+                        decoding="async"
+                      />
                     ) : (
                       <div style={{ width: 44, height: 44, borderRadius: 8, background: '#1A1208', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--amber)', fontSize: 18 }}>⊞</div>
                     )}
@@ -443,6 +449,7 @@ function ShotCard({ moment: m, cardRef, reactionCounts, myReaction, starTotal, o
           alt={m.caption ?? ''}
           style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', display: 'block' }}
           loading="lazy"
+          decoding="async"
         />
         {/* "..." menu button — top right */}
         <button

@@ -155,6 +155,8 @@ export function CategoryFilmStrip({
                     src={cat.photoUrl}
                     alt=""
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    loading="lazy"
+                    decoding="async"
                   />
                 ) : (
                   <div style={{ width: '100%', height: '100%', background: 'rgba(107,46,12,0.35)' }} />

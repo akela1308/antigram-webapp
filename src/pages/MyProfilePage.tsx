@@ -540,7 +540,13 @@ export function MyProfilePage() {
                       border: '1px solid #2E1A0A',
                     }}
                   >
-                    <img src={getMomentImageUrl(m, 'thumb')} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    <img
+                      src={getMomentImageUrl(m, 'thumb')}
+                      alt=""
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                      loading="lazy"
+                      decoding="async"
+                    />
                   </div>
                 ))}
                 {moments.length === 0 && (
@@ -780,6 +786,8 @@ function PhotoTile({
           filter: isDeleteTarget ? 'brightness(0.5)' : undefined,
           transition: 'filter 0.15s',
         }}
+        loading="lazy"
+        decoding="async"
         draggable={false}
       />
       <StarCountPill
@@ -951,7 +959,13 @@ function AlbumCard({ cover, placeholder, placeholderBg, title, subtitle, isPriva
       {/* Cover */}
       <div style={{ position: 'relative', aspectRatio: '4/3', overflow: 'hidden', background: cover ? '#0E0804' : placeholderBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {cover ? (
-          <img src={cover} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          <img
+            src={cover}
+            alt=""
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            loading="lazy"
+            decoding="async"
+          />
         ) : placeholder}
         {isPrivate && (
           <div style={{ position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>
