@@ -19,15 +19,56 @@ import { hapticImpact, withBackButton } from '../lib/platform'
 
 const MOMENT_EXPORT_MAX_SIZE = 1600
 const MOMENT_EXPORT_QUALITY = 0.85
-const QUICK_CUSTOM_EMOJIS = [
-  '😄', '😂', '🥰', '😍', '🤩', '😎', '🥺',
-  '😢', '😭', '😤', '🤬', '😰', '😱', '🤯',
-  '😴', '🥱', '😅', '😬', '🙄', '😏', '😒',
-  '😔', '🥹', '🫠', '🤭', '🫶', '💀', '🔥',
-  '💫', '✨', '💖', '💔', '💘', '🌅', '🌙',
-  '🌊', '🌿', '🍂', '☕', '🎧', '🎭', '📸',
-  '🎞️', '🪩', '🤍', '🖤', '❤️', '💛', '💚',
-  '💙', '💜', '⭐', '✦',
+const EMOJI_CATEGORIES = [
+  {
+    id: 'faces',
+    icon: '🙂',
+    emojis: [
+      '😀', '😄', '😁', '😆', '😂', '🤣', '😊', '☺️', '😌', '😉',
+      '😇', '🥰', '😍', '🤩', '😘', '😗', '😙', '😚', '😋', '😛',
+      '😜', '🤪', '😎', '🥳', '🥹', '🥺', '🫠', '🤭', '🫢', '🤫',
+      '😐', '😶', '🙄', '😏', '😒', '😔', '😞', '😢', '😭', '🥲',
+      '😅', '😬', '😮‍💨', '😴', '🥱', '😳', '😱', '😰', '😤', '🤯',
+    ],
+  },
+  {
+    id: 'love',
+    icon: '💛',
+    emojis: [
+      '🫶', '🤍', '🖤', '❤️', '🧡', '💛', '💚', '💙', '💜', '🩷',
+      '💖', '💗', '💓', '💕', '💞', '💘', '💝', '💟', '💔', '❤️‍🔥',
+      '❤️‍🩹', '💋', '💌', '💐', '🌹', '🌷', '🌸', '🌺', '🌻', '🌼',
+    ],
+  },
+  {
+    id: 'vibe',
+    icon: '✨',
+    emojis: [
+      '✨', '✦', '⭐', '🌟', '💫', '🔥', '🌈', '☀️', '🌤️', '⛅',
+      '🌙', '🌕', '🌖', '🌗', '🌘', '🌑', '🌊', '🌧️', '❄️', '☁️',
+      '🌿', '🍃', '🍂', '🍁', '🌲', '🌳', '🌴', '🌵', '🪴', '🍄',
+      '☕', '🍵', '🍯', '🍓', '🍒', '🍑', '🫧', '🪐', '🌅', '🌌',
+    ],
+  },
+  {
+    id: 'life',
+    icon: '📸',
+    emojis: [
+      '📸', '📷', '🎞️', '🎥', '🎬', '🎭', '🎨', '🖼️', '🪩', '🎧',
+      '🎵', '🎶', '🎤', '🎹', '🎸', '🕯️', '🛋️', '🪞', '🧸', '📝',
+      '📚', '💭', '💬', '🗯️', '🧿', '🪄', '🧩', '🎲', '🕹️', '🎮',
+    ],
+  },
+  {
+    id: 'symbols',
+    icon: '♡',
+    emojis: [
+      '♡', '♥', '❥', '❣️', '❦', '✧', '✩', '✪', '✫', '✬',
+      '✭', '✮', '✯', '✰', '✴️', '✳️', '❇️', '🔆', '🔅', '〰️',
+      '➰', '➿', '⭕', '🔴', '🟠', '🟡', '🟢', '🔵', '🟣', '⚪',
+      '⚫', '🟤', '⬜', '⬛', '◻️', '◼️', '▫️', '▪️',
+    ],
+  },
 ]
 
 function clamp(v: number, lo: number, hi: number): number {
@@ -36,33 +77,6 @@ function clamp(v: number, lo: number, hi: number): number {
 
 function triangleRandom(): number {
   return (Math.random() + Math.random()) / 2
-}
-
-function getGraphemes(value: string): string[] {
-  const Segmenter = (Intl as typeof Intl & {
-    Segmenter?: new (
-      locale: string | undefined,
-      options: { granularity: 'grapheme' }
-    ) => { segment: (input: string) => Iterable<{ segment: string }> }
-  }).Segmenter
-
-  if (!Segmenter) return Array.from(value)
-
-  return Array.from(new Segmenter(undefined, { granularity: 'grapheme' }).segment(value), part => part.segment)
-}
-
-function isEmojiGrapheme(value: string): boolean {
-  return /\p{Extended_Pictographic}/u.test(value)
-    || /^[\u{1F1E6}-\u{1F1FF}]{2}$/u.test(value)
-    || /^[0-9#*]\uFE0F?\u20E3$/u.test(value)
-}
-
-function getFirstEmoji(value: string): string {
-  for (const grapheme of getGraphemes(value.trim())) {
-    if (isEmojiGrapheme(grapheme)) return grapheme
-  }
-
-  return ''
 }
 
 function getMomentExportCanvas(source: HTMLCanvasElement): HTMLCanvasElement {
@@ -403,6 +417,7 @@ export function UploadPage() {
   const [showCustomMoodSheet, setShowCustomMoodSheet] = useState(false)
   const [draftEmoji, setDraftEmoji]     = useState('')
   const [draftLabel, setDraftLabel]     = useState('')
+  const [emojiCategoryId, setEmojiCategoryId] = useState(EMOJI_CATEGORIES[0].id)
   const [camError, setCamError]         = useState<string | null>(null)
   const [error, setError]               = useState<string | null>(null)
   const [todayCount, setTodayCount]     = useState<number | null>(null)
@@ -423,6 +438,8 @@ export function UploadPage() {
   const cameraUi        = getCameraUi(isCompactCamera, isTinyCamera)
   const shutterIsPressed = shutterPressed || isCapturing
   const loadedFilmName = preset.id === 'none' ? t('common.noFilter') : preset.name
+  const activeEmojiCategory =
+    EMOJI_CATEGORIES.find(category => category.id === emojiCategoryId) ?? EMOJI_CATEGORIES[0]
 
   useEffect(() => {
     const updateViewportHeight = () => setViewportHeight(window.innerHeight)
@@ -456,6 +473,9 @@ export function UploadPage() {
   }, [showCustomMoodSheet])
 
   function closeCustomMoodSheet() {
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur()
+    }
     setShowCustomMoodSheet(false)
     hapticImpact('light')
   }
@@ -845,6 +865,9 @@ export function UploadPage() {
               borderTop: '1px solid #2E2218',
               padding: '12px 20px',
               paddingBottom: 'max(32px, calc(var(--tg-bottom, 0px) + 16px))',
+              maxHeight: 'calc(100vh - 96px)',
+              overflowY: 'auto',
+              WebkitOverflowScrolling: 'touch',
             }}>
               <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: 10 }}>
                 <div style={{ width: 36, height: 4, borderRadius: 2, background: '#333' }} />
@@ -874,49 +897,58 @@ export function UploadPage() {
                 </button>
               </div>
 
-              <div style={{ marginBottom: 10 }}>
-                <p style={{ color: '#6E6258', fontSize: 12, fontWeight: 700, margin: '0 0 6px' }}>
-                  {t('camera.customEmojiInput')}
-                </p>
-                <input
-                  value={draftEmoji}
-                  onChange={e => setDraftEmoji(getFirstEmoji(e.target.value))}
-                  onPaste={e => {
-                    const emoji = getFirstEmoji(e.clipboardData.getData('text'))
-                    if (!emoji) return
-                    e.preventDefault()
-                    setDraftEmoji(emoji)
-                  }}
-                  placeholder={t('camera.customEmojiPlaceholder')}
-                  enterKeyHint="done"
-                  autoComplete="off"
-                  spellCheck={false}
-                  style={{
-                    width: '100%',
-                    padding: '12px 14px',
-                    borderRadius: 10,
-                    background: '#1A1208',
-                    color: '#fff',
-                    border: '1px solid #2E2218',
-                    fontSize: 20,
-                    outline: 'none',
-                    fontFamily: 'inherit',
-                    boxSizing: 'border-box',
-                  }}
-                />
+              <div style={{
+                display: 'flex',
+                gap: 8,
+                overflowX: 'auto',
+                paddingBottom: 8,
+                marginBottom: 8,
+                WebkitOverflowScrolling: 'touch',
+              }}>
+                {EMOJI_CATEGORIES.map(category => (
+                  <button
+                    key={category.id}
+                    onClick={() => {
+                      if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+                      setEmojiCategoryId(category.id)
+                    }}
+                    aria-label={category.id}
+                    style={{
+                      width: 42,
+                      height: 36,
+                      borderRadius: 18,
+                      flexShrink: 0,
+                      fontSize: category.id === 'symbols' ? 18 : 20,
+                      background: emojiCategoryId === category.id ? 'rgba(196,168,130,0.22)' : 'rgba(255,255,255,0.05)',
+                      border: emojiCategoryId === category.id ? '1px solid var(--amber)' : '1px solid #2E2218',
+                      color: '#fff',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {category.icon}
+                  </button>
+                ))}
               </div>
 
-              {/* Emoji grid — fast cross-platform picks */}
-              <p style={{ color: '#6E6258', fontSize: 12, fontWeight: 700, margin: '0 0 6px' }}>
-                {t('camera.quickEmoji')}
-              </p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-                {QUICK_CUSTOM_EMOJIS.map(emoji => (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
+                gap: 6,
+                maxHeight: 248,
+                overflowY: 'auto',
+                paddingRight: 2,
+                marginBottom: 12,
+                WebkitOverflowScrolling: 'touch',
+              }}>
+                {activeEmojiCategory.emojis.map(emoji => (
                   <button
                     key={emoji}
-                    onClick={() => setDraftEmoji(emoji)}
+                    onClick={() => {
+                      if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+                      setDraftEmoji(emoji)
+                    }}
                     style={{
-                      width: 42, height: 42, borderRadius: 10, fontSize: 20,
+                      width: '100%', aspectRatio: '1 / 1', minHeight: 40, borderRadius: 10, fontSize: 20,
                       background: draftEmoji === emoji ? 'rgba(196,168,130,0.2)' : 'rgba(255,255,255,0.05)',
                       border: draftEmoji === emoji ? '1px solid var(--amber)' : '1px solid #2E2218',
                       cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -940,8 +972,14 @@ export function UploadPage() {
                 <input
                   value={draftLabel}
                   onChange={e => setDraftLabel(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.currentTarget.blur()
+                    }
+                  }}
                   placeholder={t('camera.customEmotionPlaceholder')}
                   maxLength={24}
+                  enterKeyHint="done"
                   style={{
                     flex: 1, padding: '12px 14px', borderRadius: 10,
                     background: '#1A1208', color: '#fff',
@@ -950,6 +988,26 @@ export function UploadPage() {
                     fontFamily: 'inherit',
                   }}
                 />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+                  }}
+                  style={{
+                    height: 50,
+                    padding: '0 14px',
+                    borderRadius: 10,
+                    flexShrink: 0,
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid #2E2218',
+                    color: 'var(--amber)',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {t('common.done')}
+                </button>
               </div>
               <button
                 onClick={() => {
