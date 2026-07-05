@@ -55,6 +55,34 @@ function isTelegramContext(): boolean {
   return initData.length > 0
 }
 
+function normalizeLoginEmail(email: string | null | undefined): string | null {
+  const normalized = email?.trim().toLowerCase() ?? ''
+  if (!normalized || normalized.endsWith('@antigram.internal')) return null
+  return normalized
+}
+
+async function ensureEmailIdentity(userId: string, email: string | null | undefined): Promise<void> {
+  const normalizedEmail = normalizeLoginEmail(email)
+  if (!normalizedEmail) return
+
+  const { error } = await supabase
+    .from('account_identities')
+    .upsert(
+      {
+        user_id: userId,
+        provider: 'email',
+        external_id: normalizedEmail,
+        metadata: { email_login_enabled: true },
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'provider,external_id' },
+    )
+
+  if (error) {
+    console.error('[Auth] email identity sync failed:', error)
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [user, setUser] = useState<User | null>(null)
@@ -184,7 +212,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [authenticateTelegram, loadProfile])
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { error, data } = await supabase.auth.signInWithPassword({ email, password })
+    if (!error && data.user) {
+      await ensureEmailIdentity(data.user.id, data.user.email ?? email)
+    }
     return { error }
   }
 
@@ -195,6 +226,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         id: data.user.id,
         display_name: displayName,
       })
+      await ensureEmailIdentity(data.user.id, data.user.email ?? email)
     }
     return { error }
   }
