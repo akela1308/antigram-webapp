@@ -52,6 +52,11 @@ Supabase CLI сейчас подвисает на DB connection (`Initialising l
    - возвращает серверные права пользователя: Premium, лимит кадров, лимит highlights и feature flags;
    - позволяет клиенту показывать лимиты из базы, а не решать доступ локально.
 
+10. `supabase/migrations/202607050010_highlight_entitlements.sql`
+   - добавляет trigger на `highlights`;
+   - ограничивает позиции плёнки профиля серверным лимитом: 0-4 для обычного аккаунта и 0-9 для Premium;
+   - не даёт клиенту обойти лимит прямым insert/update.
+
 ## Почему приложение не должно упасть до применения
 
 - Image variants имеют fallback на старый `photo_url`.
@@ -65,6 +70,7 @@ Supabase CLI сейчас подвисает на DB connection (`Initialising l
 - Saved album будет пустым или покажет ошибку сохранения, если `saved_moments`/RLS еще не применены.
 - Email/password linking будет недоступен, если `account_identities` еще не применена.
 - Entitlements откатываются на локальный fallback и active subscription query, если `get_user_entitlements` еще не применена.
+- Расширенная плёнка профиля будет ограничиваться только UI, пока `enforce_highlight_entitlements` еще не применена.
 
 ## Проверка после применения
 
@@ -140,4 +146,14 @@ select exists (
   where routine_schema = 'public'
     and routine_name = 'get_user_entitlements'
 ) as has_user_entitlements_rpc;
+```
+
+```sql
+select exists (
+  select 1
+  from information_schema.triggers
+  where event_object_schema = 'public'
+    and event_object_table = 'highlights'
+    and trigger_name = 'enforce_highlight_entitlements_before_write'
+) as has_highlight_entitlements_trigger;
 ```

@@ -1,14 +1,16 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
-import type { Profile } from '../lib/types'
-import { getProfile } from '../lib/db'
+import type { Profile, UserEntitlements } from '../lib/types'
+import { getProfile, getUserEntitlements } from '../lib/db'
 import { identify, reset, trackTelegramAuthStarted, trackTelegramAuthSucceeded } from '../lib/analytics'
 
 interface AuthContextValue {
   session: Session | null
   user: User | null
   profile: Profile | null
+  entitlements: UserEntitlements | null
+  isPremium: boolean
   loading: boolean
   isTelegram: boolean
   telegramUser: TelegramUser | null
@@ -21,6 +23,7 @@ interface AuthContextValue {
   setRecoverySessionFromUrl: () => Promise<boolean>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
+  refreshEntitlements: () => Promise<void>
   loginWithTelegram: () => Promise<void>
 }
 
@@ -95,6 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [entitlements, setEntitlements] = useState<UserEntitlements | null>(null)
   const [loading, setLoading] = useState(true)
   const [telegramUser] = useState<TelegramUser | null>(getTelegramUser)
   const [isTelegram] = useState(isTelegramContext)
@@ -110,9 +114,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
   }, [])
 
+  const loadEntitlements = useCallback(async (userId: string) => {
+    const rights = await getUserEntitlements(userId)
+    setEntitlements(rights)
+  }, [])
+
   const refreshProfile = useCallback(async () => {
     if (user) await loadProfile(user.id)
   }, [user, loadProfile])
+
+  const refreshEntitlements = useCallback(async () => {
+    if (user) await loadEntitlements(user.id)
+  }, [user, loadEntitlements])
 
   // Telegram auth: send initData to Edge Function and get back a session
   const authenticateTelegram = useCallback(async () => {
@@ -159,7 +172,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setSession(data.session)
       setUser(data.session.user)
-      await loadProfile(data.session.user.id)
+      await Promise.all([
+        loadProfile(data.session.user.id),
+        loadEntitlements(data.session.user.id),
+      ])
       trackTelegramAuthSucceeded()
     } catch (err) {
       console.error('[TG Auth] fetch exception:', err)
@@ -177,7 +193,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (existingSession && mounted) {
         setSession(existingSession)
         setUser(existingSession.user)
-        await loadProfile(existingSession.user.id)
+        await Promise.all([
+          loadProfile(existingSession.user.id),
+          loadEntitlements(existingSession.user.id),
+        ])
         setLoading(false)
 
         // Silently sync Telegram avatar_url in background (non-blocking)
@@ -206,9 +225,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!mounted) return
       setSession(s)
       setUser(s?.user ?? null)
-      if (s?.user) loadProfile(s.user.id)
+      if (s?.user) {
+        loadProfile(s.user.id)
+        loadEntitlements(s.user.id)
+      }
       else {
         setProfile(null)
+        setEntitlements(null)
         reset()
       }
     })
@@ -217,7 +240,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       mounted = false
       subscription.unsubscribe()
     }
-  }, [authenticateTelegram, loadProfile])
+  }, [authenticateTelegram, loadEntitlements, loadProfile])
 
   const signIn = async (email: string, password: string) => {
     const { error, data } = await supabase.auth.signInWithPassword({ email, password })
@@ -272,7 +295,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setSession(data.session)
       setUser(data.session.user)
-      await loadProfile(data.session.user.id)
+      await Promise.all([
+        loadProfile(data.session.user.id),
+        loadEntitlements(data.session.user.id),
+      ])
       window.history.replaceState(null, '', '/auth?mode=recovery')
       return true
     }
@@ -288,14 +314,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setSession(data.session)
       setUser(data.session.user)
-      await loadProfile(data.session.user.id)
+      await Promise.all([
+        loadProfile(data.session.user.id),
+        loadEntitlements(data.session.user.id),
+      ])
       window.history.replaceState(null, '', '/auth?mode=recovery')
       return true
     }
 
     const { data: { session: existingSession } } = await supabase.auth.getSession()
     return Boolean(existingSession)
-  }, [loadProfile])
+  }, [loadEntitlements, loadProfile])
 
   const linkEmailPassword = async (email: string, password: string): Promise<{ error: unknown }> => {
     const { error } = await supabase.functions.invoke('link-email-auth', {
@@ -306,6 +335,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (data.session) {
         setSession(data.session)
         setUser(data.session.user)
+        await loadEntitlements(data.session.user.id)
       }
     }
     return { error }
@@ -317,6 +347,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(null)
     setUser(null)
     setProfile(null)
+    setEntitlements(null)
   }
 
   return (
@@ -325,6 +356,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         session,
         user,
         profile,
+        entitlements,
+        isPremium: Boolean(entitlements?.is_premium),
         loading,
         isTelegram,
         telegramUser,
@@ -337,6 +370,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setRecoverySessionFromUrl,
         signOut,
         refreshProfile,
+        refreshEntitlements,
         loginWithTelegram: authenticateTelegram,
       }}
     >

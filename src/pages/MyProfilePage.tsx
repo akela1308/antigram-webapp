@@ -68,7 +68,7 @@ function buildGridRows(moments: Moment[]): GridRow[] {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function MyProfilePage() {
-  const { user, profile, loading: authLoading, signOut, isTelegram, telegramUser, loginWithTelegram, telegramAuthLoading, linkEmailPassword } = useAuth()
+  const { user, profile, entitlements, isPremium, loading: authLoading, signOut, isTelegram, telegramUser, loginWithTelegram, telegramAuthLoading, linkEmailPassword } = useAuth()
   const navigate = useNavigate()
   const { t } = useLanguage()
 
@@ -285,8 +285,9 @@ export function MyProfilePage() {
   }
 
   const displayName = profile.display_name ?? profile.username ?? telegramUser?.first_name ?? t('common.anonymous')
+  const highlightLimit = entitlements?.highlight_limit ?? 5
 
-  const ringPhotos: (string | null)[] = Array.from({ length: 5 }, (_, i) => {
+  const ringPhotos: (string | null)[] = Array.from({ length: highlightLimit }, (_, i) => {
     const hl = highlights.find(h => h.position === i)
     return hl?.moments ? getMomentImageUrl(hl.moments, 'thumb') : null
   })
@@ -386,7 +387,7 @@ export function MyProfilePage() {
           <Stat label={t('profile.following')} value={followingCount} onClick={() => navigate('/me/following')} />
         </div>
 
-        <PremiumProfileCard onClick={() => navigate('/premium')} />
+        <PremiumProfileCard isActive={isPremium} onClick={() => navigate('/premium')} />
       </div>
 
       {/* Tabs */}
@@ -618,6 +619,7 @@ export function MyProfilePage() {
           userId={user.id}
           authEmail={user.email ?? null}
           isTelegram={isTelegram}
+          isPremium={isPremium}
           onClose={() => setShowSettings(false)}
           onNavigate={(path) => {
             setShowSettings(false)
@@ -655,7 +657,7 @@ export function MyProfilePage() {
   )
 }
 
-function PremiumProfileCard({ onClick }: { onClick: () => void }) {
+function PremiumProfileCard({ isActive, onClick }: { isActive: boolean; onClick: () => void }) {
   const { t } = useLanguage()
 
   return (
@@ -715,11 +717,11 @@ function PremiumProfileCard({ onClick }: { onClick: () => void }) {
             whiteSpace: 'nowrap',
           }}
         >
-          {t('premium.profileCompactHint')}
+          {isActive ? t('premium.activeCompactHint') : t('premium.profileCompactHint')}
         </span>
       </span>
       <span style={{ color: 'var(--amber)', fontSize: 11, fontWeight: 800, whiteSpace: 'nowrap' }}>
-        {t('premium.open')}
+        {isActive ? t('premium.active') : t('premium.open')}
       </span>
     </button>
   )
@@ -973,7 +975,7 @@ function AlbumCard({ cover, placeholder, placeholderBg, title, subtitle, isPriva
 // ── SettingsSheet ─────────────────────────────────────────────────────────────
 
 function SettingsSheet({
-  profile, userId, authEmail, isTelegram,
+  profile, userId, authEmail, isTelegram, isPremium,
   onClose, onNavigate, onSupportPress, onSupportInboxPress, supportInboxCount, onSaved,
   showSignOutConfirm, setShowSignOutConfirm, handleSignOut,
   onLinkEmailPassword,
@@ -982,6 +984,7 @@ function SettingsSheet({
   userId: string
   authEmail: string | null
   isTelegram: boolean
+  isPremium: boolean
   onClose: () => void
   onNavigate: (path: string) => void
   onSupportPress: () => void
@@ -1188,7 +1191,7 @@ function SettingsSheet({
           >
             <span>{t('settings.premium')}</span>
             <span style={{ color: 'var(--text-muted)', fontSize: 12, fontWeight: 700 }}>
-              {t('premium.comingSoon')}
+              {isPremium ? t('premium.active') : t('premium.comingSoon')}
             </span>
           </button>
           <button

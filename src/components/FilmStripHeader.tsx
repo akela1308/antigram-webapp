@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useLanguage } from '../contexts/LanguageContext'
 
 interface FilmStripHeaderProps {
-  photos: (string | null)[]  // exactly 5 slots
+  photos: (string | null)[]
   isOwner?: boolean
   onReplaceRequest?: (slotIndex: number) => void
   onOpenPhoto?: (slotIndex: number) => void
@@ -28,11 +28,9 @@ const S_FAR = 0.90   // 2+ positions from center
 const S_ADJ = 0.96   // 1 position from center
 const S_CTR = 1.12   // center
 
-// ─── Infinite loop: 3 copies × 5 photos = 15 virtual items ───────────────────
-const RING_SIZE    = 5
+// ─── Infinite loop: 3 copies × ring photos ───────────────────────────────────
+const MIN_RING_SIZE = 5
 const COPIES       = 3
-const TOTAL        = RING_SIZE * COPIES   // 15
-const MIDDLE_START = RING_SIZE            // index 5 — start of middle copy
 
 // ─── Sprocket edge ────────────────────────────────────────────────────────────
 function SprocketEdge() {
@@ -71,12 +69,15 @@ export function FilmStripHeader({
   const { t } = useLanguage()
   const [menuSlot, setMenuSlot] = useState<number | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const itemRefs     = useRef<(HTMLDivElement | null)[]>(Array(TOTAL).fill(null))
+  const itemRefs     = useRef<(HTMLDivElement | null)[]>([])
   const scrollEndTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Normalise to exactly 5 slots, build 3-copy virtual list
-  const ring: (string | null)[] = Array.from({ length: RING_SIZE }, (_, i) => photos[i] ?? null)
-  const virtualData = Array.from({ length: TOTAL }, (_, i) => ring[i % RING_SIZE])
+  // Normalise to at least 5 slots, build 3-copy virtual list
+  const ringSize = Math.max(MIN_RING_SIZE, photos.length)
+  const total = ringSize * COPIES
+  const middleStart = ringSize
+  const ring: (string | null)[] = Array.from({ length: ringSize }, (_, i) => photos[i] ?? null)
+  const virtualData = Array.from({ length: total }, (_, i) => ring[i % ringSize])
 
   // ── Scale / opacity update (direct DOM — no React re-render) ─────────────
   function updateScales(scrollLeft: number) {
@@ -111,11 +112,11 @@ export function FilmStripHeader({
     const el = containerRef.current
     if (!el) return
     const snapIdx = Math.round(el.scrollLeft / SNAP)
-    if (snapIdx < RING_SIZE) {
-      el.scrollLeft += RING_SIZE * SNAP
+    if (snapIdx < ringSize) {
+      el.scrollLeft += ringSize * SNAP
       updateScales(el.scrollLeft)
-    } else if (snapIdx >= RING_SIZE * 2) {
-      el.scrollLeft -= RING_SIZE * SNAP
+    } else if (snapIdx >= ringSize * 2) {
+      el.scrollLeft -= ringSize * SNAP
       updateScales(el.scrollLeft)
     }
   }
@@ -125,11 +126,11 @@ export function FilmStripHeader({
     const el = containerRef.current
     if (!el) return
     const timer = setTimeout(() => {
-      el.scrollLeft = MIDDLE_START * SNAP
+      el.scrollLeft = middleStart * SNAP
       updateScales(el.scrollLeft)
     }, 30)
     return () => clearTimeout(timer)
-  }, [])
+  }, [middleStart])
 
   // Re-run scales whenever photos change
   useEffect(() => {
@@ -151,7 +152,7 @@ export function FilmStripHeader({
 
   // ── Tap handler ───────────────────────────────────────────────────────────
   function handleTap(virtualIdx: number) {
-    const rIdx = virtualIdx % RING_SIZE
+    const rIdx = virtualIdx % ringSize
     const photo = ring[rIdx]
     if (!photo) {
       if (isOwner) onReplaceRequest?.(rIdx)

@@ -205,7 +205,8 @@ export function ProfilePage() {
   const displayName = profile.display_name ?? profile.username ?? t('common.anonymous')
   const profileRestricted = !isOwnProfile && (blockRelationship.hasBlocked || blockRelationship.blockedBy)
 
-  const highlightItems = Array.from({ length: 5 }, (_, i) => {
+  const highlightSlotCount = Math.max(5, ...highlights.map(h => h.position + 1))
+  const highlightItems = Array.from({ length: highlightSlotCount }, (_, i) => {
     const highlight = highlights.find(h => h.position === i)
     return highlight?.moments
       ? { momentId: highlight.moments.id, photoUrl: getMomentImageUrl(highlight.moments, 'thumb') }

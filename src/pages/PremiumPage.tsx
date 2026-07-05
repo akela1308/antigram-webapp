@@ -1,4 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 import { useLanguage } from '../contexts/LanguageContext'
 import {
   PREMIUM_ENABLED,
@@ -18,6 +19,10 @@ const featureKeys = [
 export function PremiumPage() {
   const navigate = useNavigate()
   const { t } = useLanguage()
+  const { entitlements, isPremium } = useAuth()
+  const premiumUntil = entitlements?.premium_until
+    ? new Date(entitlements.premium_until).toLocaleDateString()
+    : null
 
   return (
     <div
@@ -75,7 +80,13 @@ export function PremiumPage() {
           {t('premium.title')}
         </h1>
         <p style={{ color: 'rgba(243,224,193,0.72)', fontSize: 14, lineHeight: 1.5, margin: '10px auto 0', maxWidth: 310, textAlign: 'center' }}>
-          {t('premium.subtitle', { price: PREMIUM_PRICE_STARS, days: PREMIUM_PERIOD_DAYS })}
+          {isPremium
+            ? t('premium.activeSubtitle', {
+              date: premiumUntil ?? t('premium.activeNoDate'),
+              frames: entitlements?.daily_frame_limit ?? 8,
+              highlights: entitlements?.highlight_limit ?? 10,
+            })
+            : t('premium.subtitle', { price: PREMIUM_PRICE_STARS, days: PREMIUM_PERIOD_DAYS })}
         </p>
       </section>
 
@@ -117,21 +128,23 @@ export function PremiumPage() {
       </section>
 
       <button
-        disabled={!PREMIUM_ENABLED}
+        disabled={isPremium || !PREMIUM_ENABLED}
         style={{
           width: '100%',
           padding: '15px 0',
           borderRadius: 30,
           border: 'none',
           marginTop: 18,
-          background: PREMIUM_ENABLED ? 'var(--amber)' : '#2E1A0A',
-          color: PREMIUM_ENABLED ? '#140E0A' : 'var(--text-muted)',
+          background: isPremium ? 'rgba(201,132,62,0.18)' : PREMIUM_ENABLED ? 'var(--amber)' : '#2E1A0A',
+          color: isPremium ? 'var(--amber)' : PREMIUM_ENABLED ? '#140E0A' : 'var(--text-muted)',
           fontSize: 15,
           fontWeight: 900,
-          cursor: PREMIUM_ENABLED ? 'pointer' : 'not-allowed',
+          cursor: isPremium || !PREMIUM_ENABLED ? 'not-allowed' : 'pointer',
         }}
       >
-        {PREMIUM_ENABLED
+        {isPremium
+          ? t('premium.active')
+          : PREMIUM_ENABLED
           ? t('premium.buy', { price: PREMIUM_PRICE_STARS })
           : t('premium.comingSoon')}
       </button>
