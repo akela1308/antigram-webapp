@@ -7,7 +7,7 @@ import { StarCountPill } from '../components/StarSupportButton'
 import { useAuth } from '../contexts/AuthContext'
 import { useLanguage } from '../contexts/LanguageContext'
 import {
-  getProfile,
+  getPublicProfile,
   getUserMoments,
   isFollowing,
   followUser,
@@ -63,7 +63,7 @@ export function ProfilePage() {
     setReportMessage(null)
 
     const [p, fc, fgc, stars, relation] = await Promise.all([
-      getProfile(targetId),
+      getPublicProfile(targetId),
       getFollowersCount(targetId),
       getFollowingCount(targetId),
       getProfileStarTotal(targetId),

@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import type { Profile, UserEntitlements } from '../lib/types'
-import { getProfile, getUserEntitlements } from '../lib/db'
+import { getOwnProfile, getUserEntitlements } from '../lib/db'
 import { identify, reset, trackTelegramAuthStarted, trackTelegramAuthSucceeded } from '../lib/analytics'
 import {
   getTelegramInitData,
@@ -83,7 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [telegramAuthLoading, setTelegramAuthLoading] = useState(false)
 
   const loadProfile = useCallback(async (userId: string) => {
-    const p = await getProfile(userId)
+    const p = await getOwnProfile(userId)
     setProfile(p)
     identify(userId, {
       has_username: Boolean(p?.username),

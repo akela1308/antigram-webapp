@@ -82,10 +82,19 @@ function filterHiddenMoments<T extends { user_id: string }>(
 
 // ─── PROFILES ────────────────────────────────────────────────────────────────
 
-export async function getProfile(userId: string): Promise<Profile | null> {
+export async function getOwnProfile(userId: string): Promise<Profile | null> {
   const { data } = await supabase
     .from('profiles')
     .select('*')
+    .eq('id', userId)
+    .single()
+  return data as Profile | null
+}
+
+export async function getPublicProfile(userId: string): Promise<Profile | null> {
+  const { data } = await supabase
+    .from('profiles')
+    .select(PUBLIC_PROFILE_SELECT)
     .eq('id', userId)
     .single()
   return data as Profile | null
