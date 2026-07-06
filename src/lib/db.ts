@@ -1780,8 +1780,69 @@ export async function removeMomentFromAlbum(
 
 // ── Moment delete ─────────────────────────────────────────────────────────────
 
+function getMomentStoragePath(url: string | null | undefined): string | null {
+  if (!url) return null
+
+  const marker = '/storage/v1/object/public/moments/'
+  const markerIndex = url.indexOf(marker)
+  if (markerIndex === -1) return null
+
+  const rawPath = url.slice(markerIndex + marker.length).split('?')[0]
+  if (!rawPath) return null
+
+  try {
+    return decodeURIComponent(rawPath)
+  } catch {
+    return rawPath
+  }
+}
+
+function getMomentStoragePaths(moment: Pick<Moment, 'photo_url' | 'image_variants'> | null): string[] {
+  if (!moment) return []
+
+  const variants = normalizeImageVariants(moment.image_variants)
+  const urls = [
+    moment.photo_url,
+    variants.original,
+    variants.full,
+    variants.feed,
+    variants.thumb,
+  ]
+
+  return Array.from(
+    new Set(urls.map(getMomentStoragePath).filter((path): path is string => Boolean(path))),
+  )
+}
+
+async function deleteMomentStorageFiles(moment: Pick<Moment, 'photo_url' | 'image_variants'> | null) {
+  const paths = getMomentStoragePaths(moment)
+  if (!paths.length) return
+
+  const { error } = await supabase.storage.from('moments').remove(paths)
+  if (error) {
+    console.warn('[deleteMoment] moment row was deleted, but storage cleanup failed', error)
+  }
+}
+
 export async function deleteMoment(momentId: string): Promise<{ error: unknown }> {
+  const { data: momentForStorage, error: readError } = await supabase
+    .from('moments')
+    .select('photo_url, image_variants')
+    .eq('id', momentId)
+    .maybeSingle()
+
+  if (readError) {
+    console.warn('[deleteMoment] could not read storage paths before delete', readError)
+  }
+
   const { error } = await supabase.from('moments').delete().eq('id', momentId)
+  if (!error) {
+    await deleteMomentStorageFiles(momentForStorage ? {
+      photo_url: momentForStorage.photo_url,
+      image_variants: normalizeImageVariants(momentForStorage.image_variants),
+    } : null)
+  }
+
   return { error }
 }
 

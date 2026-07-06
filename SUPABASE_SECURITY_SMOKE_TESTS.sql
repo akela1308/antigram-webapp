@@ -226,6 +226,20 @@ with checks as (
   union all
 
   select
+    'moments storage delete policy exists',
+    exists (
+      select 1
+      from pg_policies
+      where schemaname = 'storage'
+        and tablename = 'objects'
+        and policyname = 'Moments files can be deleted from own folder or by admin'
+        and cmd = 'DELETE'
+    ),
+    'deleting a moment should be able to clean owner storage files without allowing users to delete other users files'
+
+  union all
+
+  select
     'saved_moments owner policies exist',
     (
       select count(*)
