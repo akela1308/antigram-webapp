@@ -39,7 +39,10 @@ export type TelegramWebAppPlatform = {
   openLink?: (url: string) => void
   openTelegramLink?: (url: string) => void
   openInvoice?: (url: string, callback?: (status: string) => void) => void
-  downloadFile?: (url: string, fileName: string) => void
+  downloadFile?: (
+    params: { url: string; file_name: string },
+    callback?: (status: boolean | 'downloading' | 'cancelled' | 'failed' | 'finished' | string) => void,
+  ) => void
   shareToStory?: (
     mediaUrl: string,
     params?: {
@@ -186,12 +189,67 @@ export function openExternalLink(url: string): void {
   window.open(url, '_blank', 'noopener,noreferrer')
 }
 
-export function downloadOrOpenFile(url: string, fileName: string): void {
+async function shareFileFromUrl(url: string, fileName: string): Promise<boolean> {
+  if (!navigator.share || typeof File === 'undefined') return false
+
+  try {
+    const response = await fetch(url)
+    if (!response.ok) return false
+
+    const blob = await response.blob()
+    const file = new File([blob], fileName, { type: blob.type || 'image/jpeg' })
+    const canShareFiles = typeof navigator.canShare === 'function'
+      ? navigator.canShare({ files: [file] })
+      : true
+
+    if (!canShareFiles) return false
+
+    await navigator.share({ files: [file], title: 'Antigram' })
+    return true
+  } catch {
+    return false
+  }
+}
+
+function downloadWithAnchor(url: string, fileName: string): boolean {
+  if (typeof document === 'undefined') return false
+
+  try {
+    const link = document.createElement('a')
+    link.href = url
+    link.download = fileName
+    link.rel = 'noopener noreferrer'
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    return true
+  } catch {
+    return false
+  }
+}
+
+export async function downloadOrOpenFile(url: string, fileName: string): Promise<void> {
   const tg = getTelegramWebApp()
   if (typeof tg?.downloadFile === 'function') {
-    tg.downloadFile(url, fileName)
-    return
+    const status = await new Promise<boolean | string>(resolve => {
+      const timeout = window.setTimeout(() => resolve('timeout'), 2500)
+      try {
+        tg.downloadFile?.({ url, file_name: fileName }, result => {
+          window.clearTimeout(timeout)
+          resolve(result)
+        })
+      } catch {
+        window.clearTimeout(timeout)
+        resolve('failed')
+      }
+    })
+
+    if (status === true || status === 'finished' || status === 'downloading') return
   }
+
+  if (await shareFileFromUrl(url, fileName)) return
+  if (downloadWithAnchor(url, fileName)) return
+
   openExternalLink(url)
 }
 
