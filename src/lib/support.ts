@@ -2,6 +2,7 @@ import { supabase } from './supabase'
 import type { Profile } from './types'
 
 export const SUPPORT_ATTACHMENT_MAX_BYTES = 8 * 1024 * 1024
+const SUPPORT_REPORTER_PROFILE_SELECT = 'id, username, display_name, bio, avatar_url, website, created_at'
 
 export interface SupportRequest {
   id: string
@@ -46,7 +47,7 @@ export async function sendSupportRequest(formData: FormData): Promise<void> {
 export async function getSupportRequests(): Promise<SupportRequest[]> {
   const { data, error } = await supabase
     .from('support_requests')
-    .select('*, profiles:profiles!support_requests_reporter_id_fkey(*)')
+    .select(`*, profiles:profiles!support_requests_reporter_id_fkey(${SUPPORT_REPORTER_PROFILE_SELECT})`)
     .order('created_at', { ascending: false })
     .limit(100)
 

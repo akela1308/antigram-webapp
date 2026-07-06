@@ -33,6 +33,9 @@ type BlockRelationshipRow = {
   blocked_id: string
 }
 
+const PUBLIC_PROFILE_SELECT = 'id, username, display_name, bio, avatar_url, website, created_at'
+const MOMENT_WITH_PUBLIC_PROFILE_SELECT = `*, profiles(${PUBLIC_PROFILE_SELECT})`
+
 function isMissingTableError(error: unknown, tableName: string): boolean {
   const maybeError = error as { code?: string; message?: string; details?: string; hint?: string } | null
   if (!maybeError) return false
@@ -104,7 +107,7 @@ export async function searchUsers(query: string, viewerId?: string | null): Prom
     getHiddenUserIdsForViewer(viewerId),
     supabase
       .from('profiles')
-      .select('*')
+      .select(PUBLIC_PROFILE_SELECT)
       .or(`username.ilike.%${q}%,display_name.ilike.%${q}%`)
       .limit(30),
   ])
@@ -140,7 +143,7 @@ export async function searchMoments(
     getHiddenUserIdsForViewer(viewerId),
     supabase
       .from('moments')
-      .select('*, profiles(*)')
+      .select(MOMENT_WITH_PUBLIC_PROFILE_SELECT)
       .eq('is_public', true)
       .or(filters.join(','))
       .order('created_at', { ascending: false })
@@ -174,7 +177,7 @@ export async function getFeed(userId: string, limit = 20): Promise<MomentWithPro
 
   const { data } = await supabase
     .from('moments')
-    .select('*, profiles(*)')
+    .select(MOMENT_WITH_PUBLIC_PROFILE_SELECT)
     .eq('is_public', true)
     .in('user_id', followingIds)
     .order('created_at', { ascending: false })
@@ -190,7 +193,7 @@ export async function getRandomMoments(
     getHiddenUserIdsForViewer(viewerId),
     supabase
       .from('moments')
-      .select('*, profiles(*)')
+      .select(MOMENT_WITH_PUBLIC_PROFILE_SELECT)
       .eq('is_public', true)
       .order('created_at', { ascending: false })
       .limit(limit * 4),
@@ -238,7 +241,7 @@ export async function getMomentsByEmotion(
 
   const { data } = await supabase
     .from('moments')
-    .select('*, profiles(*)')
+    .select(MOMENT_WITH_PUBLIC_PROFILE_SELECT)
     .eq('is_public', true)
     .in('id', sortedIds)
 
@@ -353,7 +356,7 @@ export async function getUserMoments(userId: string): Promise<Moment[]> {
 export async function getMoment(momentId: string): Promise<MomentWithProfile | null> {
   const { data } = await supabase
     .from('moments')
-    .select('*, profiles(*)')
+    .select(MOMENT_WITH_PUBLIC_PROFILE_SELECT)
     .eq('id', momentId)
     .single()
   return (data as MomentWithProfile) ?? null
@@ -801,7 +804,7 @@ export async function getFollowers(userId: string): Promise<FollowProfile[]> {
   const ids = rows.map(row => row.follower_id)
   const { data: profiles } = await supabase
     .from('profiles')
-    .select('*')
+    .select(PUBLIC_PROFILE_SELECT)
     .in('id', ids)
 
   const profileMap = new Map(((profiles as Profile[] | null) ?? []).map(profile => [profile.id, profile]))
@@ -830,7 +833,7 @@ export async function getFollowing(userId: string): Promise<FollowProfile[]> {
   const ids = rows.map(row => row.following_id)
   const { data: profiles } = await supabase
     .from('profiles')
-    .select('*')
+    .select(PUBLIC_PROFILE_SELECT)
     .in('id', ids)
 
   const profileMap = new Map(((profiles as Profile[] | null) ?? []).map(profile => [profile.id, profile]))
@@ -879,7 +882,7 @@ export async function getSavedMomentIds(userId: string): Promise<string[]> {
 export async function getSavedMoments(userId: string): Promise<MomentWithProfile[]> {
   const { data, error } = await supabase
     .from('saved_moments')
-    .select('saved_at, moments(*, profiles(*))')
+    .select(`saved_at, moments(${MOMENT_WITH_PUBLIC_PROFILE_SELECT})`)
     .eq('user_id', userId)
     .order('saved_at', { ascending: false })
 
@@ -914,7 +917,7 @@ export async function getComments(momentId: string): Promise<CommentWithProfile[
   if (!comments || comments.length === 0) return []
 
   const userIds = [...new Set((comments as { user_id: string }[]).map(c => c.user_id))]
-  const { data: profiles } = await supabase.from('profiles').select('*').in('id', userIds)
+  const { data: profiles } = await supabase.from('profiles').select(PUBLIC_PROFILE_SELECT).in('id', userIds)
   const profileMap: Record<string, Profile> = {}
   for (const p of (profiles ?? []) as Profile[]) profileMap[p.id] = p
 
@@ -929,7 +932,7 @@ export async function getComments(momentId: string): Promise<CommentWithProfile[
 export async function getNotifications(userId: string): Promise<NotificationItem[]> {
   const result = await supabase
     .from('notifications')
-    .select('*, profiles:profiles!notifications_actor_id_fkey(*), moments(photo_url, image_variants)')
+    .select(`*, profiles:profiles!notifications_actor_id_fkey(${PUBLIC_PROFILE_SELECT}), moments(photo_url, image_variants)`)
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(50)
@@ -939,7 +942,7 @@ export async function getNotifications(userId: string): Promise<NotificationItem
   if (isMissingImageVariantsError(result.error)) {
     const legacyResult = await supabase
       .from('notifications')
-      .select('*, profiles:profiles!notifications_actor_id_fkey(*), moments(photo_url)')
+      .select(`*, profiles:profiles!notifications_actor_id_fkey(${PUBLIC_PROFILE_SELECT}), moments(photo_url)`)
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(50)
@@ -1233,10 +1236,10 @@ export async function getModerationReports(status: ReportStatus | 'all' = 'open'
 
   const [{ data: profiles }, { data: moments }] = await Promise.all([
     profileIds.size > 0
-      ? supabase.from('profiles').select('*').in('id', Array.from(profileIds))
+      ? supabase.from('profiles').select(PUBLIC_PROFILE_SELECT).in('id', Array.from(profileIds))
       : Promise.resolve({ data: [] }),
     momentIds.size > 0
-      ? supabase.from('moments').select('*, profiles(*)').in('id', Array.from(momentIds))
+      ? supabase.from('moments').select(MOMENT_WITH_PUBLIC_PROFILE_SELECT).in('id', Array.from(momentIds))
       : Promise.resolve({ data: [] }),
   ])
 
@@ -1356,7 +1359,7 @@ export async function addComment(
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('*')
+    .select(PUBLIC_PROFILE_SELECT)
     .eq('id', userId)
     .single()
   return {
