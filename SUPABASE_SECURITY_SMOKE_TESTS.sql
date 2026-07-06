@@ -395,6 +395,82 @@ with checks as (
         and column_name in ('is_admin', 'is_banned', 'is_blocked')
     ),
     'moderation view should not expose raw profile service flags'
+
+  union all
+
+  select
+    'star webhook events table exists',
+    to_regclass('public.star_webhook_events') is not null,
+    'telegram Stars webhook attempts should be ledgered for retries and duplicate handling'
+
+  union all
+
+  select
+    'star webhook events RLS is enabled',
+    exists (
+      select 1
+      from pg_tables
+      where schemaname = 'public'
+        and tablename = 'star_webhook_events'
+        and rowsecurity = true
+    ),
+    'webhook ledger should not be public'
+
+  union all
+
+  select
+    'complete_star_payment function exists',
+    exists (
+      select 1
+      from information_schema.routines
+      where routine_schema = 'public'
+        and routine_name = 'complete_star_payment'
+    ),
+    'successful_payment should complete through a server-side idempotent function'
+
+  union all
+
+  select
+    'star payments charge id is unique',
+    exists (
+      select 1
+      from pg_constraint c
+      join pg_class t on t.oid = c.conrelid
+      join pg_namespace n on n.oid = t.relnamespace
+      where n.nspname = 'public'
+        and t.relname = 'star_payments'
+        and c.contype = 'u'
+        and pg_get_constraintdef(c.oid) like '%telegram_payment_charge_id%'
+    ),
+    'telegram_payment_charge_id must be unique for duplicate webhook safety'
+
+  union all
+
+  select
+    'star reconciliation is not granted to anon',
+    not exists (
+      select 1
+      from information_schema.role_table_grants
+      where table_schema = 'public'
+        and table_name = 'star_payment_reconciliation'
+        and grantee = 'anon'
+        and privilege_type = 'SELECT'
+    ),
+    'anonymous users must not be able to query payment reconciliation'
+
+  union all
+
+  select
+    'service_role can run star payment surfaces',
+    (
+      select count(*)
+      from information_schema.role_table_grants
+      where table_schema = 'public'
+        and table_name in ('star_payments', 'star_webhook_events', 'moment_star_totals', 'profile_star_totals')
+        and grantee = 'service_role'
+        and privilege_type in ('SELECT', 'INSERT', 'UPDATE')
+    ) >= 12,
+    'Stars Edge Functions need narrow service_role grants to create invoices, ledger webhooks, and complete payments'
 )
 select
   check_name,
