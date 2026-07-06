@@ -84,6 +84,26 @@ with checks as (
   union all
 
   select
+    'public_moments view exists',
+    to_regclass('public.public_moments') is not null,
+    'public moment feed surface should hide direct profile joins'
+
+  union all
+
+  select
+    'public_moments exposes only safe profile columns',
+    not exists (
+      select 1
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'public_moments'
+        and column_name in ('is_admin', 'is_banned', 'is_blocked')
+    ),
+    'public_moments should not expose service profile flags'
+
+  union all
+
+  select
     'moments privacy select policies exist',
     (
       select count(*)

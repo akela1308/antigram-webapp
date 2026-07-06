@@ -26,7 +26,7 @@ import type {
   UserEntitlements,
 } from './types'
 import { EMOTIONS } from './types'
-import { getMomentImageUrl } from './imageVariants'
+import { getMomentImageUrl, normalizeImageVariants } from './imageVariants'
 
 type BlockRelationshipRow = {
   blocker_id: string
@@ -36,6 +36,39 @@ type BlockRelationshipRow = {
 const PUBLIC_PROFILE_SELECT = 'id, username, display_name, bio, avatar_url, website, created_at'
 const MOMENT_WITH_PUBLIC_PROFILE_SELECT = `*, profiles(${PUBLIC_PROFILE_SELECT})`
 const PUBLIC_PROFILES_VIEW = 'public_profiles'
+const PUBLIC_MOMENTS_VIEW = 'public_moments'
+const PUBLIC_MOMENT_SELECT = [
+  'id',
+  'user_id',
+  'photo_url',
+  'image_variants',
+  'caption',
+  'mood',
+  'custom_mood_emoji',
+  'custom_mood_label',
+  'film_preset_id',
+  'is_public',
+  'visibility',
+  'created_at',
+  'profile_id',
+  'username',
+  'display_name',
+  'bio',
+  'avatar_url',
+  'website',
+  'profile_created_at',
+].join(', ')
+
+type PublicMomentRow = Omit<Moment, 'image_variants'> & {
+  image_variants?: unknown
+  profile_id: string
+  username: string | null
+  display_name: string | null
+  bio: string | null
+  avatar_url: string | null
+  website: string | null
+  profile_created_at: string
+}
 
 function isMissingTableError(error: unknown, tableName: string): boolean {
   const maybeError = error as { code?: string; message?: string; details?: string; hint?: string } | null
@@ -81,6 +114,36 @@ function filterHiddenMoments<T extends { user_id: string }>(
   return moments.filter(moment => !hiddenUserIds.has(moment.user_id))
 }
 
+function mapPublicMomentRow(row: PublicMomentRow): MomentWithProfile {
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    photo_url: row.photo_url,
+    image_variants: normalizeImageVariants(row.image_variants),
+    caption: row.caption,
+    mood: row.mood,
+    custom_mood_emoji: row.custom_mood_emoji,
+    custom_mood_label: row.custom_mood_label,
+    film_preset_id: row.film_preset_id,
+    is_public: row.is_public,
+    visibility: row.visibility,
+    created_at: row.created_at,
+    profiles: {
+      id: row.profile_id,
+      username: row.username,
+      display_name: row.display_name,
+      bio: row.bio,
+      avatar_url: row.avatar_url,
+      website: row.website,
+      created_at: row.profile_created_at,
+    },
+  }
+}
+
+function mapPublicMomentRows(rows: PublicMomentRow[] | null | undefined): MomentWithProfile[] {
+  return (rows ?? []).map(mapPublicMomentRow)
+}
+
 async function getPublicProfilesByIds(userIds: string[]): Promise<Profile[]> {
   if (userIds.length === 0) return []
 
@@ -108,6 +171,44 @@ async function getPublicProfilesByIds(userIds: string[]): Promise<Profile[]> {
   }
 
   return (fallback.data as Profile[] | null) ?? []
+}
+
+async function loadPublicMomentsByIds(
+  momentIds: string[],
+  viewerId?: string | null,
+): Promise<MomentWithProfile[]> {
+  if (momentIds.length === 0) return []
+
+  const uniqueIds = [...new Set(momentIds)]
+  const [hiddenUserIds, result] = await Promise.all([
+    getHiddenUserIdsForViewer(viewerId),
+    supabase
+      .from(PUBLIC_MOMENTS_VIEW)
+      .select(PUBLIC_MOMENT_SELECT)
+      .in('id', uniqueIds),
+  ])
+
+  if (!result.error) {
+    return filterHiddenMoments(mapPublicMomentRows(result.data as unknown as PublicMomentRow[] | null), hiddenUserIds)
+  }
+
+  if (!isMissingTableError(result.error, PUBLIC_MOMENTS_VIEW)) {
+    console.error('[Moments] public moments load failed:', result.error)
+    return []
+  }
+
+  const fallback = await supabase
+    .from('moments')
+    .select(MOMENT_WITH_PUBLIC_PROFILE_SELECT)
+    .eq('is_public', true)
+    .in('id', uniqueIds)
+
+  if (fallback.error) {
+    console.error('[Moments] public moments fallback failed:', fallback.error)
+    return []
+  }
+
+  return filterHiddenMoments((fallback.data as MomentWithProfile[] | null) ?? [], hiddenUserIds)
 }
 
 async function searchPublicProfiles(query: string): Promise<Profile[]> {
@@ -197,19 +298,35 @@ export async function searchMoments(
     ...moodMatches.map(mood => `mood.eq.${mood}`),
   ]
 
-  const [hiddenUserIds, { data, error }] = await Promise.all([
+  const [hiddenUserIds, result] = await Promise.all([
     getHiddenUserIdsForViewer(viewerId),
     supabase
-      .from('moments')
-      .select(MOMENT_WITH_PUBLIC_PROFILE_SELECT)
-      .eq('is_public', true)
+      .from(PUBLIC_MOMENTS_VIEW)
+      .select(PUBLIC_MOMENT_SELECT)
       .or(filters.join(','))
       .order('created_at', { ascending: false })
       .limit(limit),
   ])
 
+  if (!result.error) {
+    return filterHiddenMoments(mapPublicMomentRows(result.data as unknown as PublicMomentRow[] | null), hiddenUserIds)
+  }
+
+  if (!isMissingTableError(result.error, PUBLIC_MOMENTS_VIEW)) {
+    console.error('[Search] public moments failed:', result.error)
+    return []
+  }
+
+  const { data, error } = await supabase
+    .from('moments')
+    .select(MOMENT_WITH_PUBLIC_PROFILE_SELECT)
+    .eq('is_public', true)
+    .or(filters.join(','))
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
   if (error) {
-    console.error('[Search] moments failed:', error)
+    console.error('[Search] moments fallback failed:', error)
     return []
   }
 
@@ -233,13 +350,33 @@ export async function getFeed(userId: string, limit = 20): Promise<MomentWithPro
 
   if (followingIds.length === 0) return []
 
-  const { data } = await supabase
+  const result = await supabase
+    .from(PUBLIC_MOMENTS_VIEW)
+    .select(PUBLIC_MOMENT_SELECT)
+    .in('user_id', followingIds)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (!result.error) return mapPublicMomentRows(result.data as unknown as PublicMomentRow[] | null)
+
+  if (!isMissingTableError(result.error, PUBLIC_MOMENTS_VIEW)) {
+    console.error('[Feed] public moments failed:', result.error)
+    return []
+  }
+
+  const { data, error } = await supabase
     .from('moments')
     .select(MOMENT_WITH_PUBLIC_PROFILE_SELECT)
     .eq('is_public', true)
     .in('user_id', followingIds)
     .order('created_at', { ascending: false })
     .limit(limit)
+
+  if (error) {
+    console.error('[Feed] moments fallback failed:', error)
+    return []
+  }
+
   return (data as MomentWithProfile[]) ?? []
 }
 
@@ -247,16 +384,36 @@ export async function getRandomMoments(
   limit: number,
   viewerId?: string | null,
 ): Promise<MomentWithProfile[]> {
-  const [hiddenUserIds, { data }] = await Promise.all([
+  const [hiddenUserIds, result] = await Promise.all([
     getHiddenUserIdsForViewer(viewerId),
     supabase
-      .from('moments')
-      .select(MOMENT_WITH_PUBLIC_PROFILE_SELECT)
-      .eq('is_public', true)
+      .from(PUBLIC_MOMENTS_VIEW)
+      .select(PUBLIC_MOMENT_SELECT)
       .order('created_at', { ascending: false })
       .limit(limit * 4),
   ])
-  if (!data || data.length === 0) return []
+
+  if (!result.error) {
+    const publicMoments = mapPublicMomentRows(result.data as unknown as PublicMomentRow[] | null)
+    if (publicMoments.length === 0) return []
+    const visibleMoments = filterHiddenMoments(publicMoments, hiddenUserIds)
+    const shuffled = [...visibleMoments].sort(() => Math.random() - 0.5)
+    return (shuffled.slice(0, limit) as MomentWithProfile[])
+  }
+
+  if (!isMissingTableError(result.error, PUBLIC_MOMENTS_VIEW)) {
+    console.error('[Random] public moments failed:', result.error)
+    return []
+  }
+
+  const { data, error } = await supabase
+    .from('moments')
+    .select(MOMENT_WITH_PUBLIC_PROFILE_SELECT)
+    .eq('is_public', true)
+    .order('created_at', { ascending: false })
+    .limit(limit * 4)
+
+  if (error || !data || data.length === 0) return []
   const visibleMoments = filterHiddenMoments(data as MomentWithProfile[], hiddenUserIds)
   const shuffled = [...visibleMoments].sort(() => Math.random() - 0.5)
   return (shuffled.slice(0, limit) as MomentWithProfile[])
@@ -267,20 +424,36 @@ export async function getMomentsByEmotion(
   limit = 30,
   viewerId?: string | null,
 ): Promise<MomentWithProfile[]> {
-  const [hiddenUserIds, { data: reactionData }, { data: moodData }] = await Promise.all([
-    getHiddenUserIdsForViewer(viewerId),
+  const [{ data: reactionData }, moodResult] = await Promise.all([
     supabase
       .from('reactions')
       .select('moment_id')
       .eq('type', emotion),
     supabase
+      .from(PUBLIC_MOMENTS_VIEW)
+      .select('id')
+      .eq('mood', emotion)
+      .order('created_at', { ascending: false })
+      .limit(limit * 3),
+  ])
+
+  let moodData = moodResult.data as { id: string }[] | null
+  if (moodResult.error) {
+    if (!isMissingTableError(moodResult.error, PUBLIC_MOMENTS_VIEW)) {
+      console.error('[Emotion] public mood moments failed:', moodResult.error)
+      return []
+    }
+
+    const fallbackMood = await supabase
       .from('moments')
       .select('id')
       .eq('is_public', true)
       .eq('mood', emotion)
       .order('created_at', { ascending: false })
-      .limit(limit * 3),
-  ])
+      .limit(limit * 3)
+
+    moodData = fallbackMood.data as { id: string }[] | null
+  }
 
   const countMap: Record<string, number> = {}
   for (const m of (moodData ?? []) as { id: string }[]) {
@@ -297,15 +470,7 @@ export async function getMomentsByEmotion(
     .slice(0, limit)
     .map(([id]) => id)
 
-  const { data } = await supabase
-    .from('moments')
-    .select(MOMENT_WITH_PUBLIC_PROFILE_SELECT)
-    .eq('is_public', true)
-    .in('id', sortedIds)
-
-  if (!data) return []
-
-  const visibleMoments = filterHiddenMoments(data as MomentWithProfile[], hiddenUserIds)
+  const visibleMoments = await loadPublicMomentsByIds(sortedIds, viewerId)
   const momentMap = new Map(visibleMoments.map(m => [m.id, m]))
   return sortedIds.map(id => momentMap.get(id)).filter(Boolean) as MomentWithProfile[]
 }
@@ -412,6 +577,19 @@ export async function getUserMoments(userId: string): Promise<Moment[]> {
 }
 
 export async function getMoment(momentId: string): Promise<MomentWithProfile | null> {
+  const result = await supabase
+    .from(PUBLIC_MOMENTS_VIEW)
+    .select(PUBLIC_MOMENT_SELECT)
+    .eq('id', momentId)
+    .single()
+
+  if (!result.error) return mapPublicMomentRow(result.data as unknown as PublicMomentRow)
+
+  if (!isMissingTableError(result.error, PUBLIC_MOMENTS_VIEW)) {
+    console.error('[Moment] public moment load failed:', result.error)
+    return null
+  }
+
   const { data } = await supabase
     .from('moments')
     .select(MOMENT_WITH_PUBLIC_PROFILE_SELECT)

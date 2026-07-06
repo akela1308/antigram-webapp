@@ -119,7 +119,15 @@ id, username, display_name, bio, avatar_url, website, created_at
 
 В коде оставлен fallback на `profiles` с явным public-safe набором полей, чтобы прод не сломался, если Vercel задеплоится раньше ручного применения миграции.
 
-Остаточный риск: nested joins вида `moments -> profiles(...)` пока используют FK-связь PostgREST с явным safe select. Следующий hardening: DB-level public feed/view/RPC, чтобы и лента не зависела от прямого join к `profiles`.
+2026-07-06: добавлена миграция `202607060005_public_moments_view.sql` с `public.public_moments` view. Основные публичные moment-запросы клиента переведены на этот слой с fallback:
+
+- поиск моментов;
+- following feed;
+- random/for-you feed;
+- подборки по эмоциям;
+- публичный moment detail.
+
+Остаточный риск: saved/admin/album-specific nested joins ещё могут использовать FK-связь PostgREST с явным safe select. Это уже не основной публичный discovery surface, но следующий hardening может перевести и эти участки на RPC/view.
 
 ### 5. Client-writable `account_identities`
 
@@ -177,5 +185,6 @@ order by tablename;
 3. Сделано 2026-07-06: добавлен `public_profiles` view, прямые публичные profile reads переведены на него.
 4. Сделано 2026-07-06: добавлена canonical comments migration/RLS.
 5. Сделано 2026-07-06: добавлен foundation для privacy model `public / followers / private`.
-6. Сделано 2026-07-06: добавлен `SUPABASE_SECURITY_SMOKE_TESTS.sql` для ручной проверки ключевых RLS/schema гарантий в Supabase.
-7. Добавить автоматические smoke-тесты RLS через Supabase local или SQL fixtures.
+6. Сделано 2026-07-06: добавлен `public_moments` view, публичные ленты/поиск/подборки переведены на него.
+7. Сделано 2026-07-06: добавлен `SUPABASE_SECURITY_SMOKE_TESTS.sql` для ручной проверки ключевых RLS/schema гарантий в Supabase.
+8. Добавить автоматические smoke-тесты RLS через Supabase local или SQL fixtures.
