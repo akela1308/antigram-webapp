@@ -1,5 +1,7 @@
 // PostHog analytics — direct HTTP (no SDK dependency, safe for Mini App WebView)
 
+import { getPlatformName, getTelegramWebApp, isTelegramPlatform } from './platform'
+
 const POSTHOG_KEY = import.meta.env.VITE_POSTHOG_KEY || ''
 const POSTHOG_HOST = 'https://eu.i.posthog.com'
 
@@ -56,11 +58,19 @@ export function reset(): void {
 
 export function track(event: string, properties?: Record<string, unknown>): void {
   if (!POSTHOG_KEY) return
+  const tg = getTelegramWebApp()
   post({
     api_key: POSTHOG_KEY,
     distinct_id: _distinctId ?? getAnonymousId(),
     event,
-    properties: { ...properties, $lib: 'antigram-tg' },
+    properties: {
+      ...properties,
+      $lib: 'antigram-tg',
+      app_platform: getPlatformName(),
+      is_telegram: isTelegramPlatform(),
+      telegram_platform: tg?.platform ?? null,
+      telegram_language: tg?.initDataUnsafe?.user?.language_code ?? null,
+    },
   })
 }
 

@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useLanguage } from '../contexts/LanguageContext'
@@ -6,6 +7,7 @@ import {
   PREMIUM_PRICE_STARS,
   PREMIUM_PERIOD_DAYS,
 } from '../lib/premium'
+import { trackPremiumPageViewed, trackPremiumStarted } from '../lib/analytics'
 
 const featureKeys = [
   'premium.feature.frames',
@@ -23,6 +25,10 @@ export function PremiumPage() {
   const premiumUntil = entitlements?.premium_until
     ? new Date(entitlements.premium_until).toLocaleDateString()
     : null
+
+  useEffect(() => {
+    trackPremiumPageViewed('premium_page')
+  }, [])
 
   return (
     <div
@@ -129,6 +135,9 @@ export function PremiumPage() {
 
       <button
         disabled={isPremium || !PREMIUM_ENABLED}
+        onClick={() => {
+          if (!isPremium && PREMIUM_ENABLED) trackPremiumStarted()
+        }}
         style={{
           width: '100%',
           padding: '15px 0',

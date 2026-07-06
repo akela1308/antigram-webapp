@@ -7,7 +7,16 @@ import { EMOTIONS } from '../lib/types'
 import { FILM_PRESETS } from '../lib/filmPresets'
 import type { FilmPreset, AlgoType, GrainConfig, FlareType } from '../lib/filmPresets'
 import type { ReactionType } from '../lib/types'
-import { trackPhotoPosted, trackFilterApplied, trackShareCardOpened, trackShareCardSent } from '../lib/analytics'
+import {
+  trackCameraCaptureTaken,
+  trackFilterApplied,
+  trackMoodSelected,
+  trackPhotoPosted,
+  trackShareCardOpened,
+  trackShareCardSent,
+  trackUploadFailed,
+  trackUploadStarted,
+} from '../lib/analytics'
 import { addReaction, getTodaysMomentCount } from '../lib/db'
 import { getDailyFrameLimit } from '../lib/premium'
 import { shareMomentToChat, shareMomentToStory, canShareMomentToStory } from '../lib/telegramShare'
@@ -449,6 +458,7 @@ export function UploadPage() {
   const streamRef  = useRef<MediaStream | null>(null)
   const captureLockRef = useRef(false)
   const emojiInputRef = useRef<HTMLInputElement>(null)
+  const trackedUploadStartRef = useRef(false)
 
   // Read film preset from router state (set by FilmPicker sheet in BottomNav)
   const loadedFilmId = (location.state as { filmId?: string } | null)?.filmId
@@ -511,6 +521,13 @@ export function UploadPage() {
       emojiInputRef.current.value = ''
     }
   }
+
+  useEffect(() => {
+    if (!trackedUploadStartRef.current) {
+      trackedUploadStartRef.current = true
+      trackUploadStarted(filmSelectionLocked ? 'loaded_film' : 'camera')
+    }
+  }, [filmSelectionLocked])
 
   useEffect(() => {
     const updateViewportHeight = () => setViewportHeight(window.innerHeight)
@@ -635,6 +652,7 @@ export function UploadPage() {
         captureLockRef.current = false
         setIsCapturing(false)
         if (!blob) return
+        trackCameraCaptureTaken()
         setPhotoBlob(blob)
         setPreviewUrl(URL.createObjectURL(blob))
         streamRef.current?.getTracks().forEach(t => t.stop())
@@ -642,6 +660,7 @@ export function UploadPage() {
       }, 'image/jpeg', MOMENT_EXPORT_QUALITY)
     } catch (err) {
       console.error('[Camera] capture failed:', err)
+      trackUploadFailed('capture_failed')
       captureLockRef.current = false
       setIsCapturing(false)
       setCamError(t('camera.captureFailed'))
@@ -728,8 +747,10 @@ export function UploadPage() {
       if (msg.includes('daily_frame_limit_exceeded')) {
         setError(t('camera.limitReached'))
         setTodayCount(dailyFrameLimit)
+        trackUploadFailed('daily_frame_limit_exceeded')
       } else {
         setError(t('camera.publishError'))
+        trackUploadFailed('publish_failed')
       }
       setPhase('preview')
     }
@@ -871,7 +892,11 @@ export function UploadPage() {
                   key={e.type}
                   onClick={() => {
                     setMood(active ? null : e.type)
-                    if (!active) { setCustomMoodEmoji(''); setCustomMoodLabel('') }
+                    if (!active) {
+                      trackMoodSelected(e.type)
+                      setCustomMoodEmoji('')
+                      setCustomMoodLabel('')
+                    }
                   }}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 6,
@@ -1128,6 +1153,7 @@ export function UploadPage() {
                   setCustomMoodEmoji(draftEmoji || '✦')
                   setCustomMoodLabel(draftLabel.trim())
                   setMood('custom')
+                  trackMoodSelected('custom')
                   setShowCustomMoodSheet(false)
                 }}
                 disabled={!draftLabel.trim()}

@@ -1,22 +1,17 @@
 # Antigram Analytics Plan
 
-Дата: 2026-07-05
+This document keeps product analytics event names consistent across Codex, Claude, and manual implementation work.
 
-## Цель
+## Principles
 
-Сделать события PostHog предсказуемыми для продуктовых решений: активация, публикация первого кадра, реакции, шэринг, Premium/Stars, support и безопасность.
+- Do not send PII, raw Telegram initData, captions, search text, support text, or file names.
+- Prefer stable enums and IDs over free text.
+- Track product intent and funnel progress, not every render.
+- Analytics must never block or crash the app.
 
-## Принципы
+## Activation Funnel
 
-- Не отправлять raw Telegram `initData`.
-- Не отправлять display name, username, email, текст сообщений, captions или support message.
-- Для пользователя можно отправлять только `distinct_id`, который уже является внутренним Supabase user id.
-- До авторизации используется локальный anonymous id без PII.
-- Event names должны быть snake_case и описывать действие пользователя или системный результат.
-
-## Canonical Events
-
-### Activation
+Events:
 
 - `miniapp_opened`
 - `telegram_auth_started`
@@ -25,7 +20,11 @@
 - `first_moment_started`
 - `first_moment_posted`
 
-### Creation
+Goal: understand whether a new user reaches their first published frame.
+
+## Creation Funnel
+
+Events:
 
 - `upload_started`
 - `film_selected`
@@ -34,7 +33,18 @@
 - `moment_posted`
 - `upload_failed`
 
-### Engagement
+Safe properties:
+
+- `source`: `camera`, `loaded_film`, `gallery`, `post_success`
+- `film_id`
+- `mood`
+- `reason`
+
+Goal: identify where capture/posting fails or feels too heavy.
+
+## Engagement Funnel
+
+Events:
 
 - `reaction_sent`
 - `comment_posted`
@@ -42,16 +52,35 @@
 - `profile_followed`
 - `profile_opened`
 - `album_opened`
-- `album_created`
 
-### Discovery
+Safe properties:
+
+- `reaction`
+- `source`
+- `type`
+
+Goal: measure whether people interact after browsing.
+
+## Discovery Funnel
+
+Events:
 
 - `search_submitted`
 - `search_result_opened`
 - `mood_channel_opened`
 - `mood_channel_followed`
 
-### Growth
+Safe properties:
+
+- `scope`
+- `type`
+- `mood`
+
+Do not send raw search query text.
+
+## Growth Funnel
+
+Events:
 
 - `share_card_opened`
 - `share_card_sent`
@@ -59,7 +88,16 @@
 - `invite_friend_opened`
 - `friend_first_post_attributed`
 
-### Monetization
+Safe properties:
+
+- `source`
+- `target`
+
+Goal: understand Telegram-native sharing without exposing private URLs as product analytics text.
+
+## Monetization Funnel
+
+Events:
 
 - `stars_invoice_created`
 - `stars_payment_succeeded`
@@ -67,46 +105,32 @@
 - `premium_started`
 - `premium_activated`
 
-### Trust
+Safe properties:
+
+- `amount`
+- `source`
+
+Goal: measure intent and completion without storing payment credentials or raw webhook payloads in analytics.
+
+## Trust Funnel
+
+Events:
 
 - `report_submitted`
 - `support_request_submitted`
 - `image_load_slow`
 - `safe_area_fallback_used`
 
-## Current Implementation
+Safe properties:
 
-`src/lib/analytics.ts` exposes canonical helpers for all events above.
+- `target`
+- `surface`
 
-Older helper names still exist as aliases:
+Goal: spot safety/support issues before they become user churn.
 
-- `trackPhotoPosted` -> `moment_posted`
-- `trackReactionAdded` -> `reaction_sent`
-- `trackUserFollowed` -> `profile_followed`
-- `trackFilterApplied` -> `film_selected`
-- `trackCommentAdded` -> `comment_posted`
-- `trackSessionStart` -> `miniapp_opened`
+## Current Implementation Notes
 
-This lets existing screens keep working while we gradually rename imports.
-
-## Next Instrumentation Tasks
-
-1. Track `camera_capture_taken` when the camera button succeeds.
-2. Track `mood_selected` when the user chooses a reaction/mood before publish.
-3. Track `upload_failed` with a safe reason code, not raw error text.
-4. Track `search_submitted` and `search_result_opened` in Search.
-5. Track `profile_opened` and `album_opened`.
-6. Track `stars_invoice_created` after invoice link creation and `stars_payment_succeeded` after confirmed success.
-7. Add PostHog funnels:
-   - open -> auth -> first moment started -> first moment posted;
-   - moment opened -> reaction sent;
-   - moment posted -> share card opened -> share card sent;
-   - Stars modal opened -> invoice created -> payment succeeded.
-
-## Dashboard Questions
-
-- How many users publish a first moment in the first session?
-- Which film presets lead to more posts?
-- Which surfaces create the most reactions: feed, profile, search, moment detail?
-- Does Telegram share lead to new user activation?
-- How many users hit the daily frame limit and open Premium?
+- Analytics lives in `src/lib/analytics.ts`.
+- PostHog key is read from `VITE_POSTHOG_KEY`.
+- Events are sent through direct HTTP capture to avoid adding the browser SDK to the Mini App bundle.
+- Existing alias helpers remain for compatibility, for example `trackPhotoPosted = trackMomentPosted`.

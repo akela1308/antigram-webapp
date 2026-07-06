@@ -10,6 +10,7 @@ import {
   isStarSupportAmount,
   type StarSupportAmount,
 } from '../lib/db'
+import { trackStarsInvoiceCreated, trackStarsPaymentSucceeded } from '../lib/analytics'
 import { hapticImpact, hapticNotification, openPlatformInvoice } from '../lib/platform'
 
 type StarButtonVariant = 'inline' | 'overlay' | 'soft'
@@ -88,9 +89,11 @@ export function StarSupportButton({
 
     try {
       const invoice = await createStarInvoice(momentId, amount)
+      trackStarsInvoiceCreated(amount)
       const status = await openPlatformInvoice(invoice.invoiceLink)
 
       if (status === 'paid') {
+        trackStarsPaymentSucceeded(amount)
         hapticNotification('success')
         const nextTotal = await refreshTotalAfterPayment(amount)
         setMessage(
