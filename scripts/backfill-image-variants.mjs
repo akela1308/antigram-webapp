@@ -18,6 +18,14 @@ const bucket = process.env.MOMENTS_BUCKET ?? 'moments'
 const supabaseUrl = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
+function isAscii(value) {
+  return /^[\x00-\x7F]+$/.test(value)
+}
+
+function looksLikeJwt(value) {
+  return value.startsWith('eyJ') && value.split('.').length === 3
+}
+
 if (!Number.isInteger(limit) || limit < 1) {
   console.error('BACKFILL_LIMIT must be a positive integer.')
   process.exit(1)
@@ -40,6 +48,13 @@ if (!supabaseUrl || !serviceRoleKey) {
   console.error('Missing SUPABASE_URL and/or SUPABASE_SERVICE_ROLE_KEY.')
   console.error('Example:')
   console.error('  SUPABASE_URL=https://... SUPABASE_SERVICE_ROLE_KEY=... BACKFILL_LIMIT=5 npm run backfill:image-variants')
+  process.exit(1)
+}
+
+if (!isAscii(serviceRoleKey) || serviceRoleKey.includes('твой') || !looksLikeJwt(serviceRoleKey)) {
+  console.error('SUPABASE_SERVICE_ROLE_KEY does not look like a real Supabase service_role JWT.')
+  console.error('Use the actual key from Supabase Project Settings -> Data API/API -> Project API keys -> service_role.')
+  console.error('Do not paste the placeholder text.')
   process.exit(1)
 }
 
