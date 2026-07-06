@@ -273,6 +273,26 @@ with checks as (
         and column_name in ('is_admin', 'is_banned', 'is_blocked')
     ),
     'saved moments view should not expose service profile flags'
+
+  union all
+
+  select
+    'album_moment_details view exists',
+    to_regclass('public.album_moment_details') is not null,
+    'album detail should read moments through a safe view'
+
+  union all
+
+  select
+    'album_moment_details exposes no profile service columns',
+    not exists (
+      select 1
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'album_moment_details'
+        and column_name in ('is_admin', 'is_banned', 'is_blocked')
+    ),
+    'album moment view should not expose profile service flags'
 )
 select
   check_name,

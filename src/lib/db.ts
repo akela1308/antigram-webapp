@@ -38,6 +38,7 @@ const MOMENT_WITH_PUBLIC_PROFILE_SELECT = `*, profiles(${PUBLIC_PROFILE_SELECT})
 const PUBLIC_PROFILES_VIEW = 'public_profiles'
 const PUBLIC_MOMENTS_VIEW = 'public_moments'
 const MY_SAVED_MOMENTS_VIEW = 'my_saved_moments'
+const ALBUM_MOMENTS_VIEW = 'album_moment_details'
 const PUBLIC_MOMENT_SELECT = [
   'id',
   'user_id',
@@ -60,6 +61,22 @@ const PUBLIC_MOMENT_SELECT = [
   'profile_created_at',
 ].join(', ')
 const SAVED_MOMENT_SELECT = ['saved_at', 'saved_by_user_id', PUBLIC_MOMENT_SELECT].join(', ')
+const ALBUM_MOMENT_SELECT = [
+  'album_id',
+  'added_at',
+  'id',
+  'user_id',
+  'photo_url',
+  'image_variants',
+  'caption',
+  'mood',
+  'custom_mood_emoji',
+  'custom_mood_label',
+  'film_preset_id',
+  'is_public',
+  'visibility',
+  'created_at',
+].join(', ')
 
 type PublicMomentRow = Omit<Moment, 'image_variants'> & {
   image_variants?: unknown
@@ -75,6 +92,12 @@ type PublicMomentRow = Omit<Moment, 'image_variants'> & {
 type SavedPublicMomentRow = PublicMomentRow & {
   saved_at: string
   saved_by_user_id: string
+}
+
+type AlbumMomentDetailsRow = Omit<Moment, 'image_variants'> & {
+  album_id: string
+  added_at: string
+  image_variants?: unknown
 }
 
 function isMissingTableError(error: unknown, tableName: string): boolean {
@@ -149,6 +172,27 @@ function mapPublicMomentRow(row: PublicMomentRow): MomentWithProfile {
 
 function mapPublicMomentRows(rows: PublicMomentRow[] | null | undefined): MomentWithProfile[] {
   return (rows ?? []).map(mapPublicMomentRow)
+}
+
+function mapAlbumMomentDetailsRow(row: AlbumMomentDetailsRow): Moment {
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    photo_url: row.photo_url,
+    image_variants: normalizeImageVariants(row.image_variants),
+    caption: row.caption,
+    mood: row.mood,
+    custom_mood_emoji: row.custom_mood_emoji,
+    custom_mood_label: row.custom_mood_label,
+    film_preset_id: row.film_preset_id,
+    is_public: row.is_public,
+    visibility: row.visibility,
+    created_at: row.created_at,
+  }
+}
+
+function mapAlbumMomentDetailsRows(rows: AlbumMomentDetailsRow[] | null | undefined): Moment[] {
+  return (rows ?? []).map(mapAlbumMomentDetailsRow)
 }
 
 async function getPublicProfilesByIds(userIds: string[]): Promise<Profile[]> {
@@ -1303,23 +1347,49 @@ export async function getUserAlbums(userId: string): Promise<AlbumWithMoments[]>
 
   const albumRows = albums as Album[]
   const albumIds = albumRows.map(album => album.id)
-  type AlbumMomentRow = {
+  const albumMomentsResult = await supabase
+    .from(ALBUM_MOMENTS_VIEW)
+    .select('album_id, photo_url, image_variants')
+    .in('album_id', albumIds)
+    .order('added_at', { ascending: false })
+
+  type AlbumMomentPreviewRow = {
     album_id: string
-    moments:
+    photo_url: string
+    image_variants?: unknown
+    moments?:
       | { photo_url: string; image_variants?: Record<string, string> | null }
       | { photo_url: string; image_variants?: Record<string, string> | null }[]
       | null
   }
 
-  const albumMomentsResult = await supabase
-    .from('album_moments')
-    .select('album_id, moments(photo_url, image_variants)')
-    .in('album_id', albumIds)
-    .order('added_at', { ascending: false })
+  let albumMoments = albumMomentsResult.data as unknown as AlbumMomentPreviewRow[] | null
 
-  let albumMoments = albumMomentsResult.data as AlbumMomentRow[] | null
+  if (albumMomentsResult.error && isMissingTableError(albumMomentsResult.error, ALBUM_MOMENTS_VIEW)) {
+    const fallbackResult = await supabase
+      .from('album_moments')
+      .select('album_id, moments(photo_url, image_variants)')
+      .in('album_id', albumIds)
+      .order('added_at', { ascending: false })
 
-  if (albumMomentsResult.error && isMissingImageVariantsError(albumMomentsResult.error)) {
+    if (fallbackResult.error && isMissingImageVariantsError(fallbackResult.error)) {
+      const legacyResult = await supabase
+        .from('album_moments')
+        .select('album_id, moments(photo_url)')
+        .in('album_id', albumIds)
+        .order('added_at', { ascending: false })
+
+      if (legacyResult.error) {
+        console.error('[Albums] legacy moments load failed:', legacyResult.error)
+      }
+      albumMoments = legacyResult.data as AlbumMomentPreviewRow[] | null
+    } else if (fallbackResult.error) {
+      console.error('[Albums] fallback moments load failed:', fallbackResult.error)
+      albumMoments = null
+    } else {
+      albumMoments = fallbackResult.data as AlbumMomentPreviewRow[] | null
+    }
+  } else if (albumMomentsResult.error && isMissingImageVariantsError(albumMomentsResult.error)) {
     const legacyResult = await supabase
       .from('album_moments')
       .select('album_id, moments(photo_url)')
@@ -1329,7 +1399,7 @@ export async function getUserAlbums(userId: string): Promise<AlbumWithMoments[]>
     if (legacyResult.error) {
       console.error('[Albums] legacy moments load failed:', legacyResult.error)
     }
-    albumMoments = legacyResult.data as AlbumMomentRow[] | null
+    albumMoments = legacyResult.data as AlbumMomentPreviewRow[] | null
   } else if (albumMomentsResult.error) {
     console.error('[Albums] moments load failed:', albumMomentsResult.error)
   }
@@ -1342,7 +1412,8 @@ export async function getUserAlbums(userId: string): Promise<AlbumWithMoments[]>
   for (const row of albumMoments ?? []) {
     const albumStats = stats[row.album_id]
     if (!albumStats) continue
-    const moment = Array.isArray(row.moments) ? row.moments[0] : row.moments
+    const nestedMoment = Array.isArray(row.moments) ? row.moments[0] : row.moments
+    const moment = row.photo_url ? row : nestedMoment
     albumStats.count += 1
     albumStats.first_moment_url ??= moment ? getMomentImageUrl(moment as Moment, 'thumb') : null
   }
@@ -1378,6 +1449,21 @@ export async function updateAlbumTitle(
 }
 
 export async function getAlbumMoments(albumId: string): Promise<Moment[]> {
+  const result = await supabase
+    .from(ALBUM_MOMENTS_VIEW)
+    .select(ALBUM_MOMENT_SELECT)
+    .eq('album_id', albumId)
+    .order('added_at', { ascending: false })
+
+  if (!result.error) {
+    return mapAlbumMomentDetailsRows(result.data as unknown as AlbumMomentDetailsRow[] | null)
+  }
+
+  if (!isMissingTableError(result.error, ALBUM_MOMENTS_VIEW)) {
+    console.error('[Albums] detail view load failed:', result.error)
+    return []
+  }
+
   const { data } = await supabase
     .from('album_moments')
     .select('moments(*)')
