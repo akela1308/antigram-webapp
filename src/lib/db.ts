@@ -37,6 +37,7 @@ const PUBLIC_PROFILE_SELECT = 'id, username, display_name, bio, avatar_url, webs
 const MOMENT_WITH_PUBLIC_PROFILE_SELECT = `*, profiles(${PUBLIC_PROFILE_SELECT})`
 const PUBLIC_PROFILES_VIEW = 'public_profiles'
 const PUBLIC_MOMENTS_VIEW = 'public_moments'
+const MY_SAVED_MOMENTS_VIEW = 'my_saved_moments'
 const PUBLIC_MOMENT_SELECT = [
   'id',
   'user_id',
@@ -58,6 +59,7 @@ const PUBLIC_MOMENT_SELECT = [
   'website',
   'profile_created_at',
 ].join(', ')
+const SAVED_MOMENT_SELECT = ['saved_at', 'saved_by_user_id', PUBLIC_MOMENT_SELECT].join(', ')
 
 type PublicMomentRow = Omit<Moment, 'image_variants'> & {
   image_variants?: unknown
@@ -68,6 +70,11 @@ type PublicMomentRow = Omit<Moment, 'image_variants'> & {
   avatar_url: string | null
   website: string | null
   profile_created_at: string
+}
+
+type SavedPublicMomentRow = PublicMomentRow & {
+  saved_at: string
+  saved_by_user_id: string
 }
 
 function isMissingTableError(error: unknown, tableName: string): boolean {
@@ -1110,6 +1117,21 @@ export async function getSavedMomentIds(userId: string): Promise<string[]> {
 }
 
 export async function getSavedMoments(userId: string): Promise<MomentWithProfile[]> {
+  const result = await supabase
+    .from(MY_SAVED_MOMENTS_VIEW)
+    .select(SAVED_MOMENT_SELECT)
+    .eq('saved_by_user_id', userId)
+    .order('saved_at', { ascending: false })
+
+  if (!result.error) {
+    return mapPublicMomentRows(result.data as unknown as SavedPublicMomentRow[])
+  }
+
+  if (!isMissingTableError(result.error, MY_SAVED_MOMENTS_VIEW)) {
+    console.error('[Saved] moments view load failed:', result.error)
+    return []
+  }
+
   const { data, error } = await supabase
     .from('saved_moments')
     .select(`saved_at, moments(${MOMENT_WITH_PUBLIC_PROFILE_SELECT})`)

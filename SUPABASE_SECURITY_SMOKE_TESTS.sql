@@ -239,6 +239,40 @@ with checks as (
         )
     ) = 3,
     'saved album should remain private to the owner'
+
+  union all
+
+  select
+    'my_saved_moments view exists',
+    to_regclass('public.my_saved_moments') is not null,
+    'saved album should read through an owner-only safe view'
+
+  union all
+
+  select
+    'my_saved_moments is not granted to anon',
+    not exists (
+      select 1
+      from information_schema.role_table_grants
+      where table_schema = 'public'
+        and table_name = 'my_saved_moments'
+        and grantee = 'anon'
+        and privilege_type = 'SELECT'
+    ),
+    'anonymous users must not be able to query saved moments'
+
+  union all
+
+  select
+    'my_saved_moments exposes only safe profile columns',
+    not exists (
+      select 1
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'my_saved_moments'
+        and column_name in ('is_admin', 'is_banned', 'is_blocked')
+    ),
+    'saved moments view should not expose service profile flags'
 )
 select
   check_name,
