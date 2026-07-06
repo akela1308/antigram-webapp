@@ -293,6 +293,40 @@ with checks as (
         and column_name in ('is_admin', 'is_banned', 'is_blocked')
     ),
     'album moment view should not expose profile service flags'
+
+  union all
+
+  select
+    'my_notifications view exists',
+    to_regclass('public.my_notifications') is not null,
+    'notifications should read through an owner-only safe view'
+
+  union all
+
+  select
+    'my_notifications is not granted to anon',
+    not exists (
+      select 1
+      from information_schema.role_table_grants
+      where table_schema = 'public'
+        and table_name = 'my_notifications'
+        and grantee = 'anon'
+        and privilege_type = 'SELECT'
+    ),
+    'anonymous users must not be able to query notifications'
+
+  union all
+
+  select
+    'my_notifications exposes only safe actor columns',
+    not exists (
+      select 1
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'my_notifications'
+        and column_name in ('is_admin', 'is_banned', 'is_blocked')
+    ),
+    'notifications view should not expose actor service profile flags'
 )
 select
   check_name,

@@ -131,7 +131,9 @@ id, username, display_name, bio, avatar_url, website, created_at
 
 2026-07-06: добавлена миграция `202607060007_album_moments_view.sql` с `public.album_moment_details` view. Чтение превью альбомов и деталей альбома переведено на этот слой с fallback. View возвращает только поля момента и не делает profile join.
 
-Остаточный риск: admin/highlight/notification-specific nested joins ещё могут использовать FK-связь PostgREST с явным safe select. Это уже не основной публичный discovery surface, но следующий hardening может перевести и эти участки на RPC/view.
+2026-07-06: добавлена миграция `202607060008_my_notifications_view.sql` с `public.my_notifications` view. Экран уведомлений переведён на owner-only слой с fallback. View не выдаётся `anon`, возвращает safe-поля actor profile и минимальное превью момента.
+
+Остаточный риск: admin/highlight-specific nested joins ещё могут использовать FK-связь PostgREST с явным safe select. Это уже не основной публичный discovery surface, но следующий hardening может перевести и эти участки на RPC/view.
 
 ### 5. Client-writable `account_identities`
 
@@ -192,5 +194,6 @@ order by tablename;
 6. Сделано 2026-07-06: добавлен `public_moments` view, публичные ленты/поиск/подборки переведены на него.
 7. Сделано 2026-07-06: добавлен `my_saved_moments` view, сохранёнки переведены на owner-only safe view.
 8. Сделано 2026-07-06: добавлен `album_moment_details` view, альбомные moment reads переведены на safe view.
-9. Сделано 2026-07-06: добавлен `SUPABASE_SECURITY_SMOKE_TESTS.sql` для ручной проверки ключевых RLS/schema гарантий в Supabase.
-10. Добавить автоматические smoke-тесты RLS через Supabase local или SQL fixtures.
+9. Сделано 2026-07-06: добавлен `my_notifications` view, уведомления переведены на owner-only safe view.
+10. Сделано 2026-07-06: добавлен `SUPABASE_SECURITY_SMOKE_TESTS.sql` для ручной проверки ключевых RLS/schema гарантий в Supabase.
+11. Добавить автоматические smoke-тесты RLS через Supabase local или SQL fixtures.

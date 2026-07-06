@@ -39,6 +39,7 @@ const PUBLIC_PROFILES_VIEW = 'public_profiles'
 const PUBLIC_MOMENTS_VIEW = 'public_moments'
 const MY_SAVED_MOMENTS_VIEW = 'my_saved_moments'
 const ALBUM_MOMENTS_VIEW = 'album_moment_details'
+const MY_NOTIFICATIONS_VIEW = 'my_notifications'
 const PUBLIC_MOMENT_SELECT = [
   'id',
   'user_id',
@@ -77,6 +78,25 @@ const ALBUM_MOMENT_SELECT = [
   'visibility',
   'created_at',
 ].join(', ')
+const MY_NOTIFICATION_SELECT = [
+  'id',
+  'user_id',
+  'type',
+  'actor_id',
+  'moment_id',
+  'payload',
+  'read',
+  'created_at',
+  'actor_profile_id',
+  'actor_username',
+  'actor_display_name',
+  'actor_bio',
+  'actor_avatar_url',
+  'actor_website',
+  'actor_profile_created_at',
+  'moment_photo_url',
+  'moment_image_variants',
+].join(', ')
 
 type PublicMomentRow = Omit<Moment, 'image_variants'> & {
   image_variants?: unknown
@@ -98,6 +118,18 @@ type AlbumMomentDetailsRow = Omit<Moment, 'image_variants'> & {
   album_id: string
   added_at: string
   image_variants?: unknown
+}
+
+type NotificationViewRow = Omit<NotificationItem, 'profiles' | 'moments'> & {
+  actor_profile_id: string | null
+  actor_username: string | null
+  actor_display_name: string | null
+  actor_bio: string | null
+  actor_avatar_url: string | null
+  actor_website: string | null
+  actor_profile_created_at: string | null
+  moment_photo_url: string | null
+  moment_image_variants?: unknown
 }
 
 function isMissingTableError(error: unknown, tableName: string): boolean {
@@ -193,6 +225,32 @@ function mapAlbumMomentDetailsRow(row: AlbumMomentDetailsRow): Moment {
 
 function mapAlbumMomentDetailsRows(rows: AlbumMomentDetailsRow[] | null | undefined): Moment[] {
   return (rows ?? []).map(mapAlbumMomentDetailsRow)
+}
+
+function mapNotificationViewRow(row: NotificationViewRow): NotificationItem {
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    type: row.type,
+    actor_id: row.actor_id,
+    moment_id: row.moment_id,
+    payload: row.payload,
+    read: row.read,
+    created_at: row.created_at,
+    profiles: row.actor_profile_id ? {
+      id: row.actor_profile_id,
+      username: row.actor_username,
+      display_name: row.actor_display_name,
+      bio: row.actor_bio,
+      avatar_url: row.actor_avatar_url,
+      website: row.actor_website,
+      created_at: row.actor_profile_created_at ?? row.created_at,
+    } : null,
+    moments: row.moment_photo_url ? {
+      photo_url: row.moment_photo_url,
+      image_variants: normalizeImageVariants(row.moment_image_variants),
+    } : null,
+  }
 }
 
 async function getPublicProfilesByIds(userIds: string[]): Promise<Profile[]> {
@@ -1227,15 +1285,31 @@ export async function getComments(momentId: string): Promise<CommentWithProfile[
 
 export async function getNotifications(userId: string): Promise<NotificationItem[]> {
   const result = await supabase
+    .from(MY_NOTIFICATIONS_VIEW)
+    .select(MY_NOTIFICATION_SELECT)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(50)
+
+  if (!result.error) {
+    return ((result.data as unknown as NotificationViewRow[] | null) ?? []).map(mapNotificationViewRow)
+  }
+
+  if (!isMissingTableError(result.error, MY_NOTIFICATIONS_VIEW)) {
+    console.error('[Notifications] view load failed:', result.error)
+    return []
+  }
+
+  const fallbackResult = await supabase
     .from('notifications')
     .select(`*, profiles:profiles!notifications_actor_id_fkey(${PUBLIC_PROFILE_SELECT}), moments(photo_url, image_variants)`)
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(50)
 
-  if (!result.error) return (result.data as NotificationItem[]) ?? []
+  if (!fallbackResult.error) return (fallbackResult.data as NotificationItem[]) ?? []
 
-  if (isMissingImageVariantsError(result.error)) {
+  if (isMissingImageVariantsError(fallbackResult.error)) {
     const legacyResult = await supabase
       .from('notifications')
       .select(`*, profiles:profiles!notifications_actor_id_fkey(${PUBLIC_PROFILE_SELECT}), moments(photo_url)`)
@@ -1248,8 +1322,8 @@ export async function getNotifications(userId: string): Promise<NotificationItem
     return []
   }
 
-  if (result.error) {
-    console.error('[Notifications] load failed:', result.error)
+  if (fallbackResult.error) {
+    console.error('[Notifications] load failed:', fallbackResult.error)
     return []
   }
 
