@@ -56,6 +56,7 @@ export function MomentFeedPage() {
   const [myReactions, setMyReactions] = useState<Record<string, ReactionType | null>>({})
   const [starTotals, setStarTotals] = useState<Record<string, number>>({})
   const [menuMomentId, setMenuMomentId] = useState<string | null>(null)
+  const [deleteConfirmMomentId, setDeleteConfirmMomentId] = useState<string | null>(null)
   const [albumPickerMomentId, setAlbumPickerMomentId] = useState<string | null>(null)
   const [albums, setAlbums] = useState<AlbumWithMoments[]>([])
   const [toast, setToast] = useState<string | null>(null)
@@ -123,6 +124,7 @@ export function MomentFeedPage() {
     await deleteMoment(momentId)
     setLocalMoments(prev => prev.filter(m => m.id !== momentId))
     setMenuMomentId(null)
+    setDeleteConfirmMomentId(null)
     if (localMoments.length <= 1) navigate(-1)
   }
 
@@ -248,6 +250,7 @@ export function MomentFeedPage() {
             {/* Common actions for everyone */}
             {(() => {
               const menuMoment = localMoments.find(m => m.id === menuMomentId)
+              const canManageOwnMoment = Boolean(user && menuMoment?.user_id === user.id) || isOwner
               return (
                 <>
                   <MenuBtn
@@ -278,6 +281,17 @@ export function MomentFeedPage() {
                       setMenuMomentId(null)
                     }}
                   />
+                  {canManageOwnMoment && (
+                    <MenuBtn
+                      label={t('profile.deleteFrame')}
+                      icon="✕"
+                      danger
+                      onClick={() => {
+                        setDeleteConfirmMomentId(menuMomentId)
+                        setMenuMomentId(null)
+                      }}
+                    />
+                  )}
                 </>
               )
             })()}
@@ -288,21 +302,21 @@ export function MomentFeedPage() {
                   icon="⊞"
                   onClick={() => handleAddToAlbum(menuMomentId)}
                 />
-                <MenuBtn
-                  label={t('profile.deleteFrame')}
-                  icon="✕"
-                  danger
-                  onClick={() => handleDelete(menuMomentId)}
-                />
               </>
             ) : (
               <>
-                <MenuBtn
-                  label={t('moment.report')}
-                  icon="⚑"
-                  danger
-                  onClick={() => handleReport(menuMomentId)}
-                />
+                {(() => {
+                  const menuMoment = localMoments.find(m => m.id === menuMomentId)
+                  if (user && menuMoment?.user_id === user.id) return null
+                  return (
+                    <MenuBtn
+                      label={t('moment.report')}
+                      icon="⚑"
+                      danger
+                      onClick={() => handleReport(menuMomentId)}
+                    />
+                  )
+                })()}
                 {(() => {
                   const menuMoment = localMoments.find(m => m.id === menuMomentId)
                   if (!user || !menuMoment || menuMoment.user_id === user.id) return null
@@ -317,6 +331,7 @@ export function MomentFeedPage() {
                 })()}
                 {isAdmin && (() => {
                   const menuMoment = localMoments.find(m => m.id === menuMomentId)
+                  if (user && menuMoment?.user_id === user.id) return null
                   return (
                     <>
                       <MenuBtn
@@ -343,6 +358,38 @@ export function MomentFeedPage() {
             )}
 
             <MenuBtn label={t('common.cancel')} icon="" muted onClick={() => setMenuMomentId(null)} />
+          </div>
+        </>
+      )}
+
+      {/* Delete confirm sheet */}
+      {deleteConfirmMomentId && (
+        <>
+          <div
+            onClick={() => setDeleteConfirmMomentId(null)}
+            style={{ position: 'fixed', inset: 0, zIndex: 199, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
+          />
+          <div style={{
+            position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 200,
+            background: '#110C08', borderRadius: '24px 24px 0 0',
+            borderTop: '1px solid #2E2218',
+            padding: '24px 20px',
+            paddingBottom: 'max(32px, env(safe-area-inset-bottom, 20px))',
+          }}>
+            <p style={{ color: '#fff', fontSize: 17, fontWeight: 600, margin: '0 0 6px', textAlign: 'center' }}>{t('moment.deleteQuestion')}</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: 13, margin: '0 0 20px', textAlign: 'center' }}>{t('moment.deleteHint')}</p>
+            <button
+              onClick={() => handleDelete(deleteConfirmMomentId)}
+              style={{ width: '100%', padding: '14px 0', borderRadius: 30, background: '#e05a5a', color: '#fff', fontSize: 15, fontWeight: 700, border: 'none', cursor: 'pointer', marginBottom: 10 }}
+            >
+              {t('common.delete')}
+            </button>
+            <button
+              onClick={() => setDeleteConfirmMomentId(null)}
+              style={{ width: '100%', padding: '12px 0', background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 14, cursor: 'pointer' }}
+            >
+              {t('common.cancel')}
+            </button>
           </div>
         </>
       )}
