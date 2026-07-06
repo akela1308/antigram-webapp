@@ -28,6 +28,12 @@ export SUPABASE_SERVICE_ROLE_KEY="your-service-role-key"
 
 Do not put the service role key in client `.env` files or Vercel frontend variables.
 
+Before running against production, make sure the service role has the narrow backfill grants from:
+
+```text
+supabase/migrations/202607070002_image_backfill_service_role_grants.sql
+```
+
 Optional:
 
 ```bash
