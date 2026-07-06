@@ -327,6 +327,26 @@ with checks as (
         and column_name in ('is_admin', 'is_banned', 'is_blocked')
     ),
     'notifications view should not expose actor service profile flags'
+
+  union all
+
+  select
+    'highlight_moment_details view exists',
+    to_regclass('public.highlight_moment_details') is not null,
+    'profile film strip should read highlights through a safe view'
+
+  union all
+
+  select
+    'highlight_moment_details exposes no profile service columns',
+    not exists (
+      select 1
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'highlight_moment_details'
+        and column_name in ('is_admin', 'is_banned', 'is_blocked')
+    ),
+    'highlight view should not expose profile service flags'
 )
 select
   check_name,

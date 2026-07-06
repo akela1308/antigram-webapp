@@ -40,6 +40,7 @@ const PUBLIC_MOMENTS_VIEW = 'public_moments'
 const MY_SAVED_MOMENTS_VIEW = 'my_saved_moments'
 const ALBUM_MOMENTS_VIEW = 'album_moment_details'
 const MY_NOTIFICATIONS_VIEW = 'my_notifications'
+const HIGHLIGHT_MOMENTS_VIEW = 'highlight_moment_details'
 const PUBLIC_MOMENT_SELECT = [
   'id',
   'user_id',
@@ -97,6 +98,16 @@ const MY_NOTIFICATION_SELECT = [
   'moment_photo_url',
   'moment_image_variants',
 ].join(', ')
+const HIGHLIGHT_MOMENT_SELECT = [
+  'id',
+  'user_id',
+  'moment_id',
+  'position',
+  'created_at',
+  'moment_detail_id',
+  'moment_photo_url',
+  'moment_image_variants',
+].join(', ')
 
 type PublicMomentRow = Omit<Moment, 'image_variants'> & {
   image_variants?: unknown
@@ -128,6 +139,12 @@ type NotificationViewRow = Omit<NotificationItem, 'profiles' | 'moments'> & {
   actor_avatar_url: string | null
   actor_website: string | null
   actor_profile_created_at: string | null
+  moment_photo_url: string | null
+  moment_image_variants?: unknown
+}
+
+type HighlightMomentDetailsRow = Omit<HighlightWithMoment, 'moments'> & {
+  moment_detail_id: string | null
   moment_photo_url: string | null
   moment_image_variants?: unknown
 }
@@ -225,6 +242,21 @@ function mapAlbumMomentDetailsRow(row: AlbumMomentDetailsRow): Moment {
 
 function mapAlbumMomentDetailsRows(rows: AlbumMomentDetailsRow[] | null | undefined): Moment[] {
   return (rows ?? []).map(mapAlbumMomentDetailsRow)
+}
+
+function mapHighlightMomentDetailsRow(row: HighlightMomentDetailsRow): HighlightWithMoment {
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    moment_id: row.moment_id,
+    position: row.position,
+    created_at: row.created_at,
+    moments: row.moment_detail_id && row.moment_photo_url ? {
+      id: row.moment_detail_id,
+      photo_url: row.moment_photo_url,
+      image_variants: normalizeImageVariants(row.moment_image_variants),
+    } : null,
+  }
 }
 
 function mapNotificationViewRow(row: NotificationViewRow): NotificationItem {
@@ -1363,14 +1395,29 @@ export async function getUnreadNotificationsCount(userId: string): Promise<numbe
 
 export async function getHighlights(userId: string): Promise<HighlightWithMoment[]> {
   const result = await supabase
+    .from(HIGHLIGHT_MOMENTS_VIEW)
+    .select(HIGHLIGHT_MOMENT_SELECT)
+    .eq('user_id', userId)
+    .order('position')
+
+  if (!result.error) {
+    return ((result.data as unknown as HighlightMomentDetailsRow[] | null) ?? []).map(mapHighlightMomentDetailsRow)
+  }
+
+  if (!isMissingTableError(result.error, HIGHLIGHT_MOMENTS_VIEW)) {
+    console.error('[Highlights] view load failed:', result.error)
+    return []
+  }
+
+  const fallbackResult = await supabase
     .from('highlights')
     .select('*, moments(id, photo_url, image_variants)')
     .eq('user_id', userId)
     .order('position')
 
-  if (!result.error) return (result.data as HighlightWithMoment[]) ?? []
+  if (!fallbackResult.error) return (fallbackResult.data as HighlightWithMoment[]) ?? []
 
-  if (isMissingImageVariantsError(result.error)) {
+  if (isMissingImageVariantsError(fallbackResult.error)) {
     const legacyResult = await supabase
       .from('highlights')
       .select('*, moments(id, photo_url)')
@@ -1382,7 +1429,7 @@ export async function getHighlights(userId: string): Promise<HighlightWithMoment
     return []
   }
 
-  console.error('[Highlights] load failed:', result.error)
+  console.error('[Highlights] load failed:', fallbackResult.error)
   return []
 }
 
