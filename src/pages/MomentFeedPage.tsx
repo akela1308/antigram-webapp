@@ -250,7 +250,7 @@ export function MomentFeedPage() {
             {/* Common actions for everyone */}
             {(() => {
               const menuMoment = localMoments.find(m => m.id === menuMomentId)
-              const canManageOwnMoment = Boolean(user && menuMoment?.user_id === user.id) || isOwner
+              const canManageOwnMoment = Boolean(user && menuMoment?.user_id === user.id)
               return (
                 <>
                   <MenuBtn
