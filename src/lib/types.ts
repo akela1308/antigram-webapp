@@ -21,6 +21,7 @@ export interface Moment {
   custom_mood_label: string | null
   film_preset_id: string | null
   is_public: boolean
+  visibility?: 'public' | 'followers' | 'private'
   created_at: string
 }
 

@@ -165,31 +165,59 @@ async function insertMomentWithImageVariants(payload: {
   custom_mood_label: string | null
   film_preset_id: string | null
   is_public: boolean
-  visibility: 'public'
+  visibility?: 'public'
 }) {
-  const insert = async (momentPayload: Omit<typeof payload, 'image_variants'> | typeof payload) =>
-    supabase.from('moments').insert(momentPayload).select('id').single()
-
-  const result = await insert(payload)
-  if (!result.error) return result.data
-
-  const columnErrorText = [
-    result.error.code,
-    result.error.message,
-    result.error.details,
-    result.error.hint,
-  ].filter(Boolean).join(' ')
-
-  if (!columnErrorText.includes('image_variants')) {
-    throw new Error(result.error.message)
+  type MomentInsertPayload = Omit<typeof payload, 'image_variants' | 'visibility'> & {
+    image_variants?: ImageVariants
+    visibility?: 'public'
   }
 
-  const { image_variants: _imageVariants, ...legacyPayload } = payload
-  const legacyResult = await insert(legacyPayload)
-  if (legacyResult.error) throw new Error(legacyResult.error.message)
+  const insert = async (momentPayload: MomentInsertPayload) =>
+    supabase.from('moments').insert(momentPayload).select('id').single()
 
-  console.warn('[Upload] moments.image_variants is not available yet; saved moment without variants')
-  return legacyResult.data
+  const attempts: MomentInsertPayload[] = [
+    payload,
+    (() => {
+      const { image_variants: _imageVariants, ...withoutImageVariants } = payload
+      return withoutImageVariants
+    })(),
+    (() => {
+      const { visibility: _visibility, ...withoutVisibility } = payload
+      return withoutVisibility
+    })(),
+    (() => {
+      const { image_variants: _imageVariants, visibility: _visibility, ...legacyPayload } = payload
+      return legacyPayload
+    })(),
+  ]
+
+  let lastError: { message: string } | null = null
+  for (const attempt of attempts) {
+    const result = await insert(attempt)
+    if (!result.error) {
+      if (!('image_variants' in attempt)) {
+        console.warn('[Upload] moments.image_variants is not available yet; saved moment without variants')
+      }
+      if (!('visibility' in attempt)) {
+        console.warn('[Upload] moments.visibility is not available yet; saved moment with legacy is_public')
+      }
+      return result.data
+    }
+
+    const columnErrorText = [
+      result.error.code,
+      result.error.message,
+      result.error.details,
+      result.error.hint,
+    ].filter(Boolean).join(' ')
+
+    lastError = result.error
+    if (!columnErrorText.includes('image_variants') && !columnErrorText.includes('visibility')) {
+      throw new Error(result.error.message)
+    }
+  }
+
+  throw new Error(lastError?.message ?? 'Could not publish moment')
 }
 
 // ── Grain ─────────────────────────────────────────────────────────────────────
