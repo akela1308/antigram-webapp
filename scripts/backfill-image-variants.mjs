@@ -11,10 +11,30 @@ const VARIANTS = {
 
 const args = new Set(process.argv.slice(2))
 const apply = args.has('--apply')
-const limit = Number(process.env.BACKFILL_LIMIT ?? '10')
+const confirmedSmallBatch = args.has('--confirm-small-batch')
+const allowLargeBatch = process.env.BACKFILL_ALLOW_LARGE_BATCH === 'true'
+const limit = Number(process.env.BACKFILL_LIMIT ?? '5')
 const bucket = process.env.MOMENTS_BUCKET ?? 'moments'
 const supabaseUrl = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+if (!Number.isInteger(limit) || limit < 1) {
+  console.error('BACKFILL_LIMIT must be a positive integer.')
+  process.exit(1)
+}
+
+if (apply && !confirmedSmallBatch) {
+  console.error('Refusing to apply without --confirm-small-batch.')
+  console.error('Example:')
+  console.error('  BACKFILL_LIMIT=3 npm run backfill:image-variants -- --apply --confirm-small-batch')
+  process.exit(1)
+}
+
+if (apply && limit > 25 && !allowLargeBatch) {
+  console.error('Refusing to apply more than 25 moments in one batch.')
+  console.error('Use smaller batches, or set BACKFILL_ALLOW_LARGE_BATCH=true after testing carefully.')
+  process.exit(1)
+}
 
 if (!supabaseUrl || !serviceRoleKey) {
   console.error('Missing SUPABASE_URL and/or SUPABASE_SERVICE_ROLE_KEY.')
@@ -27,9 +47,14 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
   auth: { persistSession: false, autoRefreshToken: false },
 })
 
-function isEmptyVariants(value) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return true
-  return !value.thumb && !value.feed && !value.full
+function normalizeVariants(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+  return value
+}
+
+function needsBackfill(value) {
+  const variants = normalizeVariants(value)
+  return !variants.thumb || !variants.feed || !variants.full
 }
 
 async function fetchSourceImage(url) {
@@ -77,18 +102,24 @@ async function getBackfillCandidates() {
 
   if (error) throw error
 
-  return (data ?? []).filter(moment => moment.photo_url && isEmptyVariants(moment.image_variants)).slice(0, limit)
+  return (data ?? []).filter(moment => moment.photo_url && needsBackfill(moment.image_variants)).slice(0, limit)
 }
 
 async function backfillMoment(moment) {
-  console.log(`- ${moment.id} ${apply ? 'backfilling' : 'would backfill'}`)
+  const existingVariants = normalizeVariants(moment.image_variants)
+  const missingVariants = Object.keys(VARIANTS).filter(name => !existingVariants[name])
+
+  console.log(`- ${moment.id} ${apply ? 'backfilling' : 'would backfill'} (${missingVariants.join(', ')})`)
 
   if (!apply) return { id: moment.id, dryRun: true }
 
   const source = await fetchSourceImage(moment.photo_url)
-  const imageVariants = { original: moment.photo_url }
+  const imageVariants = {
+    ...existingVariants,
+    original: existingVariants.original ?? moment.photo_url,
+  }
 
-  for (const [name, config] of Object.entries(VARIANTS)) {
+  for (const [name, config] of Object.entries(VARIANTS).filter(([name]) => missingVariants.includes(name))) {
     const variant = await makeVariant(source, config)
     imageVariants[name] = await uploadVariant(moment, name, variant)
     console.log(`  uploaded ${name}`)
@@ -107,6 +138,7 @@ async function main() {
   console.log(`Image variants backfill (${apply ? 'APPLY' : 'DRY RUN'})`)
   console.log(`Limit: ${limit}`)
   console.log(`Bucket: ${bucket}`)
+  if (apply) console.log('Confirmed small batch: yes')
 
   const candidates = await getBackfillCandidates()
   if (candidates.length === 0) {

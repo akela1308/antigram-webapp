@@ -31,7 +31,7 @@ Do not put the service role key in client `.env` files or Vercel frontend variab
 Optional:
 
 ```bash
-export BACKFILL_LIMIT=10
+export BACKFILL_LIMIT=5
 export MOMENTS_BUCKET=moments
 ```
 
@@ -46,10 +46,12 @@ This lists the first moments that need backfill.
 ## Apply
 
 ```bash
-BACKFILL_LIMIT=5 npm run backfill:image-variants -- --apply
+BACKFILL_LIMIT=3 npm run backfill:image-variants -- --apply --confirm-small-batch
 ```
 
-Increase `BACKFILL_LIMIT` only after confirming the first small batch works.
+The script refuses to apply without `--confirm-small-batch`. It also refuses batches larger than 25 unless `BACKFILL_ALLOW_LARGE_BATCH=true` is set intentionally.
+
+Increase `BACKFILL_LIMIT` only after confirming the first small batch works and Supabase egress looks normal.
 
 ## Verify
 
