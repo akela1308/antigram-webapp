@@ -69,16 +69,15 @@ SQL лежит минимум в трех местах:
 
 В `20260614_notifications.sql` есть trigger на `public.comments`, но в репозитории не найдена миграция создания `comments`.
 
-Нужно проверить в Supabase:
+2026-07-06: добавлена canonical migration `202607060003_comments_canonical_rls.sql`. Она idempotent и безопасна для продовой таблицы, если она уже была создана вручную:
 
-```sql
-select table_schema, table_name
-from information_schema.tables
-where table_schema = 'public'
-  and table_name = 'comments';
-```
-
-Если таблица существует, нужно добавить ее canonical migration в репозиторий. Если нет, notification migration для comments сейчас неполная.
+- создаёт `public.comments`, если таблицы нет;
+- добавляет базовые колонки, индексы и ограничения на непустой текст до 1000 символов;
+- включает RLS;
+- читать можно комментарии к публичным моментам, владельцу момента и админу;
+- создавать может только авторизованный пользователь от своего `auth.uid()` к публичному моменту;
+- update/delete разрешены автору комментария или админу;
+- если `notify_on_comment()` уже есть в базе, миграция подключает trigger `on_comment_notify`.
 
 ### 3. Публичный bucket `moments`
 
@@ -167,6 +166,6 @@ order by tablename;
 1. Собрать canonical Supabase migrations в одном месте.
 2. Сделано 2026-07-06: `getOwnProfile()` и `getPublicProfile()` разделены, чужие профили в клиенте больше не грузятся через `select('*')`.
 3. Сделано 2026-07-06: добавлен `public_profiles` view, прямые публичные profile reads переведены на него.
-4. Проверить фактическую таблицу `comments` и добавить миграцию, если она создана вручную.
+4. Сделано 2026-07-06: добавлена canonical comments migration/RLS.
 5. Подготовить privacy model на будущее: public / followers / private.
 6. Добавить smoke-тесты RLS через Supabase local или SQL fixtures.
