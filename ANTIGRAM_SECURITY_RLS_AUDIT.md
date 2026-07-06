@@ -177,4 +177,5 @@ order by tablename;
 3. Сделано 2026-07-06: добавлен `public_profiles` view, прямые публичные profile reads переведены на него.
 4. Сделано 2026-07-06: добавлена canonical comments migration/RLS.
 5. Сделано 2026-07-06: добавлен foundation для privacy model `public / followers / private`.
-6. Добавить smoke-тесты RLS через Supabase local или SQL fixtures.
+6. Сделано 2026-07-06: добавлен `SUPABASE_SECURITY_SMOKE_TESTS.sql` для ручной проверки ключевых RLS/schema гарантий в Supabase.
+7. Добавить автоматические smoke-тесты RLS через Supabase local или SQL fixtures.
