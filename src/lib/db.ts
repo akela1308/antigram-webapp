@@ -35,6 +35,7 @@ type BlockRelationshipRow = {
 
 const PUBLIC_PROFILE_SELECT = 'id, username, display_name, bio, avatar_url, website, created_at'
 const MOMENT_WITH_PUBLIC_PROFILE_SELECT = `*, profiles(${PUBLIC_PROFILE_SELECT})`
+const PUBLIC_PROFILES_VIEW = 'public_profiles'
 
 function isMissingTableError(error: unknown, tableName: string): boolean {
   const maybeError = error as { code?: string; message?: string; details?: string; hint?: string } | null
@@ -80,6 +81,63 @@ function filterHiddenMoments<T extends { user_id: string }>(
   return moments.filter(moment => !hiddenUserIds.has(moment.user_id))
 }
 
+async function getPublicProfilesByIds(userIds: string[]): Promise<Profile[]> {
+  if (userIds.length === 0) return []
+
+  const uniqueIds = [...new Set(userIds)]
+  const result = await supabase
+    .from(PUBLIC_PROFILES_VIEW)
+    .select(PUBLIC_PROFILE_SELECT)
+    .in('id', uniqueIds)
+
+  if (!result.error) return (result.data as Profile[] | null) ?? []
+
+  if (!isMissingTableError(result.error, PUBLIC_PROFILES_VIEW)) {
+    console.error('[Profiles] public profiles load failed:', result.error)
+    return []
+  }
+
+  const fallback = await supabase
+    .from('profiles')
+    .select(PUBLIC_PROFILE_SELECT)
+    .in('id', uniqueIds)
+
+  if (fallback.error) {
+    console.error('[Profiles] public profiles fallback failed:', fallback.error)
+    return []
+  }
+
+  return (fallback.data as Profile[] | null) ?? []
+}
+
+async function searchPublicProfiles(query: string): Promise<Profile[]> {
+  const result = await supabase
+    .from(PUBLIC_PROFILES_VIEW)
+    .select(PUBLIC_PROFILE_SELECT)
+    .or(`username.ilike.%${query}%,display_name.ilike.%${query}%`)
+    .limit(30)
+
+  if (!result.error) return (result.data as Profile[] | null) ?? []
+
+  if (!isMissingTableError(result.error, PUBLIC_PROFILES_VIEW)) {
+    console.error('[Profiles] public search failed:', result.error)
+    return []
+  }
+
+  const fallback = await supabase
+    .from('profiles')
+    .select(PUBLIC_PROFILE_SELECT)
+    .or(`username.ilike.%${query}%,display_name.ilike.%${query}%`)
+    .limit(30)
+
+  if (fallback.error) {
+    console.error('[Profiles] public search fallback failed:', fallback.error)
+    return []
+  }
+
+  return (fallback.data as Profile[] | null) ?? []
+}
+
 // ─── PROFILES ────────────────────────────────────────────────────────────────
 
 export async function getOwnProfile(userId: string): Promise<Profile | null> {
@@ -92,12 +150,8 @@ export async function getOwnProfile(userId: string): Promise<Profile | null> {
 }
 
 export async function getPublicProfile(userId: string): Promise<Profile | null> {
-  const { data } = await supabase
-    .from('profiles')
-    .select(PUBLIC_PROFILE_SELECT)
-    .eq('id', userId)
-    .single()
-  return data as Profile | null
+  const [profile] = await getPublicProfilesByIds([userId])
+  return profile ?? null
 }
 
 export async function updateProfile(
@@ -112,16 +166,11 @@ export async function searchUsers(query: string, viewerId?: string | null): Prom
   const q = query.trim().replace(/[,%]/g, ' ')
   if (q.length < 2) return []
 
-  const [hiddenUserIds, { data }] = await Promise.all([
+  const [hiddenUserIds, profiles] = await Promise.all([
     getHiddenUserIdsForViewer(viewerId),
-    supabase
-      .from('profiles')
-      .select(PUBLIC_PROFILE_SELECT)
-      .or(`username.ilike.%${q}%,display_name.ilike.%${q}%`)
-      .limit(30),
+    searchPublicProfiles(q),
   ])
 
-  const profiles = (data as Profile[]) ?? []
   return hiddenUserIds.size === 0
     ? profiles
     : profiles.filter(profile => !hiddenUserIds.has(profile.id))
@@ -811,12 +860,9 @@ export async function getFollowers(userId: string): Promise<FollowProfile[]> {
   if (rows.length === 0) return []
 
   const ids = rows.map(row => row.follower_id)
-  const { data: profiles } = await supabase
-    .from('profiles')
-    .select(PUBLIC_PROFILE_SELECT)
-    .in('id', ids)
+  const profiles = await getPublicProfilesByIds(ids)
 
-  const profileMap = new Map(((profiles as Profile[] | null) ?? []).map(profile => [profile.id, profile]))
+  const profileMap = new Map(profiles.map(profile => [profile.id, profile]))
   return rows
     .map(row => {
       const profile = profileMap.get(row.follower_id)
@@ -840,12 +886,9 @@ export async function getFollowing(userId: string): Promise<FollowProfile[]> {
   if (rows.length === 0) return []
 
   const ids = rows.map(row => row.following_id)
-  const { data: profiles } = await supabase
-    .from('profiles')
-    .select(PUBLIC_PROFILE_SELECT)
-    .in('id', ids)
+  const profiles = await getPublicProfilesByIds(ids)
 
-  const profileMap = new Map(((profiles as Profile[] | null) ?? []).map(profile => [profile.id, profile]))
+  const profileMap = new Map(profiles.map(profile => [profile.id, profile]))
   return rows
     .map(row => {
       const profile = profileMap.get(row.following_id)
@@ -926,9 +969,9 @@ export async function getComments(momentId: string): Promise<CommentWithProfile[
   if (!comments || comments.length === 0) return []
 
   const userIds = [...new Set((comments as { user_id: string }[]).map(c => c.user_id))]
-  const { data: profiles } = await supabase.from('profiles').select(PUBLIC_PROFILE_SELECT).in('id', userIds)
+  const profiles = await getPublicProfilesByIds(userIds)
   const profileMap: Record<string, Profile> = {}
-  for (const p of (profiles ?? []) as Profile[]) profileMap[p.id] = p
+  for (const p of profiles) profileMap[p.id] = p
 
   return (comments as { id: string; moment_id: string; user_id: string; text: string; created_at: string }[]).map(c => ({
     ...c,
@@ -1366,13 +1409,9 @@ export async function addComment(
     .single()
   if (error || !comment) return { data: null, error }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select(PUBLIC_PROFILE_SELECT)
-    .eq('id', userId)
-    .single()
+  const [profile] = await getPublicProfilesByIds([userId])
   return {
-    data: { ...(comment as { id: string; moment_id: string; user_id: string; text: string; created_at: string }), profiles: (profile as Profile) ?? null },
+    data: { ...(comment as { id: string; moment_id: string; user_id: string; text: string; created_at: string }), profiles: profile ?? null },
     error: null,
   }
 }

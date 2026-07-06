@@ -102,7 +102,16 @@ id, username, display_name, bio, avatar_url, website, created_at
 
 `getProfile(userId)` разделён на `getOwnProfile()` и `getPublicProfile()`: полный `select('*')` остался только для профиля текущего пользователя в `AuthContext`, а чужой `ProfilePage` грузит public-safe поля.
 
-Остаточный риск: RLS всё ещё разрешает публичное чтение самой таблицы `profiles`, поэтому защита sensitive-полей сейчас в основном держится на дисциплине клиентских select'ов. Следующий hardening: public-safe view/RPC для чужих профилей и постепенный перевод клиента на него.
+2026-07-06: добавлена миграция `202607060002_public_profiles_view.sql` с `public.public_profiles` view. Прямые публичные чтения профилей в клиенте переведены на этот view:
+
+- чужой `ProfilePage`;
+- поиск пользователей;
+- списки followers/following;
+- профили авторов комментариев.
+
+В коде оставлен fallback на `profiles` с явным public-safe набором полей, чтобы прод не сломался, если Vercel задеплоится раньше ручного применения миграции.
+
+Остаточный риск: nested joins вида `moments -> profiles(...)` пока используют FK-связь PostgREST с явным safe select. Следующий hardening: DB-level public feed/view/RPC, чтобы и лента не зависела от прямого join к `profiles`.
 
 ### 5. Client-writable `account_identities`
 
@@ -157,6 +166,7 @@ order by tablename;
 
 1. Собрать canonical Supabase migrations в одном месте.
 2. Сделано 2026-07-06: `getOwnProfile()` и `getPublicProfile()` разделены, чужие профили в клиенте больше не грузятся через `select('*')`.
-3. Проверить фактическую таблицу `comments` и добавить миграцию, если она создана вручную.
-4. Подготовить privacy model на будущее: public / followers / private.
-5. Добавить smoke-тесты RLS через Supabase local или SQL fixtures.
+3. Сделано 2026-07-06: добавлен `public_profiles` view, прямые публичные profile reads переведены на него.
+4. Проверить фактическую таблицу `comments` и добавить миграцию, если она создана вручную.
+5. Подготовить privacy model на будущее: public / followers / private.
+6. Добавить smoke-тесты RLS через Supabase local или SQL fixtures.
