@@ -347,6 +347,40 @@ with checks as (
         and column_name in ('is_admin', 'is_banned', 'is_blocked')
     ),
     'highlight view should not expose profile service flags'
+
+  union all
+
+  select
+    'admin_moderation_reports view exists',
+    to_regclass('public.admin_moderation_reports') is not null,
+    'moderation queue should read through an admin safe view'
+
+  union all
+
+  select
+    'admin_moderation_reports is not granted to anon',
+    not exists (
+      select 1
+      from information_schema.role_table_grants
+      where table_schema = 'public'
+        and table_name = 'admin_moderation_reports'
+        and grantee = 'anon'
+        and privilege_type = 'SELECT'
+    ),
+    'anonymous users must not be able to query moderation reports'
+
+  union all
+
+  select
+    'admin_moderation_reports exposes no profile service columns',
+    not exists (
+      select 1
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'admin_moderation_reports'
+        and column_name in ('is_admin', 'is_banned', 'is_blocked')
+    ),
+    'moderation view should not expose raw profile service flags'
 )
 select
   check_name,

@@ -135,7 +135,9 @@ id, username, display_name, bio, avatar_url, website, created_at
 
 2026-07-06: добавлена миграция `202607060009_highlight_moments_view.sql` с `public.highlight_moment_details` view. Верхняя плёнка профиля (`highlights`) переведена на safe view с fallback. View возвращает только highlight-row и минимальное превью момента.
 
-Остаточный риск: admin-specific nested joins ещё могут использовать FK-связь PostgREST с явным safe select. Это админская поверхность, но следующий hardening может перевести и эти участки на RPC/view.
+2026-07-06: добавлена миграция `202607060010_admin_moderation_reports_view.sql` с `public.admin_moderation_reports` view. Очередь модерации переведена на admin-only safe view с fallback. View опирается на RLS `reports`, не выдаётся `anon` и не возвращает raw service-флаги профилей.
+
+Остаточный риск: отдельные admin actions всё ещё пишут напрямую в `profiles`, `moments`, `reports` и `admin_audit_log`, но чтение очереди модерации больше не собирается через клиентские FK-joins.
 
 ### 5. Client-writable `account_identities`
 
@@ -198,5 +200,6 @@ order by tablename;
 8. Сделано 2026-07-06: добавлен `album_moment_details` view, альбомные moment reads переведены на safe view.
 9. Сделано 2026-07-06: добавлен `my_notifications` view, уведомления переведены на owner-only safe view.
 10. Сделано 2026-07-06: добавлен `highlight_moment_details` view, профильная плёнка переведена на safe view.
-11. Сделано 2026-07-06: добавлен `SUPABASE_SECURITY_SMOKE_TESTS.sql` для ручной проверки ключевых RLS/schema гарантий в Supabase.
-12. Добавить автоматические smoke-тесты RLS через Supabase local или SQL fixtures.
+11. Сделано 2026-07-06: добавлен `admin_moderation_reports` view, очередь модерации переведена на admin safe view.
+12. Сделано 2026-07-06: добавлен `SUPABASE_SECURITY_SMOKE_TESTS.sql` для ручной проверки ключевых RLS/schema гарантий в Supabase.
+13. Добавить автоматические smoke-тесты RLS через Supabase local или SQL fixtures.

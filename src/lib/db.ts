@@ -41,6 +41,7 @@ const MY_SAVED_MOMENTS_VIEW = 'my_saved_moments'
 const ALBUM_MOMENTS_VIEW = 'album_moment_details'
 const MY_NOTIFICATIONS_VIEW = 'my_notifications'
 const HIGHLIGHT_MOMENTS_VIEW = 'highlight_moment_details'
+const ADMIN_MODERATION_REPORTS_VIEW = 'admin_moderation_reports'
 const PUBLIC_MOMENT_SELECT = [
   'id',
   'user_id',
@@ -108,6 +109,48 @@ const HIGHLIGHT_MOMENT_SELECT = [
   'moment_photo_url',
   'moment_image_variants',
 ].join(', ')
+const ADMIN_MODERATION_REPORT_SELECT = [
+  'id',
+  'reporter_id',
+  'reported_moment_id',
+  'reported_user_id',
+  'reason',
+  'status',
+  'admin_note',
+  'reviewed_by',
+  'reviewed_at',
+  'created_at',
+  'reporter_username',
+  'reporter_display_name',
+  'reporter_bio',
+  'reporter_avatar_url',
+  'reporter_website',
+  'reporter_created_at',
+  'reported_user_username',
+  'reported_user_display_name',
+  'reported_user_bio',
+  'reported_user_avatar_url',
+  'reported_user_website',
+  'reported_user_created_at',
+  'moment_id',
+  'moment_user_id',
+  'moment_photo_url',
+  'moment_image_variants',
+  'moment_caption',
+  'moment_mood',
+  'moment_custom_mood_emoji',
+  'moment_custom_mood_label',
+  'moment_film_preset_id',
+  'moment_is_public',
+  'moment_visibility',
+  'moment_created_at',
+  'moment_author_username',
+  'moment_author_display_name',
+  'moment_author_bio',
+  'moment_author_avatar_url',
+  'moment_author_website',
+  'moment_author_created_at',
+].join(', ')
 
 type PublicMomentRow = Omit<Moment, 'image_variants'> & {
   image_variants?: unknown
@@ -147,6 +190,39 @@ type HighlightMomentDetailsRow = Omit<HighlightWithMoment, 'moments'> & {
   moment_detail_id: string | null
   moment_photo_url: string | null
   moment_image_variants?: unknown
+}
+
+type AdminModerationReportRow = RawModerationReport & {
+  reporter_username: string | null
+  reporter_display_name: string | null
+  reporter_bio: string | null
+  reporter_avatar_url: string | null
+  reporter_website: string | null
+  reporter_created_at: string | null
+  reported_user_username: string | null
+  reported_user_display_name: string | null
+  reported_user_bio: string | null
+  reported_user_avatar_url: string | null
+  reported_user_website: string | null
+  reported_user_created_at: string | null
+  moment_id: string | null
+  moment_user_id: string | null
+  moment_photo_url: string | null
+  moment_image_variants?: unknown
+  moment_caption: string | null
+  moment_mood: string | null
+  moment_custom_mood_emoji: string | null
+  moment_custom_mood_label: string | null
+  moment_film_preset_id: string | null
+  moment_is_public: boolean | null
+  moment_visibility: 'public' | 'followers' | 'private' | null
+  moment_created_at: string | null
+  moment_author_username: string | null
+  moment_author_display_name: string | null
+  moment_author_bio: string | null
+  moment_author_avatar_url: string | null
+  moment_author_website: string | null
+  moment_author_created_at: string | null
 }
 
 function isMissingTableError(error: unknown, tableName: string): boolean {
@@ -281,6 +357,95 @@ function mapNotificationViewRow(row: NotificationViewRow): NotificationItem {
     moments: row.moment_photo_url ? {
       photo_url: row.moment_photo_url,
       image_variants: normalizeImageVariants(row.moment_image_variants),
+    } : null,
+  }
+}
+
+function buildSafeProfile(
+  id: string | null,
+  username: string | null,
+  displayName: string | null,
+  bio: string | null,
+  avatarUrl: string | null,
+  website: string | null,
+  createdAt: string | null,
+): Profile | null {
+  if (!id) return null
+  return {
+    id,
+    username,
+    display_name: displayName,
+    bio,
+    avatar_url: avatarUrl,
+    website,
+    created_at: createdAt ?? new Date(0).toISOString(),
+  }
+}
+
+function mapAdminModerationReportRow(row: AdminModerationReportRow): ModerationReport {
+  const reporter = buildSafeProfile(
+    row.reporter_id,
+    row.reporter_username,
+    row.reporter_display_name,
+    row.reporter_bio,
+    row.reporter_avatar_url,
+    row.reporter_website,
+    row.reporter_created_at,
+  )
+  const reportedUser = buildSafeProfile(
+    row.reported_user_id,
+    row.reported_user_username,
+    row.reported_user_display_name,
+    row.reported_user_bio,
+    row.reported_user_avatar_url,
+    row.reported_user_website,
+    row.reported_user_created_at,
+  )
+  const momentAuthor = buildSafeProfile(
+    row.moment_user_id,
+    row.moment_author_username,
+    row.moment_author_display_name,
+    row.moment_author_bio,
+    row.moment_author_avatar_url,
+    row.moment_author_website,
+    row.moment_author_created_at,
+  )
+
+  return {
+    id: row.id,
+    reporter_id: row.reporter_id,
+    reported_moment_id: row.reported_moment_id,
+    reported_user_id: row.reported_user_id,
+    reason: row.reason,
+    status: row.status,
+    admin_note: row.admin_note,
+    reviewed_by: row.reviewed_by,
+    reviewed_at: row.reviewed_at,
+    created_at: row.created_at,
+    reporter,
+    reported_user: reportedUser,
+    reported_moment: row.moment_id && row.moment_user_id && row.moment_photo_url && row.moment_created_at ? {
+      id: row.moment_id,
+      user_id: row.moment_user_id,
+      photo_url: row.moment_photo_url,
+      image_variants: normalizeImageVariants(row.moment_image_variants),
+      caption: row.moment_caption,
+      mood: row.moment_mood,
+      custom_mood_emoji: row.moment_custom_mood_emoji,
+      custom_mood_label: row.moment_custom_mood_label,
+      film_preset_id: row.moment_film_preset_id,
+      is_public: row.moment_is_public ?? row.moment_visibility === 'public',
+      visibility: row.moment_visibility ?? undefined,
+      created_at: row.moment_created_at,
+      profiles: momentAuthor ?? {
+        id: row.moment_user_id,
+        username: null,
+        display_name: null,
+        bio: null,
+        avatar_url: null,
+        website: null,
+        created_at: row.moment_created_at,
+      },
     } : null,
   }
 }
@@ -1668,6 +1833,24 @@ type RawModerationReport = {
 }
 
 export async function getModerationReports(status: ReportStatus | 'all' = 'open'): Promise<ModerationReport[]> {
+  let viewQuery = supabase
+    .from(ADMIN_MODERATION_REPORTS_VIEW)
+    .select(ADMIN_MODERATION_REPORT_SELECT)
+    .order('created_at', { ascending: false })
+    .limit(100)
+
+  if (status !== 'all') viewQuery = viewQuery.eq('status', status)
+
+  const viewResult = await viewQuery
+  if (!viewResult.error) {
+    return ((viewResult.data as unknown as AdminModerationReportRow[] | null) ?? []).map(mapAdminModerationReportRow)
+  }
+
+  if (!isMissingTableError(viewResult.error, ADMIN_MODERATION_REPORTS_VIEW)) {
+    console.error('[Moderation] reports view load failed:', viewResult.error)
+    return []
+  }
+
   let query = supabase
     .from('reports')
     .select('id, reporter_id, reported_moment_id, reported_user_id, reason, status, admin_note, reviewed_by, reviewed_at, created_at')
