@@ -141,6 +141,8 @@ id, username, display_name, bio, avatar_url, website, created_at
 
 2026-07-07: добавлена миграция `202607070003_star_service_role_grants.sql`. Она явно выдаёт `service_role` минимальные права для Stars Edge Functions: создание invoice rows, запись webhook ledger, завершение платежа через `complete_star_payment`, обновление totals и чтение reconciliation view. `star_payment_reconciliation` явно закрыта от `anon` и `authenticated`.
 
+2026-07-07: добавлена миграция `202607070004_mark_my_notifications_read_rpc.sql`. Клиентский mark-read переведён на RPC `mark_my_notifications_read()`, где пользователь берётся из `auth.uid()`, а не из параметра `userId` с клиента. Старый прямой update оставлен только как fallback до применения миграции.
+
 Остаточный риск: отдельные admin actions всё ещё пишут напрямую в `profiles`, `moments`, `reports` и `admin_audit_log`, но чтение очереди модерации больше не собирается через клиентские FK-joins.
 
 ### 5. Client-writable `account_identities`
@@ -208,3 +210,4 @@ order by tablename;
 12. Сделано 2026-07-06: добавлен `SUPABASE_SECURITY_SMOKE_TESTS.sql` для ручной проверки ключевых RLS/schema гарантий в Supabase.
 13. Добавить автоматические smoke-тесты RLS через Supabase local или SQL fixtures.
 14. Сделано 2026-07-07: добавлены smoke checks для Stars ledger/function/charge uniqueness/service_role grants.
+15. Сделано 2026-07-07: добавлен owner-only RPC для mark notifications read.

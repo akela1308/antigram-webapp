@@ -1528,6 +1528,14 @@ export async function getNotifications(userId: string): Promise<NotificationItem
 }
 
 export async function markNotificationsRead(userId: string): Promise<{ error: unknown }> {
+  const { error: rpcError } = await supabase.rpc('mark_my_notifications_read')
+  if (!rpcError) return { error: null }
+
+  if (!isMissingRpcError(rpcError, 'mark_my_notifications_read')) {
+    console.error('[Notifications] mark read RPC failed:', rpcError)
+    return { error: rpcError }
+  }
+
   const { error } = await supabase
     .from('notifications')
     .update({ read: true })

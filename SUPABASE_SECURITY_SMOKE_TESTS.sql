@@ -345,6 +345,18 @@ with checks as (
   union all
 
   select
+    'mark_my_notifications_read function exists',
+    exists (
+      select 1
+      from information_schema.routines
+      where routine_schema = 'public'
+        and routine_name = 'mark_my_notifications_read'
+    ),
+    'notification read state should be updated through auth.uid() RPC instead of trusting client user_id'
+
+  union all
+
+  select
     'highlight_moment_details view exists',
     to_regclass('public.highlight_moment_details') is not null,
     'profile film strip should read highlights through a safe view'
