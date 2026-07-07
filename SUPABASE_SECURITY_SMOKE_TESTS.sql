@@ -252,6 +252,51 @@ with checks as (
   union all
 
   select
+    'profiles.referral_code column exists',
+    exists (
+      select 1
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'profiles'
+        and column_name = 'referral_code'
+    ),
+    'profiles need stable referral codes for Telegram invite attribution'
+
+  union all
+
+  select
+    'referrals table exists',
+    to_regclass('public.referrals') is not null,
+    'referral attribution should be stored server-side'
+
+  union all
+
+  select
+    'referrals RLS is enabled',
+    exists (
+      select 1
+      from pg_tables
+      where schemaname = 'public'
+        and tablename = 'referrals'
+        and rowsecurity = true
+    ),
+    'referral rows should not be public'
+
+  union all
+
+  select
+    'referral RPCs exist',
+    (
+      select count(*)
+      from information_schema.routines
+      where routine_schema = 'public'
+        and routine_name in ('record_referral_open', 'mark_my_referral_first_post')
+    ) = 2,
+    'server should record opens and users should mark first-post conversion without trusting client ids'
+
+  union all
+
+  select
     'moments storage delete policy exists',
     exists (
       select 1

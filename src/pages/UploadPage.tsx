@@ -16,6 +16,7 @@ import {
   trackShareCardSent,
   trackUploadFailed,
   trackUploadStarted,
+  trackFriendFirstPostAttributed,
 } from '../lib/analytics'
 import { addReaction, getTodaysMomentCount } from '../lib/db'
 import { getDailyFrameLimit } from '../lib/premium'
@@ -448,7 +449,7 @@ function applyFlare(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, fl
 
 type Phase = 'viewfinder' | 'preview' | 'uploading' | 'success'
 export function UploadPage() {
-  const { user, entitlements } = useAuth()
+  const { user, profile, entitlements } = useAuth()
   const { language, t } = useLanguage()
   const navigate = useNavigate()
   const location = useLocation()
@@ -732,6 +733,14 @@ export function UploadPage() {
       }
 
       trackPhotoPosted(preset.id)
+      void (async () => {
+        try {
+          const { data } = await supabase.rpc('mark_my_referral_first_post')
+          if (data === true) trackFriendFirstPostAttributed()
+        } catch {
+          // Referral attribution is a growth signal; posting should never depend on it.
+        }
+      })()
       setTodayCount(prev => (prev ?? 0) + 1)
       if (insertedMoment?.id) {
         setPublishedMoment({
@@ -792,7 +801,7 @@ export function UploadPage() {
         onShareChat={
           publishedMoment
             ? async () => {
-                await shareMomentToChat({ ...publishedMoment, momentId: publishedMoment.id, language })
+                await shareMomentToChat({ ...publishedMoment, momentId: publishedMoment.id, language, referralCode: profile?.referral_code ?? null })
                 trackShareCardSent('telegram_chat')
               }
             : undefined
@@ -800,7 +809,7 @@ export function UploadPage() {
         onShareStory={
           publishedMoment
             ? async () => {
-                await shareMomentToStory({ ...publishedMoment, momentId: publishedMoment.id, language })
+                await shareMomentToStory({ ...publishedMoment, momentId: publishedMoment.id, language, referralCode: profile?.referral_code ?? null })
                 trackShareCardSent(canShareMomentToStory() ? 'telegram_story' : 'telegram_chat_fallback')
               }
             : undefined

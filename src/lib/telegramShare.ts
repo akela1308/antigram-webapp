@@ -7,14 +7,21 @@ interface MomentShareParams {
   photoUrl?: string | null
   caption?: string | null
   language: ShareLanguage
+  referralCode?: string | null
 }
 
 function cleanTelegramName(value: string | undefined): string {
   return (value ?? '').trim().replace(/^@/, '').replace(/^\//, '').replace(/\/$/, '')
 }
 
-export function buildMomentStartParam(momentId: string): string {
-  return `moment_${momentId}`
+function cleanReferralCode(value: string | null | undefined): string | null {
+  const cleaned = (value ?? '').trim().toLowerCase()
+  return /^[a-z0-9_-]{4,24}$/.test(cleaned) ? cleaned : null
+}
+
+export function buildMomentStartParam(momentId: string, referralCode?: string | null): string {
+  const cleanCode = cleanReferralCode(referralCode)
+  return cleanCode ? `moment_${momentId}_ref_${cleanCode}` : `moment_${momentId}`
 }
 
 export function buildMiniAppUrl(startParam?: string): string | null {
@@ -29,8 +36,8 @@ export function buildMiniAppUrl(startParam?: string): string | null {
   return `https://t.me/${path}${query}`
 }
 
-export function buildMomentUrl(momentId: string): string {
-  return buildMiniAppUrl(buildMomentStartParam(momentId)) ?? `${window.location.origin}/moment/${momentId}`
+export function buildMomentUrl(momentId: string, referralCode?: string | null): string {
+  return buildMiniAppUrl(buildMomentStartParam(momentId, referralCode)) ?? `${window.location.origin}/moment/${momentId}`
 }
 
 export function buildMomentShareText(caption: string | null | undefined, language: ShareLanguage): string {
@@ -50,8 +57,8 @@ export function canShareMomentToStory(): boolean {
   )
 }
 
-export async function shareMomentToChat({ momentId, caption, language }: MomentShareParams): Promise<void> {
-  const url = buildMomentUrl(momentId)
+export async function shareMomentToChat({ momentId, caption, language, referralCode }: MomentShareParams): Promise<void> {
+  const url = buildMomentUrl(momentId, referralCode)
   const text = buildMomentShareText(caption, language)
   const telegramShareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`
   const tg = getTelegramWebApp()
@@ -76,7 +83,7 @@ export async function shareMomentToStory(params: MomentShareParams): Promise<voi
   const tg = getTelegramWebApp()
 
   if (photoUrl && canShareMomentToStory() && typeof tg?.shareToStory === 'function') {
-    const url = buildMomentUrl(momentId)
+    const url = buildMomentUrl(momentId, params.referralCode)
     const text = buildMomentShareText(caption, language).slice(0, 200)
 
     hapticImpact('light')

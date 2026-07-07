@@ -145,6 +145,8 @@ id, username, display_name, bio, avatar_url, website, created_at
 
 2026-07-07: добавлена миграция `202607070005_search_public_moments_rpc.sql`. Поиск моментов получает narrow RPC `search_public_moments(query, limit)`, который возвращает только `public_moments` safe surface, ранжирует совпадения по caption/mood/custom mood/author и ограничивает limit. Клиент использует RPC первым путём и оставляет старый `public_moments` query как fallback до применения миграции.
 
+2026-07-07: добавлена миграция `202607070006_referral_attribution.sql`. Появились `profiles.referral_code`, приватная таблица `referrals`, service-role RPC `record_referral_open(...)` и owner-only RPC `mark_my_referral_first_post()`. Telegram share-ссылки на моменты теперь могут добавлять `ref_...` в `startapp`, а `telegram-auth` записывает first-touch attribution при входе.
+
 Остаточный риск: отдельные admin actions всё ещё пишут напрямую в `profiles`, `moments`, `reports` и `admin_audit_log`, но чтение очереди модерации больше не собирается через клиентские FK-joins.
 
 ### 5. Client-writable `account_identities`
@@ -214,3 +216,4 @@ order by tablename;
 14. Сделано 2026-07-07: добавлены smoke checks для Stars ledger/function/charge uniqueness/service_role grants.
 15. Сделано 2026-07-07: добавлен owner-only RPC для mark notifications read.
 16. Сделано 2026-07-07: добавлен public-safe RPC `search_public_moments` и smoke checks для Search V1.
+17. Сделано 2026-07-07: добавлен foundation для Telegram referral attribution.

@@ -152,6 +152,33 @@ async function upsertTelegramIdentity(
     }, { onConflict: 'provider,external_id' })
 }
 
+function getStartParam(initData: string): string | null {
+  const value = new URLSearchParams(initData).get('start_param')?.trim() ?? ''
+  return value.length > 0 && value.length <= 128 ? value : null
+}
+
+function getReferralCodeFromStartParam(startParam: string | null): string | null {
+  if (!startParam) return null
+  const match = startParam.match(/(?:^|_)ref_([a-zA-Z0-9_-]{4,24})$/)
+  return match?.[1]?.toLowerCase() ?? null
+}
+
+async function recordReferralOpen(
+  admin: SupabaseAdmin,
+  inviteeId: string,
+  startParam: string | null,
+) {
+  const referralCode = getReferralCodeFromStartParam(startParam)
+  if (!referralCode) return
+
+  const { error } = await admin.rpc('record_referral_open', {
+    p_invitee_id: inviteeId,
+    p_referral_code: referralCode,
+    p_start_param: startParam,
+  })
+  if (error) console.error('[Referral] record open failed:', error)
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -183,6 +210,7 @@ Deno.serve(async (req) => {
       })
     }
     const tgUser = tgAuth.user
+    const startParam = getStartParam(initData)
 
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: { autoRefreshToken: false, persistSession: false },
@@ -215,6 +243,7 @@ Deno.serve(async (req) => {
           if (tgUser.photo_url) profileUpdate.avatar_url = tgUser.photo_url
           await supabaseAdmin.from('profiles').update(profileUpdate).eq('id', linkedIdentity.user_id)
           await upsertTelegramIdentity(supabaseAdmin, linkedIdentity.user_id, tgUser)
+          await recordReferralOpen(supabaseAdmin, linkedIdentity.user_id, startParam)
 
           return new Response(
             JSON.stringify({
@@ -245,6 +274,7 @@ Deno.serve(async (req) => {
       }
       await supabaseAdmin.from('profiles').update(profileUpdate).eq('id', signInData.session.user.id)
       await upsertTelegramIdentity(supabaseAdmin, signInData.session.user.id, tgUser)
+      await recordReferralOpen(supabaseAdmin, signInData.session.user.id, startParam)
 
       return new Response(
         JSON.stringify({
@@ -284,6 +314,7 @@ Deno.serve(async (req) => {
       avatar_url: tgUser.photo_url ?? null,
     })
     await upsertTelegramIdentity(supabaseAdmin, newUser.user.id, tgUser)
+    await recordReferralOpen(supabaseAdmin, newUser.user.id, startParam)
 
     // Sign in to get session tokens
     const { data: newSignIn, error: newSignInError } = await supabaseAdmin.auth.signInWithPassword({

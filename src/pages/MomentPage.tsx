@@ -25,7 +25,7 @@ import type { MomentWithProfile, ReactionType } from '../lib/types'
 export function MomentPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, profile: authProfile } = useAuth()
   const { language, t } = useLanguage()
 
   const [moment, setMoment] = useState<MomentWithProfile | null>(null)
@@ -104,6 +104,7 @@ export function MomentPage() {
       caption: moment.caption,
       photoUrl: getMomentImageUrl(moment, 'full'),
       language,
+      referralCode: authProfile?.referral_code ?? null,
     })
     trackShareCardSent('telegram_chat')
   }

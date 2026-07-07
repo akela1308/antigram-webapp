@@ -6,6 +6,7 @@ export interface Profile {
   avatar_url: string | null
   website: string | null
   created_at: string
+  referral_code?: string | null
   is_admin?: boolean
   is_banned?: boolean
 }

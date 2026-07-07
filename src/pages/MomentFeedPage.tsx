@@ -272,6 +272,7 @@ export function MomentFeedPage() {
                         caption: menuMoment.caption,
                         photoUrl: getMomentImageUrl(menuMoment, 'full'),
                         language,
+                        referralCode: myProfile?.referral_code ?? null,
                       })
                         .then(() => {
                           trackShareCardSent('telegram_chat')
