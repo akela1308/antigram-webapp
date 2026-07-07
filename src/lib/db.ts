@@ -1744,22 +1744,69 @@ export async function searchAlbums(
 ): Promise<AlbumSearchResult[]> {
   const q = query.trim().replace(/[,%]/g, ' ')
   if (q.length < 2) return []
+  const lower = q.toLowerCase()
+  const moodMatches = EMOTIONS
+    .filter(emotion => emotion.type.includes(lower) || emotion.label.toLowerCase().includes(lower))
+    .map(emotion => emotion.type)
+  const pattern = `%${q}%`
+  const contentFilters = [
+    `caption.ilike.${pattern}`,
+    `custom_mood_label.ilike.${pattern}`,
+    ...moodMatches.map(mood => `mood.eq.${mood}`),
+  ]
 
-  const { data, error } = await supabase
-    .from('albums')
-    .select('id, user_id, title, is_public, created_at')
-    .eq('is_public', true)
-    .ilike('title', `%${q}%`)
-    .order('created_at', { ascending: false })
-    .limit(limit)
+  const [titleResult, contentResult] = await Promise.all([
+    supabase
+      .from('albums')
+      .select('id, user_id, title, is_public, created_at')
+      .eq('is_public', true)
+      .ilike('title', pattern)
+      .order('created_at', { ascending: false })
+      .limit(limit),
+    supabase
+      .from(ALBUM_MOMENTS_VIEW)
+      .select('album_id, created_at')
+      .or(contentFilters.join(','))
+      .order('created_at', { ascending: false })
+      .limit(limit * 4),
+  ])
 
-  if (error) {
-    console.error('[Search] albums failed:', error)
-    return []
+  if (titleResult.error) {
+    console.error('[Search] album titles failed:', titleResult.error)
+  }
+  if (contentResult.error && !isMissingTableError(contentResult.error, ALBUM_MOMENTS_VIEW)) {
+    console.error('[Search] album content failed:', contentResult.error)
+  }
+
+  const titleRows = (titleResult.data as Album[] | null) ?? []
+  const contentAlbumIds = contentResult.error
+    ? []
+    : [...new Set(((contentResult.data as { album_id: string }[] | null) ?? []).map(row => row.album_id))]
+  const missingAlbumIds = contentAlbumIds.filter(albumId => !titleRows.some(album => album.id === albumId))
+
+  const contentAlbumResult = missingAlbumIds.length > 0
+    ? await supabase
+      .from('albums')
+      .select('id, user_id, title, is_public, created_at')
+      .eq('is_public', true)
+      .in('id', missingAlbumIds)
+    : { data: [], error: null }
+
+  if (contentAlbumResult.error) {
+    console.error('[Search] album content rows failed:', contentAlbumResult.error)
+  }
+
+  const albumOrder = new Map<string, number>()
+  for (const album of titleRows) albumOrder.set(album.id, albumOrder.size)
+  for (const albumId of contentAlbumIds) {
+    if (!albumOrder.has(albumId)) albumOrder.set(albumId, albumOrder.size)
   }
 
   const hiddenUserIds = await getHiddenUserIdsForViewer(viewerId)
-  const albumRows = ((data as Album[] | null) ?? []).filter(album => !hiddenUserIds.has(album.user_id))
+  const albumRows = [...titleRows, ...(((contentAlbumResult.data as Album[] | null) ?? []))]
+    .filter(album => !hiddenUserIds.has(album.user_id))
+    .sort((a, b) => (albumOrder.get(a.id) ?? 9999) - (albumOrder.get(b.id) ?? 9999))
+    .slice(0, limit)
   if (albumRows.length === 0) return []
 
   const albumIds = albumRows.map(album => album.id)
