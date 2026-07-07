@@ -104,6 +104,32 @@ with checks as (
   union all
 
   select
+    'search_public_moments function exists',
+    exists (
+      select 1
+      from information_schema.routines
+      where routine_schema = 'public'
+        and routine_name = 'search_public_moments'
+    ),
+    'Search V1 should use a narrow public-safe RPC instead of broad client-side ilike queries'
+
+  union all
+
+  select
+    'search_public_moments executable by clients',
+    (
+      select count(*)
+      from information_schema.routine_privileges
+      where routine_schema = 'public'
+        and routine_name = 'search_public_moments'
+        and grantee in ('anon', 'authenticated')
+        and privilege_type = 'EXECUTE'
+    ) = 2,
+    'anonymous and authenticated discovery search should be able to call the public-safe RPC'
+
+  union all
+
+  select
     'moments privacy select policies exist',
     (
       select count(*)

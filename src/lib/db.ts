@@ -163,6 +163,10 @@ type PublicMomentRow = Omit<Moment, 'image_variants'> & {
   profile_created_at: string
 }
 
+type SearchPublicMomentRow = PublicMomentRow & {
+  search_rank?: number | null
+}
+
 type SavedPublicMomentRow = PublicMomentRow & {
   saved_at: string
   saved_by_user_id: string
@@ -606,20 +610,33 @@ export async function searchMoments(
 
   const [hiddenUserIds, result] = await Promise.all([
     getHiddenUserIdsForViewer(viewerId),
-    supabase
-      .from(PUBLIC_MOMENTS_VIEW)
-      .select(PUBLIC_MOMENT_SELECT)
-      .or(filters.join(','))
-      .order('created_at', { ascending: false })
-      .limit(limit),
+    supabase.rpc('search_public_moments', {
+      p_query: q,
+      p_limit: limit,
+    }),
   ])
 
   if (!result.error) {
-    return filterHiddenMoments(mapPublicMomentRows(result.data as unknown as PublicMomentRow[] | null), hiddenUserIds)
+    return filterHiddenMoments(mapPublicMomentRows(result.data as SearchPublicMomentRow[] | null), hiddenUserIds)
   }
 
-  if (!isMissingTableError(result.error, PUBLIC_MOMENTS_VIEW)) {
-    console.error('[Search] public moments failed:', result.error)
+  if (!isMissingRpcError(result.error, 'search_public_moments')) {
+    console.error('[Search] public moments RPC failed:', result.error)
+  }
+
+  const publicResult = await supabase
+    .from(PUBLIC_MOMENTS_VIEW)
+    .select(PUBLIC_MOMENT_SELECT)
+    .or(filters.join(','))
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (!publicResult.error) {
+    return filterHiddenMoments(mapPublicMomentRows(publicResult.data as unknown as PublicMomentRow[] | null), hiddenUserIds)
+  }
+
+  if (!isMissingTableError(publicResult.error, PUBLIC_MOMENTS_VIEW)) {
+    console.error('[Search] public moments failed:', publicResult.error)
     return []
   }
 
