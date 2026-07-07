@@ -8,7 +8,7 @@ import type { Profile } from '../lib/types'
 import { useNavigate } from 'react-router-dom'
 import { useLanguage } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'
-import { trackSearchResultOpened, trackSearchSubmitted } from '../lib/analytics'
+import { trackMoodChannelOpened, trackSearchResultOpened, trackSearchSubmitted } from '../lib/analytics'
 
 type FilterValue = 'for_you' | ReactionType
 
@@ -91,6 +91,11 @@ export function SearchPage() {
       })
     }
   }, [user, userReactionsMap])
+
+  const handleFilterChange = useCallback((value: FilterValue) => {
+    setFilter(value)
+    trackMoodChannelOpened(value, 'search')
+  }, [])
 
   useEffect(() => {
     if (!isSearching) loadFeed()
@@ -195,7 +200,7 @@ export function SearchPage() {
 
         {/* Emotion filter strip (only when not searching) */}
         {!isSearching && (
-          <CategoryFilmStrip active={filter} onChange={setFilter} />
+          <CategoryFilmStrip active={filter} onChange={handleFilterChange} />
         )}
       </div>
 

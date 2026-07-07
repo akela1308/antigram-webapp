@@ -6,6 +6,7 @@ import { getRandomMoments, getMomentsByEmotion, getMomentStarTotals, getMomentRe
 import { useAuth } from '../contexts/AuthContext'
 import { useLanguage } from '../contexts/LanguageContext'
 import type { MomentWithProfile, ReactionType } from '../lib/types'
+import { trackMoodChannelOpened } from '../lib/analytics'
 
 type FilterValue = 'for_you' | ReactionType
 
@@ -76,6 +77,11 @@ export function ExplorePage() {
     }
   }, [user, userReactionsMap])
 
+  const handleFilterChange = useCallback((value: FilterValue) => {
+    setFilter(value)
+    trackMoodChannelOpened(value, 'explore')
+  }, [])
+
   useEffect(() => {
     loadFeed()
   }, [loadFeed])
@@ -94,7 +100,7 @@ export function ExplorePage() {
             {t('explore.title')}
           </h1>
         </div>
-        <CategoryFilmStrip active={filter} onChange={setFilter} />
+        <CategoryFilmStrip active={filter} onChange={handleFilterChange} />
       </div>
 
       <div style={{ flex: 1, padding: '8px 12px 96px' }}>

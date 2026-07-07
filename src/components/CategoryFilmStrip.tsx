@@ -124,7 +124,11 @@ export function CategoryFilmStrip({
           return (
             <button
               key={`${cat.id}-${virtualIndex}`}
-              onClick={() => onChange(cat.id)}
+              onClick={() => {
+                if (cat.id !== active) onChange(cat.id)
+              }}
+              aria-pressed={isActive}
+              aria-label={label}
               style={{
                 flexShrink: 0,
                 display: 'flex',

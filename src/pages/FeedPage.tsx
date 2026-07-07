@@ -10,6 +10,7 @@ import { getFeed, getRandomMoments, getMomentsByEmotion, getMomentStarTotals, ge
 import { EMOTIONS } from '../lib/types'
 import type { MomentWithProfile, ReactionType } from '../lib/types'
 import { getMomentImageUrl } from '../lib/imageVariants'
+import { trackMoodChannelOpened } from '../lib/analytics'
 
 type FilterValue = 'for_you' | ReactionType
 type CustomMood = { emoji: string; label: string } | null
@@ -86,6 +87,11 @@ export function FeedPage() {
       await addReaction(momentId, user.id, type)
     }
   }, [user, userReactionsMap])
+
+  const handleFilterChange = useCallback((value: FilterValue) => {
+    setFilter(value)
+    trackMoodChannelOpened(value, 'home')
+  }, [])
 
   useEffect(() => {
     loadFeed()
@@ -194,7 +200,7 @@ export function FeedPage() {
         {/* Category film strip */}
         <CategoryFilmStrip
           active={filter}
-          onChange={setFilter}
+          onChange={handleFilterChange}
           thumbnailScope={user ? 'following' : 'global'}
           userId={user?.id ?? null}
         />

@@ -100,7 +100,7 @@ export const trackAlbumCreated = () => track('album_created')
 
 export const trackSearchSubmitted = (scope: string) => track('search_submitted', { scope })
 export const trackSearchResultOpened = (type: string) => track('search_result_opened', { type })
-export const trackMoodChannelOpened = (mood: string) => track('mood_channel_opened', { mood })
+export const trackMoodChannelOpened = (mood: string, source?: string) => track('mood_channel_opened', { mood, source })
 export const trackMoodChannelFollowed = (mood: string) => track('mood_channel_followed', { mood })
 
 export const trackShareCardOpened = (source: string) => track('share_card_opened', { source })
