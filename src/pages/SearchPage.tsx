@@ -9,7 +9,7 @@ import type { Profile } from '../lib/types'
 import { useNavigate } from 'react-router-dom'
 import { useLanguage } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'
-import { trackMoodChannelOpened, trackSearchResultOpened, trackSearchSubmitted } from '../lib/analytics'
+import { trackAlbumOpened, trackMoodChannelOpened, trackSearchResultOpened, trackSearchSubmitted } from '../lib/analytics'
 
 type FilterValue = 'for_you' | ReactionType
 type EmotionItem = (typeof EMOTIONS)[number]
@@ -291,6 +291,7 @@ export function SearchPage() {
                   album={album}
                   onPress={() => {
                     trackSearchResultOpened('album')
+                    trackAlbumOpened('search')
                     navigate(`/album/${album.id}`, { state: { albumTitle: album.title, userId: album.user_id } })
                   }}
                 />
