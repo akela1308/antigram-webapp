@@ -23,6 +23,7 @@ export function SearchPage() {
   const { t } = useLanguage()
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
   const [userResults, setUserResults] = useState<Profile[]>([])
   const [albumResults, setAlbumResults] = useState<AlbumSearchResult[]>([])
   const [momentResults, setMomentResults] = useState<MomentWithProfile[]>([])
@@ -35,14 +36,27 @@ export function SearchPage() {
   const [starTotals, setStarTotals] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const lastTrackedSearchRef = useRef<string | null>(null)
+  const latestQueryRef = useRef('')
 
-  const isSearching = query.trim().length >= 2
+  const trimmedQuery = query.trim()
+  const debouncedSearchQuery = debouncedQuery.trim()
+  const isSearching = trimmedQuery.length >= 2
   const moodResults = isSearching
     ? EMOTIONS.filter(emotion => {
-      const needle = query.trim().toLowerCase()
+      const needle = trimmedQuery.toLowerCase()
       return emotion.type.includes(needle) || emotion.label.toLowerCase().includes(needle)
     })
     : []
+
+  latestQueryRef.current = trimmedQuery
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setDebouncedQuery(query)
+    }, 300)
+
+    return () => window.clearTimeout(timeout)
+  }, [query])
 
   // Load discovery feed
   const loadFeed = useCallback(async () => {
@@ -119,16 +133,17 @@ export function SearchPage() {
 
   // Global search
   useEffect(() => {
-    if (!isSearching) {
+    if (!isSearching || debouncedSearchQuery.length < 2) {
       setUserResults([])
       setAlbumResults([])
       setMomentResults([])
+      setSearchLoading(false)
       return
     }
 
     let cancelled = false
     setSearchLoading(true)
-    const searchQuery = query.trim()
+    const searchQuery = debouncedSearchQuery
     if (lastTrackedSearchRef.current !== searchQuery) {
       lastTrackedSearchRef.current = searchQuery
       trackSearchSubmitted('global', { query_length: searchQuery.length })
@@ -140,7 +155,7 @@ export function SearchPage() {
         searchAlbums(searchQuery, 12, user?.id),
         searchMoments(searchQuery, 24, user?.id),
       ])
-      if (cancelled) return
+      if (cancelled || latestQueryRef.current !== searchQuery) return
 
       setUserResults(users)
       setAlbumResults(albums)
@@ -152,7 +167,7 @@ export function SearchPage() {
           getMomentReactionSummaries(ids, user?.id),
           getMomentStarTotals(ids),
         ])
-        if (cancelled) return
+        if (cancelled || latestQueryRef.current !== searchQuery) return
 
         setReactionsMap(buildReactionListMapFromSummaries(reactionSummaries))
         setUserReactionsMap(buildUserReactionMapFromSummaries(reactionSummaries))
@@ -167,7 +182,7 @@ export function SearchPage() {
     })()
 
     return () => { cancelled = true }
-  }, [query, isSearching, user?.id])
+  }, [debouncedSearchQuery, isSearching, user?.id])
 
   return (
     <div className="flex flex-col" style={{ minHeight: '100dvh', paddingTop: 'var(--tg-top, 56px)' }}>
