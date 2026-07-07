@@ -98,7 +98,9 @@ export const trackProfileOpened = (source: string) => track('profile_opened', { 
 export const trackAlbumOpened = (source: string) => track('album_opened', { source })
 export const trackAlbumCreated = () => track('album_created')
 
-export const trackSearchSubmitted = (scope: string) => track('search_submitted', { scope })
+export const trackSearchSubmitted = (scope: string, properties?: Record<string, unknown>) => {
+  track('search_submitted', { scope, ...properties })
+}
 export const trackSearchResultOpened = (type: string) => track('search_result_opened', { type })
 export const trackMoodChannelOpened = (mood: string, source?: string) => track('mood_channel_opened', { mood, source })
 export const trackMoodChannelFollowed = (mood: string) => track('mood_channel_followed', { mood })

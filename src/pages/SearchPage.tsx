@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, Children } from 'react'
+import { useState, useEffect, useCallback, useRef, Children } from 'react'
 import { CategoryFilmStrip } from '../components/CategoryFilmStrip'
 import { MomentCard } from '../components/MomentCard'
 import { MomentCardSkeleton } from '../components/Skeleton'
@@ -31,6 +31,7 @@ export function SearchPage() {
   const [userReactionsMap, setUserReactionsMap] = useState<Record<string, ReactionType | null>>({})
   const [starTotals, setStarTotals] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
+  const lastTrackedSearchRef = useRef<string | null>(null)
 
   const isSearching = query.trim().length >= 2
 
@@ -112,7 +113,10 @@ export function SearchPage() {
     let cancelled = false
     setSearchLoading(true)
     const searchQuery = query.trim()
-    trackSearchSubmitted('global')
+    if (lastTrackedSearchRef.current !== searchQuery) {
+      lastTrackedSearchRef.current = searchQuery
+      trackSearchSubmitted('global', { query_length: searchQuery.length })
+    }
 
     ;(async () => {
       const [users, foundMoments] = await Promise.all([
