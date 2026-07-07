@@ -328,6 +328,54 @@ with checks as (
   union all
 
   select
+    'albums canonical owner/public policies exist',
+    (
+      select count(*)
+      from pg_policies
+      where schemaname = 'public'
+        and tablename = 'albums'
+        and policyname in (
+          'Albums visible when public or owned',
+          'Albums can be created by owner',
+          'Albums can be updated by owner',
+          'Albums can be deleted by owner'
+        )
+    ) = 4,
+    'public albums should be discoverable while private albums remain owner-only'
+
+  union all
+
+  select
+    'album_moments canonical policies exist',
+    (
+      select count(*)
+      from pg_policies
+      where schemaname = 'public'
+        and tablename = 'album_moments'
+        and policyname in (
+          'Album moments visible when album visible',
+          'Album moments can be created by album owner',
+          'Album moments can be deleted by album owner'
+        )
+    ) = 3,
+    'album contents should only be visible through visible albums'
+
+  union all
+
+  select
+    'album tables RLS is enabled',
+    (
+      select count(*)
+      from pg_tables
+      where schemaname = 'public'
+        and tablename in ('albums', 'album_moments')
+        and rowsecurity = true
+    ) = 2,
+    'albums and album_moments must be protected by RLS'
+
+  union all
+
+  select
     'my_saved_moments view exists',
     to_regclass('public.my_saved_moments') is not null,
     'saved album should read through an owner-only safe view'

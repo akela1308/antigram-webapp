@@ -133,6 +133,8 @@ id, username, display_name, bio, avatar_url, website, created_at
 
 2026-07-06: добавлена миграция `202607060007_album_moments_view.sql` с `public.album_moment_details` view. Чтение превью альбомов и деталей альбома переведено на этот слой с fallback. View возвращает только поля момента и не делает profile join.
 
+2026-07-07: добавлена миграция `202607070007_album_rls_hardening.sql`. Она включает canonical RLS для `albums` и `album_moments`: публичные альбомы читаются всеми, приватные только владельцем; связи `album_moments` читаются только через видимый альбом, а создание/удаление доступно владельцу альбома. Это закрывает риск, что публичный момент внутри приватного альбома мог раскрыть саму связь альбома через view/search.
+
 2026-07-06: добавлена миграция `202607060008_my_notifications_view.sql` с `public.my_notifications` view. Экран уведомлений переведён на owner-only слой с fallback. View не выдаётся `anon`, возвращает safe-поля actor profile и минимальное превью момента.
 
 2026-07-06: добавлена миграция `202607060009_highlight_moments_view.sql` с `public.highlight_moment_details` view. Верхняя плёнка профиля (`highlights`) переведена на safe view с fallback. View возвращает только highlight-row и минимальное превью момента.
@@ -217,3 +219,4 @@ order by tablename;
 15. Сделано 2026-07-07: добавлен owner-only RPC для mark notifications read.
 16. Сделано 2026-07-07: добавлен public-safe RPC `search_public_moments` и smoke checks для Search V1.
 17. Сделано 2026-07-07: добавлен foundation для Telegram referral attribution.
+18. Сделано 2026-07-07: добавлены canonical RLS policies для `albums` и `album_moments`, плюс smoke checks.
