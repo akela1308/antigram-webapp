@@ -35,6 +35,8 @@ import { EMOTIONS } from '../lib/types'
 import type { Moment, HighlightWithMoment, AlbumWithMoments, ReactionType, Profile } from '../lib/types'
 import type { SupportRequest } from '../lib/support'
 import { getMomentImageUrl } from '../lib/imageVariants'
+import { trackInviteFriendOpened } from '../lib/analytics'
+import { shareAntigramInvite } from '../lib/telegramShare'
 
 type ReactionPreview = { type: ReactionType }
 type TelegramUserInfo = {
@@ -1055,6 +1057,14 @@ function SettingsSheet({
     setLoginMessage({ type: 'success', text: t('settings.loginLinked') })
   }
 
+  const handleInviteFriend = async () => {
+    trackInviteFriendOpened('settings')
+    await shareAntigramInvite({
+      referralCode: profile.referral_code ?? null,
+      language,
+    })
+  }
+
   const sheetStyle: React.CSSProperties = {
     position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 100,
     background: '#110C08',
@@ -1191,6 +1201,13 @@ function SettingsSheet({
           </button>
 
           <p style={sectionTitleStyle}>{t('settings.rulesSupport')}</p>
+          <button
+            type="button"
+            onClick={handleInviteFriend}
+            style={{ ...linkButtonStyle, color: 'var(--amber)' }}
+          >
+            {t('settings.inviteFriend')}
+          </button>
           <button
             type="button"
             onClick={() => onNavigate('/premium')}

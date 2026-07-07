@@ -10,6 +10,11 @@ interface MomentShareParams {
   referralCode?: string | null
 }
 
+interface InviteShareParams {
+  referralCode?: string | null
+  language: ShareLanguage
+}
+
 function cleanTelegramName(value: string | undefined): string {
   return (value ?? '').trim().replace(/^@/, '').replace(/^\//, '').replace(/\/$/, '')
 }
@@ -36,6 +41,15 @@ export function buildMiniAppUrl(startParam?: string): string | null {
   return `https://t.me/${path}${query}`
 }
 
+export function buildInviteStartParam(referralCode?: string | null): string | null {
+  const cleanCode = cleanReferralCode(referralCode)
+  return cleanCode ? `ref_${cleanCode}` : null
+}
+
+export function buildInviteUrl(referralCode?: string | null): string {
+  return buildMiniAppUrl(buildInviteStartParam(referralCode) ?? undefined) ?? window.location.origin
+}
+
 export function buildMomentUrl(momentId: string, referralCode?: string | null): string {
   return buildMiniAppUrl(buildMomentStartParam(momentId, referralCode)) ?? `${window.location.origin}/moment/${momentId}`
 }
@@ -46,6 +60,12 @@ export function buildMomentShareText(caption: string | null | undefined, languag
 
   if (!trimmedCaption) return intro
   return `${intro}: ${trimmedCaption}`
+}
+
+export function buildInviteShareText(language: ShareLanguage): string {
+  return language === 'ru'
+    ? 'Залетай в Antigram: камерные моменты, плёнки и эмоции без лишнего шума.'
+    : 'Join me on Antigram: film-like moments, moods, and quiet social photos.'
 }
 
 export function canShareMomentToStory(): boolean {
@@ -60,6 +80,27 @@ export function canShareMomentToStory(): boolean {
 export async function shareMomentToChat({ momentId, caption, language, referralCode }: MomentShareParams): Promise<void> {
   const url = buildMomentUrl(momentId, referralCode)
   const text = buildMomentShareText(caption, language)
+  const telegramShareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`
+  const tg = getTelegramWebApp()
+
+  hapticImpact('light')
+
+  if (typeof tg?.openTelegramLink === 'function') {
+    openTelegramLink(telegramShareUrl)
+    return
+  }
+
+  if (navigator.share) {
+    await navigator.share({ title: 'Antigram', text, url })
+    return
+  }
+
+  await navigator.clipboard?.writeText(`${text}\n${url}`)
+}
+
+export async function shareAntigramInvite({ referralCode, language }: InviteShareParams): Promise<void> {
+  const url = buildInviteUrl(referralCode)
+  const text = buildInviteShareText(language)
   const telegramShareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`
   const tg = getTelegramWebApp()
 
