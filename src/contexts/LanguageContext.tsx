@@ -87,6 +87,7 @@ const translations: Record<AppLanguage, Record<string, string>> = {
     'explore.emptyEmotion': 'Нет постов с такой эмоцией.',
     'search.people': 'Люди',
     'search.moments': 'Моменты',
+    'search.moods': 'Настроения',
 
     'notifications.title': 'Уведомления',
     'notifications.signIn': 'Войдите, чтобы видеть уведомления',
@@ -403,6 +404,7 @@ const translations: Record<AppLanguage, Record<string, string>> = {
     'explore.emptyEmotion': 'No posts with this emotion.',
     'search.people': 'People',
     'search.moments': 'Moments',
+    'search.moods': 'Moods',
 
     'notifications.title': 'Notifications',
     'notifications.signIn': 'Sign in to see notifications',

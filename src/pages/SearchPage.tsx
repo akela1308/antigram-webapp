@@ -3,6 +3,7 @@ import { CategoryFilmStrip } from '../components/CategoryFilmStrip'
 import { MomentCard } from '../components/MomentCard'
 import { MomentCardSkeleton } from '../components/Skeleton'
 import { searchUsers, searchMoments, getRandomMoments, getMomentsByEmotion, getMomentStarTotals, getMomentReactionSummaries, buildReactionListMapFromSummaries, buildUserReactionMapFromSummaries, addReaction } from '../lib/db'
+import { EMOTIONS } from '../lib/types'
 import type { MomentWithProfile, ReactionType } from '../lib/types'
 import type { Profile } from '../lib/types'
 import { useNavigate } from 'react-router-dom'
@@ -11,6 +12,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { trackMoodChannelOpened, trackSearchResultOpened, trackSearchSubmitted } from '../lib/analytics'
 
 type FilterValue = 'for_you' | ReactionType
+type EmotionItem = (typeof EMOTIONS)[number]
 
 interface ReactionsMap {
   [momentId: string]: { type: ReactionType }[]
@@ -34,6 +36,12 @@ export function SearchPage() {
   const lastTrackedSearchRef = useRef<string | null>(null)
 
   const isSearching = query.trim().length >= 2
+  const moodResults = isSearching
+    ? EMOTIONS.filter(emotion => {
+      const needle = query.trim().toLowerCase()
+      return emotion.type.includes(needle) || emotion.label.toLowerCase().includes(needle)
+    })
+    : []
 
   // Load discovery feed
   const loadFeed = useCallback(async () => {
@@ -96,6 +104,12 @@ export function SearchPage() {
   const handleFilterChange = useCallback((value: FilterValue) => {
     setFilter(value)
     trackMoodChannelOpened(value, 'search')
+  }, [])
+
+  const openMoodChannel = useCallback((value: ReactionType) => {
+    setQuery('')
+    setFilter(value)
+    trackMoodChannelOpened(value, 'search_result')
   }, [])
 
   useEffect(() => {
@@ -226,6 +240,13 @@ export function SearchPage() {
             </div>
           )}
 
+          {!searchLoading && moodResults.length > 0 && (
+            <section>
+              <SearchSectionTitle>{t('search.moods')}</SearchSectionTitle>
+              <MoodChannelRow moods={moodResults} onPress={openMoodChannel} />
+            </section>
+          )}
+
           {!searchLoading && userResults.length > 0 && (
             <section>
               <SearchSectionTitle>{t('search.people')}</SearchSectionTitle>
@@ -349,6 +370,53 @@ function UserRow({ profile, onPress }: { profile: Profile; onPress: () => void }
         <polyline points="9 18 15 12 9 6" />
       </svg>
     </button>
+  )
+}
+
+function MoodChannelRow({
+  moods,
+  onPress,
+}: {
+  moods: EmotionItem[]
+  onPress: (value: ReactionType) => void
+}) {
+  const { t } = useLanguage()
+  return (
+    <div
+      className="no-scrollbar"
+      style={{
+        display: 'flex',
+        gap: 8,
+        overflowX: 'auto',
+        padding: '2px 12px 10px',
+        WebkitOverflowScrolling: 'touch',
+      }}
+    >
+      {moods.map(mood => (
+        <button
+          key={mood.type}
+          onClick={() => onPress(mood.type)}
+          style={{
+            flexShrink: 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            minHeight: 42,
+            padding: '9px 12px',
+            borderRadius: 18,
+            border: '1px solid rgba(212,137,26,0.45)',
+            background: 'rgba(201,132,62,0.10)',
+            color: 'var(--text)',
+            cursor: 'pointer',
+          }}
+        >
+          <span style={{ fontSize: 18, lineHeight: 1 }}>{mood.emoji}</span>
+          <span style={{ fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}>
+            {t(`emotion.${mood.type}`)}
+          </span>
+        </button>
+      ))}
+    </div>
   )
 }
 
