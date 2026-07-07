@@ -86,6 +86,7 @@ const translations: Record<AppLanguage, Record<string, string>> = {
     'explore.title': 'Подборки',
     'explore.emptyEmotion': 'Нет постов с такой эмоцией.',
     'search.people': 'Люди',
+    'search.albums': 'Альбомы',
     'search.moments': 'Моменты',
     'search.moods': 'Настроения',
 
@@ -405,6 +406,7 @@ const translations: Record<AppLanguage, Record<string, string>> = {
     'explore.title': 'Collections',
     'explore.emptyEmotion': 'No posts with this emotion.',
     'search.people': 'People',
+    'search.albums': 'Albums',
     'search.moments': 'Moments',
     'search.moods': 'Moods',
 

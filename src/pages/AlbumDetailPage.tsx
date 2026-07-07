@@ -25,6 +25,7 @@ export function AlbumDetailPage() {
   const { t } = useLanguage()
   const state = location.state as { albumTitle?: string; userId?: string; isSavedAlbum?: boolean } | null
   const isSavedAlbum = albumId === 'saved' || state?.isSavedAlbum === true
+  const isOwnerAlbum = !isSavedAlbum && !!user && state?.userId === user.id
 
   const [albumMoments, setAlbumMoments] = useState<Moment[]>([])
   const [allMoments, setAllMoments] = useState<Moment[]>([])
@@ -43,13 +44,13 @@ export function AlbumDetailPage() {
     setLoading(true)
     const [am, um] = await Promise.all([
       isSavedAlbum && user ? getSavedMoments(user.id) : getAlbumMoments(albumId),
-      user && !isSavedAlbum ? getUserMoments(user.id) : Promise.resolve([]),
+      isOwnerAlbum ? getUserMoments(user.id) : Promise.resolve([]),
     ])
     setAlbumMoments(am as MomentWithProfile[])
     setAllMoments(um)
     setMomentStarTotals(am.length > 0 ? await getMomentStarTotals(am.map(moment => moment.id)) : {})
     setLoading(false)
-  }, [albumId, isSavedAlbum, user])
+  }, [albumId, isOwnerAlbum, isSavedAlbum, user])
 
   useEffect(() => { load() }, [load])
 
@@ -113,7 +114,7 @@ export function AlbumDetailPage() {
         <h2 style={{ color: 'var(--text)', fontSize: 17, fontWeight: 700, margin: 0, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {albumTitle.startsWith('#') ? albumTitle : `#${albumTitle}`}
         </h2>
-        {!isSavedAlbum && (
+        {isOwnerAlbum && (
           <button
             onClick={() => setShowMenu(prev => !prev)}
             style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 22, cursor: 'pointer', padding: '0 4px', position: 'relative' }}
@@ -146,7 +147,7 @@ export function AlbumDetailPage() {
       </div>
 
       {/* Add button */}
-      {!isSavedAlbum && (
+      {isOwnerAlbum && (
         <div style={{ padding: '12px 16px' }}>
         <button
           onClick={() => setShowAddPicker(true)}
@@ -180,7 +181,7 @@ export function AlbumDetailPage() {
               key={m.id}
               style={{ position: 'relative', aspectRatio: '1', overflow: 'hidden', cursor: 'pointer' }}
               onClick={() => {
-                if (isSavedAlbum) {
+                if (isSavedAlbum || !isOwnerAlbum) {
                   const startIndex = albumMoments.findIndex(moment => moment.id === m.id)
                   navigate('/moment-feed', { state: { moments: albumMoments, startIndex, isOwner: false, userId: user?.id } })
                   return
@@ -205,7 +206,7 @@ export function AlbumDetailPage() {
                 compact
                 style={{ position: 'absolute', right: 5, bottom: 5 }}
               />
-              {!isSavedAlbum && removeConfirmId === m.id && (
+              {isOwnerAlbum && removeConfirmId === m.id && (
                 <div style={{
                   position: 'absolute', inset: 0,
                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,

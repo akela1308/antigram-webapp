@@ -117,6 +117,10 @@ export interface AlbumWithMoments extends Album {
   first_moment_url: string | null
 }
 
+export interface AlbumSearchResult extends AlbumWithMoments {
+  profiles: Profile | null
+}
+
 export interface MomentStarTotal {
   moment_id: string
   total_amount: number

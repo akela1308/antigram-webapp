@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback, useRef, Children } from 'react'
 import { CategoryFilmStrip } from '../components/CategoryFilmStrip'
 import { MomentCard } from '../components/MomentCard'
 import { MomentCardSkeleton } from '../components/Skeleton'
-import { searchUsers, searchMoments, getRandomMoments, getMomentsByEmotion, getMomentStarTotals, getMomentReactionSummaries, buildReactionListMapFromSummaries, buildUserReactionMapFromSummaries, addReaction } from '../lib/db'
+import { searchUsers, searchMoments, searchAlbums, getRandomMoments, getMomentsByEmotion, getMomentStarTotals, getMomentReactionSummaries, buildReactionListMapFromSummaries, buildUserReactionMapFromSummaries, addReaction } from '../lib/db'
 import { EMOTIONS } from '../lib/types'
-import type { MomentWithProfile, ReactionType } from '../lib/types'
+import type { AlbumSearchResult, MomentWithProfile, ReactionType } from '../lib/types'
 import type { Profile } from '../lib/types'
 import { useNavigate } from 'react-router-dom'
 import { useLanguage } from '../contexts/LanguageContext'
@@ -24,6 +24,7 @@ export function SearchPage() {
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
   const [userResults, setUserResults] = useState<Profile[]>([])
+  const [albumResults, setAlbumResults] = useState<AlbumSearchResult[]>([])
   const [momentResults, setMomentResults] = useState<MomentWithProfile[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
 
@@ -120,6 +121,7 @@ export function SearchPage() {
   useEffect(() => {
     if (!isSearching) {
       setUserResults([])
+      setAlbumResults([])
       setMomentResults([])
       return
     }
@@ -133,13 +135,15 @@ export function SearchPage() {
     }
 
     ;(async () => {
-      const [users, foundMoments] = await Promise.all([
+      const [users, albums, foundMoments] = await Promise.all([
         searchUsers(searchQuery, user?.id),
+        searchAlbums(searchQuery, 12, user?.id),
         searchMoments(searchQuery, 24, user?.id),
       ])
       if (cancelled) return
 
       setUserResults(users)
+      setAlbumResults(albums)
       setMomentResults(foundMoments)
 
       if (foundMoments.length > 0) {
@@ -234,7 +238,7 @@ export function SearchPage() {
             </div>
           )}
 
-          {!searchLoading && userResults.length === 0 && momentResults.length === 0 && (
+          {!searchLoading && userResults.length === 0 && albumResults.length === 0 && momentResults.length === 0 && (
             <div style={{ padding: '48px 24px', textAlign: 'center' }}>
               <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>{t('common.notFound')}</p>
             </div>
@@ -257,6 +261,22 @@ export function SearchPage() {
                   onPress={() => {
                     trackSearchResultOpened('profile')
                     navigate(`/profile/${profile.id}`)
+                  }}
+                />
+              ))}
+            </section>
+          )}
+
+          {!searchLoading && albumResults.length > 0 && (
+            <section>
+              <SearchSectionTitle>{t('search.albums')}</SearchSectionTitle>
+              {albumResults.map(album => (
+                <AlbumRow
+                  key={album.id}
+                  album={album}
+                  onPress={() => {
+                    trackSearchResultOpened('album')
+                    navigate(`/album/${album.id}`, { state: { albumTitle: album.title, userId: album.user_id } })
                   }}
                 />
               ))}
@@ -365,6 +385,60 @@ function UserRow({ profile, onPress }: { profile: Profile; onPress: () => void }
             {profile.bio}
           </p>
         )}
+      </div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round">
+        <polyline points="9 18 15 12 9 6" />
+      </svg>
+    </button>
+  )
+}
+
+function AlbumRow({ album, onPress }: { album: AlbumSearchResult; onPress: () => void }) {
+  const ownerName = album.profiles?.display_name || album.profiles?.username || 'antigram'
+  return (
+    <button
+      onClick={onPress}
+      style={{
+        width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+        padding: '12px 16px', background: 'none', border: 'none',
+        borderBottom: '1px solid var(--border)', cursor: 'pointer', textAlign: 'left',
+      }}
+    >
+      <div
+        style={{
+          width: 54,
+          height: 54,
+          borderRadius: 10,
+          overflow: 'hidden',
+          flexShrink: 0,
+          border: '1px solid var(--border)',
+          background: 'var(--bg-warm)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'var(--brown)',
+          fontSize: 20,
+        }}
+      >
+        {album.first_moment_url ? (
+          <img
+            src={album.first_moment_url}
+            alt=""
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            loading="lazy"
+            decoding="async"
+          />
+        ) : (
+          <span>□</span>
+        )}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ color: 'var(--text)', fontWeight: 700, fontSize: 14, margin: 0, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+          {album.title.startsWith('#') ? album.title : `#${album.title}`}
+        </p>
+        <p style={{ color: 'var(--text-muted)', fontSize: 12, margin: '3px 0 0', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+          {ownerName} · {album.moments_count}
+        </p>
       </div>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round">
         <polyline points="9 18 15 12 9 6" />

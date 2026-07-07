@@ -14,6 +14,7 @@ import type {
   CommentWithProfile,
   Album,
   AlbumWithMoments,
+  AlbumSearchResult,
   HighlightWithMoment,
   NotificationItem,
   MomentStarTotal,
@@ -1733,6 +1734,95 @@ export async function getUserAlbums(userId: string): Promise<AlbumWithMoments[]>
     ...album,
     moments_count: stats[album.id]?.count ?? 0,
     first_moment_url: stats[album.id]?.first_moment_url ?? null,
+  }))
+}
+
+export async function searchAlbums(
+  query: string,
+  limit = 12,
+  viewerId?: string | null,
+): Promise<AlbumSearchResult[]> {
+  const q = query.trim().replace(/[,%]/g, ' ')
+  if (q.length < 2) return []
+
+  const { data, error } = await supabase
+    .from('albums')
+    .select('id, user_id, title, is_public, created_at')
+    .eq('is_public', true)
+    .ilike('title', `%${q}%`)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) {
+    console.error('[Search] albums failed:', error)
+    return []
+  }
+
+  const hiddenUserIds = await getHiddenUserIdsForViewer(viewerId)
+  const albumRows = ((data as Album[] | null) ?? []).filter(album => !hiddenUserIds.has(album.user_id))
+  if (albumRows.length === 0) return []
+
+  const albumIds = albumRows.map(album => album.id)
+  const [profiles, albumMomentsResult] = await Promise.all([
+    getPublicProfilesByIds(albumRows.map(album => album.user_id)),
+    supabase
+      .from(ALBUM_MOMENTS_VIEW)
+      .select('album_id, photo_url, image_variants')
+      .in('album_id', albumIds)
+      .order('added_at', { ascending: false }),
+  ])
+
+  const profileById = new Map(profiles.map(profile => [profile.id, profile]))
+  const stats: Record<string, { count: number; first_moment_url: string | null }> = {}
+  for (const albumId of albumIds) stats[albumId] = { count: 0, first_moment_url: null }
+
+  type AlbumMomentPreviewRow = {
+    album_id: string
+    photo_url: string
+    image_variants?: unknown
+    moments?:
+      | { photo_url: string; image_variants?: Record<string, string> | null }
+      | { photo_url: string; image_variants?: Record<string, string> | null }[]
+      | null
+  }
+
+  let albumMoments = albumMomentsResult.data as unknown as AlbumMomentPreviewRow[] | null
+
+  if (albumMomentsResult.error && isMissingTableError(albumMomentsResult.error, ALBUM_MOMENTS_VIEW)) {
+    const fallbackResult = await supabase
+      .from('album_moments')
+      .select('album_id, moments(photo_url, image_variants)')
+      .in('album_id', albumIds)
+      .order('added_at', { ascending: false })
+
+    if (fallbackResult.error && isMissingImageVariantsError(fallbackResult.error)) {
+      const legacyResult = await supabase
+        .from('album_moments')
+        .select('album_id, moments(photo_url)')
+        .in('album_id', albumIds)
+        .order('added_at', { ascending: false })
+      albumMoments = legacyResult.data as AlbumMomentPreviewRow[] | null
+    } else if (!fallbackResult.error) {
+      albumMoments = fallbackResult.data as AlbumMomentPreviewRow[] | null
+    }
+  } else if (albumMomentsResult.error && !isMissingImageVariantsError(albumMomentsResult.error)) {
+    console.error('[Search] album previews failed:', albumMomentsResult.error)
+  }
+
+  for (const row of albumMoments ?? []) {
+    const albumStats = stats[row.album_id]
+    if (!albumStats) continue
+    const nestedMoment = Array.isArray(row.moments) ? row.moments[0] : row.moments
+    const moment = row.photo_url ? row : nestedMoment
+    albumStats.count += 1
+    albumStats.first_moment_url ??= moment ? getMomentImageUrl(moment as Moment, 'thumb') : null
+  }
+
+  return albumRows.map(album => ({
+    ...album,
+    moments_count: stats[album.id]?.count ?? 0,
+    first_moment_url: stats[album.id]?.first_moment_url ?? null,
+    profiles: profileById.get(album.user_id) ?? null,
   }))
 }
 
