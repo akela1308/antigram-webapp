@@ -17,10 +17,11 @@ import {
   trackUploadFailed,
   trackUploadStarted,
   trackFriendFirstPostAttributed,
+  trackInviteFriendOpened,
 } from '../lib/analytics'
 import { addReaction, getTodaysMomentCount } from '../lib/db'
 import { getDailyFrameLimit } from '../lib/premium'
-import { shareMomentToChat, shareMomentToStory, canShareMomentToStory } from '../lib/telegramShare'
+import { shareMomentToChat, shareMomentToStory, canShareMomentToStory, shareAntigramInvite } from '../lib/telegramShare'
 import { createResizedJpegBlob, MOMENT_IMAGE_VARIANTS } from '../lib/imageVariants'
 import type { ImageVariants } from '../lib/types'
 import { hapticImpact, withBackButton } from '../lib/platform'
@@ -814,6 +815,10 @@ export function UploadPage() {
               }
             : undefined
         }
+        onInviteFriend={async () => {
+          trackInviteFriendOpened('post_success')
+          await shareAntigramInvite({ referralCode: profile?.referral_code ?? null, language })
+        }}
         onOpenFeed={() => navigate('/')}
       />
     )
@@ -1757,6 +1762,7 @@ function DevelopingScreen({
   canShareStory,
   onShareChat,
   onShareStory,
+  onInviteFriend,
   onOpenFeed,
 }: {
   previewUrl: string | null
@@ -1764,6 +1770,7 @@ function DevelopingScreen({
   canShareStory: boolean
   onShareChat?: () => void | Promise<void>
   onShareStory?: () => void | Promise<void>
+  onInviteFriend: () => void | Promise<void>
   onOpenFeed: () => void
 }) {
   const { t } = useLanguage()
@@ -1969,7 +1976,7 @@ function DevelopingScreen({
             type="button"
             onClick={onOpenFeed}
             style={{
-              marginTop: 3,
+              marginTop: 2,
               border: 'none',
               background: 'transparent',
               color: 'rgba(232,196,144,0.62)',
@@ -1978,6 +1985,20 @@ function DevelopingScreen({
             }}
           >
             {t('camera.openFeed')}
+          </button>
+          <button
+            type="button"
+            onClick={() => void onInviteFriend()}
+            style={{
+              marginTop: -4,
+              border: 'none',
+              background: 'transparent',
+              color: 'rgba(232,196,144,0.46)',
+              fontSize: 12,
+              fontWeight: 700,
+            }}
+          >
+            {t('camera.inviteFriend')}
           </button>
         </div>
       </div>
