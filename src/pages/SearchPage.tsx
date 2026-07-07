@@ -394,6 +394,7 @@ function UserRow({ profile, onPress }: { profile: Profile; onPress: () => void }
 }
 
 function AlbumRow({ album, onPress }: { album: AlbumSearchResult; onPress: () => void }) {
+  const { t } = useLanguage()
   const ownerName = album.profiles?.display_name || album.profiles?.username || 'antigram'
   return (
     <button
@@ -437,7 +438,7 @@ function AlbumRow({ album, onPress }: { album: AlbumSearchResult; onPress: () =>
           {album.title.startsWith('#') ? album.title : `#${album.title}`}
         </p>
         <p style={{ color: 'var(--text-muted)', fontSize: 12, margin: '3px 0 0', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
-          {ownerName} · {album.moments_count}
+          {ownerName} · {t('profile.framesCount', { count: album.moments_count })}
         </p>
       </div>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round">
