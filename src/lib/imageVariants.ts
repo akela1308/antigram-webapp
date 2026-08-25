@@ -1,9 +1,14 @@
 import type { ImageVariantName, ImageVariants, Moment } from './types'
 
+// Лестница вариантов. Источник ограничен 1600px (MOMENT_EXPORT_MAX_SIZE),
+// на практике почти всегда 1080x1080 — поэтому feed/full со стороной >= 1080
+// не давали никакой экономии: feed.jpg получался байт-в-байт равен оригиналу.
+// Стороны и quality подобраны так, чтобы каждый вариант был реально легче
+// предыдущего. Основной расход egress — лента, а не детальный просмотр.
 export const MOMENT_IMAGE_VARIANTS: Record<Exclude<ImageVariantName, 'original'>, { maxSide: number; quality: number }> = {
-  thumb: { maxSide: 480, quality: 0.78 },
-  feed: { maxSide: 1080, quality: 0.82 },
-  full: { maxSide: 1600, quality: 0.85 },
+  thumb: { maxSide: 400, quality: 0.70 },
+  feed: { maxSide: 800, quality: 0.72 },
+  full: { maxSide: 1080, quality: 0.82 },
 }
 
 export function getMomentImageUrl(
@@ -31,9 +36,12 @@ export async function createResizedJpegBlob(source: Blob, maxSide: number, quali
   const image = await loadImage(source)
   const sourceMaxSide = Math.max(image.naturalWidth, image.naturalHeight)
 
-  if (sourceMaxSide <= maxSide) return source
-
-  const scale = maxSide / sourceMaxSide
+  // Раньше здесь был ранний выход `if (sourceMaxSide <= maxSide) return source`.
+  // Из-за него вариант, у которого maxSide >= стороны исходника, возвращался
+  // как исходный blob — то есть вообще без пережатия. Теперь всегда
+  // перекодируем: даже без уменьшения стороны более низкий quality даёт
+  // заметную экономию (особенно на зерне плёнки, которое дорого кодируется).
+  const scale = Math.min(1, maxSide / sourceMaxSide)
   const canvas = document.createElement('canvas')
   canvas.width = Math.max(1, Math.round(image.naturalWidth * scale))
   canvas.height = Math.max(1, Math.round(image.naturalHeight * scale))
@@ -45,12 +53,16 @@ export async function createResizedJpegBlob(source: Blob, maxSide: number, quali
   ctx.imageSmoothingQuality = 'high'
   ctx.drawImage(image, 0, 0, canvas.width, canvas.height)
 
-  return new Promise((resolve, reject) => {
+  const encoded = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(blob => {
       if (blob) resolve(blob)
       else reject(new Error('Could not export resized JPEG'))
     }, 'image/jpeg', quality)
   })
+
+  // Страховка: если исходник почему-то оказался легче пережатого варианта
+  // (например, уже сильно сжатый JPEG), отдаём исходник.
+  return encoded.size < source.size ? encoded : source
 }
 
 export function normalizeImageVariants(value: unknown): ImageVariants {

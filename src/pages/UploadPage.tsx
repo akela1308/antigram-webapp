@@ -134,13 +134,20 @@ function getMomentExportCanvas(source: HTMLCanvasElement): HTMLCanvasElement {
   return output
 }
 
+// Пути к файлам уникальны (userId/timestamp/variant.jpg) и никогда не
+// перезаписываются, поэтому картинки можно кэшировать максимально долго.
+// По умолчанию Supabase Storage отдаёт cache-control: max-age=3600 — то есть
+// один и тот же кадр перекачивается заново каждый час просмотра. Год +
+// immutable убирает повторные загрузки из egress почти полностью.
+const MOMENT_IMAGE_CACHE_CONTROL = '31536000, immutable'
+
 async function uploadMomentImages(userId: string, source: Blob): Promise<{ photoUrl: string; variants: ImageVariants }> {
   const stamp = Date.now()
   const originalPath = `${userId}/${stamp}/original.jpg`
 
   const { error: originalError } = await supabase.storage
     .from('moments')
-    .upload(originalPath, source, { contentType: 'image/jpeg' })
+    .upload(originalPath, source, { contentType: 'image/jpeg', cacheControl: MOMENT_IMAGE_CACHE_CONTROL })
   if (originalError) throw new Error(originalError.message)
 
   const { data: { publicUrl: originalUrl } } = supabase.storage.from('moments').getPublicUrl(originalPath)
@@ -156,7 +163,7 @@ async function uploadMomentImages(userId: string, source: Blob): Promise<{ photo
 
     const { error } = await supabase.storage
       .from('moments')
-      .upload(path, blob, { contentType: 'image/jpeg' })
+      .upload(path, blob, { contentType: 'image/jpeg', cacheControl: MOMENT_IMAGE_CACHE_CONTROL })
     if (error) throw new Error(error.message)
 
     const { data: { publicUrl } } = supabase.storage.from('moments').getPublicUrl(path)

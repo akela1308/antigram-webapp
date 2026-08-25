@@ -492,8 +492,11 @@ function ShotCard({ moment: m, cardRef, reactionCounts, myReaction, starTotal, o
     <div ref={cardRef} style={{ marginBottom: 8, borderBottom: '8px solid #080503' }}>
       {/* Photo with "..." button */}
       <div style={{ position: 'relative' }}>
+        {/* Лента прокрутки — самый частый экран, поэтому здесь feed-вариант,
+            а не full: кадр всё равно показывается по ширине экрана.
+            Полноразмерный original остаётся в меню «сохранить» и на MomentPage. */}
         <img
-          src={getMomentImageUrl(m, 'full')}
+          src={getMomentImageUrl(m, 'feed')}
           alt={m.caption ?? ''}
           style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', display: 'block' }}
           loading="lazy"
