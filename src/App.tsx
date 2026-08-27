@@ -19,6 +19,7 @@ import { PrivacyPage } from './pages/PrivacyPage'
 import { TermsPage } from './pages/TermsPage'
 import { PremiumPage } from './pages/PremiumPage'
 import { ModerationPage } from './pages/ModerationPage'
+import { PaymentsPage } from './pages/PaymentsPage'
 import { trackSessionStart } from './lib/analytics'
 import { getTelegramLaunchPath, getTelegramStartParam } from './lib/telegramLaunch'
 
@@ -89,6 +90,7 @@ export function App() {
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/premium" element={<PremiumPage />} />
         <Route path="/admin/moderation" element={<ModerationPage />} />
+        <Route path="/admin/payments" element={<PaymentsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       {!hideNav && <BottomNav />}

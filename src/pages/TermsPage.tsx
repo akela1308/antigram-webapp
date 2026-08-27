@@ -89,8 +89,8 @@ export function TermsPage() {
         <h2 style={headingStyle}>{isRu ? '7. Antigram Premium' : '7. Antigram Premium'}</h2>
         <p style={textStyle}>
           {isRu
-            ? `Antigram Premium — цифровая услуга внутри приложения. На запуске Premium планируется по цене ${PREMIUM_PRICE_STARS} Stars за ${PREMIUM_PERIOD_DAYS} дней и будет оплачиваться через Telegram Stars. Premium может включать увеличенный дневной лимит кадров, редкие плёнки и фильтры, расширенную плёнку профиля, Premium-бейдж, ранний доступ к функциям и приоритетную поддержку. Состав функций может меняться, но активные оплаченные преимущества сохраняются на оплаченный период.`
-            : `Antigram Premium is a digital service inside the app. At launch, Premium is planned at ${PREMIUM_PRICE_STARS} Stars for ${PREMIUM_PERIOD_DAYS} days and will be paid through Telegram Stars. Premium may include a higher daily frame limit, rare films and filters, an expanded profile film strip, a Premium badge, early access to features, and priority support. The feature set may change, but active paid benefits remain available for the paid period.`}
+            ? `Antigram Premium — цифровая услуга внутри приложения. Premium стоит ${PREMIUM_PRICE_STARS} Stars за ${PREMIUM_PERIOD_DAYS} дней и оплачивается через Telegram Stars. Это разовая оплата без автопродления: по окончании срока Premium можно продлить вручную, а повторная покупка прибавляется к остатку текущего срока. Premium может включать увеличенный дневной лимит кадров, редкие плёнки и фильтры, расширенную плёнку профиля, Premium-бейдж, ранний доступ к функциям и приоритетную поддержку. Состав функций может меняться, но активные оплаченные преимущества сохраняются на оплаченный период.`
+            : `Antigram Premium is a digital service inside the app. Premium costs ${PREMIUM_PRICE_STARS} Stars for ${PREMIUM_PERIOD_DAYS} days and is paid through Telegram Stars. It is a one-time payment without auto-renewal: you can extend Premium manually when it expires, and a repeat purchase is added on top of the remaining period. Premium may include a higher daily frame limit, rare films and filters, an expanded profile film strip, a Premium badge, early access to features, and priority support. The feature set may change, but active paid benefits remain available for the paid period.`}
         </p>
         <p style={{ ...textStyle, marginTop: 8 }}>
           {isRu
@@ -112,8 +112,8 @@ export function TermsPage() {
         <h2 style={headingStyle}>{isRu ? '9. Поддержка' : '9. Support'}</h2>
         <p style={textStyle}>
           {isRu
-            ? 'По вопросам платежей, Stars, удаления аккаунта и модерации напишите в поддержку: support@antigram.app.'
-            : 'For payments, Stars, account deletion, and moderation questions, contact support: support@antigram.app.'}
+            ? 'По вопросам платежей, Stars, удаления аккаунта и модерации напишите в поддержку: support@antigram.app. По оплатам и возвратам можно также отправить боту Antigram команду /paysupport — там указано, какие данные о платеже приложить.'
+            : 'For payments, Stars, account deletion, and moderation questions, contact support: support@antigram.app. For payments and refunds you can also send the /paysupport command to the Antigram bot, which explains what payment details to include.'}
         </p>
       </section>
 

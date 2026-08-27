@@ -83,6 +83,24 @@ export function ModerationPage() {
   return (
     <PageShell onBack={() => navigate(-1)} title={t('moderation.title')}>
       <div style={{ padding: '12px 14px 100px' }}>
+        <Link
+          to="/admin/payments"
+          style={{
+            display: 'block',
+            marginBottom: 12,
+            padding: '11px 14px',
+            borderRadius: 12,
+            border: '1px solid #2E2218',
+            background: 'rgba(255,255,255,0.03)',
+            color: 'var(--amber)',
+            fontSize: 13,
+            fontWeight: 800,
+            textDecoration: 'none',
+          }}
+        >
+          {language === 'ru' ? '★ Платежи и возвраты' : '★ Payments and refunds'}
+        </Link>
+
         <div className="no-scrollbar" style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 12 }}>
           {(['open', 'reviewed', 'dismissed', 'actioned', 'all'] as FilterValue[]).map(item => (
             <button

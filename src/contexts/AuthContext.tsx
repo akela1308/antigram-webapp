@@ -29,7 +29,7 @@ interface AuthContextValue {
   setRecoverySessionFromUrl: () => Promise<boolean>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
-  refreshEntitlements: () => Promise<void>
+  refreshEntitlements: () => Promise<UserEntitlements | null>
   loginWithTelegram: () => Promise<void>
 }
 
@@ -95,6 +95,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loadEntitlements = useCallback(async (userId: string) => {
     const rights = await getUserEntitlements(userId)
     setEntitlements(rights)
+    // Возвращаем значение: после оплаты Premium экран ждёт активации вебхуком
+    // и опрашивает права, а состояние React обновится только к следующему рендеру.
+    return rights
   }, [])
 
   const refreshProfile = useCallback(async () => {
@@ -102,7 +105,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user, loadProfile])
 
   const refreshEntitlements = useCallback(async () => {
-    if (user) await loadEntitlements(user.id)
+    if (!user) return null
+    return await loadEntitlements(user.id)
   }, [user, loadEntitlements])
 
   // Telegram auth: send initData to Edge Function and get back a session

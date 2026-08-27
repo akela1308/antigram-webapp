@@ -138,6 +138,25 @@ export interface StarInvoiceResponse {
   paymentId: string
 }
 
+export interface PremiumInvoiceResponse {
+  invoiceLink: string
+  subscriptionId: string
+}
+
+/** Строка списка платежей в админке. Идентификаторов Telegram здесь нет. */
+export interface AdminPayment {
+  id: string
+  kind: 'moment' | 'premium'
+  amount: number
+  status: string
+  created_at: string
+  paid_at: string | null
+  refunded_at: string | null
+  payer_name: string
+  counterparty_name: string
+  target_id: string | null
+}
+
 export interface PremiumSubscription {
   id: string
   user_id: string

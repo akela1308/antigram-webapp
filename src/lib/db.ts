@@ -21,6 +21,8 @@ import type {
   ProfileStarTotal,
   PremiumSubscription,
   StarInvoiceResponse,
+  PremiumInvoiceResponse,
+  AdminPayment,
   FollowProfile,
   ReportStatus,
   ModerationReport,
@@ -1189,6 +1191,62 @@ export async function getProfileStarTotal(profileId: string): Promise<number> {
   }
 
   return ((data as ProfileStarTotal | null)?.total_received) ?? 0
+}
+
+/**
+ * Счёт на Antigram Premium. Цену назначает сервер — клиент её не присылает,
+ * а подписка активируется только вебхуком по successful_payment.
+ */
+/** Последние платежи для админки. Проверку прав делает сама функция в базе. */
+export async function getAdminPayments(limit = 100): Promise<AdminPayment[]> {
+  const { data, error } = await supabase.rpc('admin_recent_payments', { p_limit: limit })
+  if (error) throw error
+  return (data as AdminPayment[]) ?? []
+}
+
+/**
+ * Возврат звёзд. Сначала Telegram, потом база — порядок задан на сервере.
+ * Клиент присылает только внутренний id: charge id в браузер не попадает.
+ */
+export async function adminRefundPayment(kind: 'moment' | 'premium', id: string): Promise<void> {
+  const { data: sessionData } = await supabase.auth.getSession()
+  const token = sessionData.session?.access_token
+  if (!token) throw new Error('auth_required')
+
+  const { data, error } = await supabase.functions.invoke<{ ok?: boolean; error?: string }>(
+    'admin-refund-payment',
+    {
+      body: { kind, id },
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  )
+
+  if (error) throw error
+  if (!data?.ok) throw new Error(data?.error ?? 'refund_failed')
+}
+
+export async function createPremiumInvoice(): Promise<PremiumInvoiceResponse> {
+  const { data: sessionData } = await supabase.auth.getSession()
+  const token = sessionData.session?.access_token
+
+  if (!token) {
+    throw new Error('auth_required')
+  }
+
+  const { data, error } = await supabase.functions.invoke<PremiumInvoiceResponse>(
+    'create-star-invoice',
+    {
+      body: { kind: 'premium' },
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  )
+
+  if (error) throw error
+  if (!data?.invoiceLink || !data.subscriptionId) {
+    throw new Error('invoice_link_missing')
+  }
+
+  return data
 }
 
 export async function createStarInvoice(

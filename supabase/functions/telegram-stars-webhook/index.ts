@@ -7,6 +7,12 @@ const BOT_TOKEN = Deno.env.get('BOT_TOKEN') ?? ''
 const WEBHOOK_SECRET = Deno.env.get('TELEGRAM_WEBHOOK_SECRET') ?? ''
 const WEBAPP_URL = Deno.env.get('WEBAPP_URL') ?? 'https://antigram-webapp.vercel.app'
 
+// Счета двух видов различаются префиксом payload: `star_…` — поддержка кадра,
+// `premium_…` — подписка. Payload генерирует сервер, подделать вид нельзя.
+const PREMIUM_PAYLOAD_PREFIX = 'premium_'
+const isPremiumPayload = (payload: string | undefined | null) =>
+  Boolean(payload && payload.startsWith(PREMIUM_PAYLOAD_PREFIX))
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-telegram-bot-api-secret-token',
@@ -60,6 +66,13 @@ interface StarPaymentRow {
   status: string
 }
 
+interface CompletePremiumResult {
+  subscription_id: string
+  user_id: string
+  expires_at: string
+  already_active: boolean
+}
+
 interface CompletePaymentResult {
   payment_id: string
   moment_id: string
@@ -69,7 +82,7 @@ interface CompletePaymentResult {
 }
 
 type BotLanguage = 'ru' | 'en'
-type BotTextKey = 'fallback' | 'what' | 'upload' | 'support' | 'welcome'
+type BotTextKey = 'fallback' | 'what' | 'upload' | 'support' | 'welcome' | 'paysupport'
 type AuthorNotificationResult =
   | { status: 'sent' }
   | { status: 'failed'; error: string }
@@ -100,6 +113,13 @@ const BOT_TEXT: Record<BotLanguage, Record<BotTextKey, string>> = {
       'Это Antigram.\n\n' +
       'Здесь сохраняют моменты как кадры на плёнке: фото, настроение, альбомы, реакции и люди, которых хочется найти по вайбу.\n\n' +
       'Начни с приложения — там уже можно смотреть ленту, загружать кадры и собирать профиль.',
+    paysupport:
+      'Оплата в Antigram проходит через Telegram Stars.\n\n' +
+      'Звёздами можно поддержать понравившийся кадр и оформить Antigram Premium. ' +
+      'Поддержка кадра — это добровольный знак признания и рейтинг автора, а не перевод денег автору.\n\n' +
+      'Если звёзды списались, а доступ или счётчик не появились — напишите сюда. ' +
+      'Укажите дату и сумму платежа: мы найдём его по идентификатору Telegram и вернём звёзды, если покупка не сработала.\n\n' +
+      'Полные условия — в разделе «Условия» внутри приложения.',
   },
   en: {
     fallback:
@@ -125,6 +145,13 @@ const BOT_TEXT: Record<BotLanguage, Record<BotTextKey, string>> = {
       'This is Antigram.\n\n' +
       'Save moments as film-like frames: photos, moods, albums, reactions, and people you discover by the feeling of a shot.\n\n' +
       'Start with the app — you can already browse the feed, upload frames, and build your profile there.',
+    paysupport:
+      'Payments in Antigram go through Telegram Stars.\n\n' +
+      'Stars can support a frame you like and unlock Antigram Premium. ' +
+      'Supporting a frame is a voluntary appreciation signal and author reputation, not a money transfer to the author.\n\n' +
+      'If Stars were charged but the access or counter did not appear, write here. ' +
+      'Include the date and amount: we will find the payment by its Telegram identifier and refund the Stars if the purchase did not work.\n\n' +
+      'Full rules are in the Terms section inside the app.',
   },
 }
 
@@ -144,15 +171,28 @@ Deno.serve(async (req) => {
     }
 
     const update = await req.json() as TelegramUpdate
-    const hasValidWebhookSecret =
-      !WEBHOOK_SECRET || req.headers.get('x-telegram-bot-api-secret-token') === WEBHOOK_SECRET
     const hasPaymentUpdate = Boolean(update.pre_checkout_query || update.message?.successful_payment)
 
-    if (!hasValidWebhookSecret && hasPaymentUpdate) {
-      console.error('[Stars] payment update rejected: invalid webhook secret')
+    // Раньше здесь было `!WEBHOOK_SECRET || ...`: при незаданном секрете любой
+    // запрос считался валидным, включая платёжные. Это открытая дверь —
+    // достаточно выписать себе счёт на 1 звезду, взять его invoice_payload и
+    // прислать поддельный successful_payment, ничего не заплатив.
+    // Платежи теперь fail closed: нет секрета — нет обработки.
+    const suppliedSecret = req.headers.get('x-telegram-bot-api-secret-token') ?? ''
+    const hasValidWebhookSecret = Boolean(WEBHOOK_SECRET) && timingSafeEqual(suppliedSecret, WEBHOOK_SECRET)
+
+    if (hasPaymentUpdate && !hasValidWebhookSecret) {
+      console.error(
+        WEBHOOK_SECRET
+          ? '[Stars] payment update rejected: invalid webhook secret'
+          : '[Stars] payment update rejected: TELEGRAM_WEBHOOK_SECRET is not set',
+      )
       return json({ ok: false, error: 'Invalid webhook secret' }, 401)
     }
 
+    // Не платёжные апдейты (меню бота) пока пропускаем даже без секрета, чтобы
+    // не уронить живого бота, если webhook зарегистрирован без secret_token.
+    // Как только setWebhook будет перевыпущен с секретом — это можно ужесточить.
     if (!hasValidWebhookSecret) {
       console.warn('[Bot] non-payment update received without valid webhook secret')
     }
@@ -188,6 +228,11 @@ Deno.serve(async (req) => {
     if (successfulPayment) {
       if (successfulPayment.currency !== 'XTR') {
         console.error('[Stars] unexpected currency:', successfulPayment.currency)
+        return json({ ok: true })
+      }
+
+      if (isPremiumPayload(successfulPayment.invoice_payload)) {
+        await handlePremiumPayment(admin, update, successfulPayment)
         return json({ ok: true })
       }
 
@@ -229,6 +274,108 @@ Deno.serve(async (req) => {
   }
 })
 
+// ── premium ─────────────────────────────────────────────────────────────────
+
+/**
+ * Подтверждение счёта на подписку. Цена сверяется с той, что сервер записал в
+ * строку подписки при выписке счёта: клиент её не присылает и подменить не может.
+ * Ответить нужно за 10 секунд, иначе Telegram отменит платёж.
+ */
+async function handlePremiumPreCheckout(
+  admin: ReturnType<typeof createClient>,
+  query: NonNullable<TelegramUpdate['pre_checkout_query']>,
+) {
+  const { data, error } = await admin
+    .from('premium_subscriptions')
+    .select('id, status, price_stars')
+    .eq('invoice_payload', query.invoice_payload)
+    .maybeSingle()
+
+  const subscription = data as { id: string; status: string; price_stars: number } | null
+  const ok = !error
+    && subscription !== null
+    && subscription.status === 'pending'
+    && query.currency === 'XTR'
+    && subscription.price_stars === query.total_amount
+
+  await telegramApi('answerPreCheckoutQuery', {
+    pre_checkout_query_id: query.id,
+    ok,
+    error_message: ok ? undefined : 'Не удалось подтвердить счёт Antigram Premium. Попробуйте ещё раз.',
+  })
+
+  if (!ok) {
+    console.error('[Premium] pre_checkout rejected:', { query, error, subscription })
+  }
+}
+
+/**
+ * Активация подписки. Единственная точка, где премиум включается, — и только
+ * после successful_payment от Telegram.
+ */
+async function handlePremiumPayment(
+  admin: ReturnType<typeof createClient>,
+  update: TelegramUpdate,
+  payment: NonNullable<NonNullable<TelegramUpdate['message']>['successful_payment']>,
+) {
+  const chatId = update.message?.chat?.id
+  const language = getUserLanguage(update.message?.from)
+
+  const { data, error } = await admin.rpc('complete_premium_subscription', {
+    p_invoice_payload: payment.invoice_payload,
+    p_telegram_payment_charge_id: payment.telegram_payment_charge_id,
+    p_provider_payment_charge_id: payment.provider_payment_charge_id ?? null,
+    p_telegram_payer_id: update.message?.from?.id ?? null,
+    p_raw_update: update,
+  })
+
+  if (error) {
+    console.error('[Premium] activation failed:', error, payment.invoice_payload)
+    if (chatId) {
+      await telegramApi('sendMessage', {
+        chat_id: chatId,
+        text: language === 'ru'
+          ? 'Оплата получена, но включить Premium не удалось. Отправьте /paysupport — разберёмся и вернём звёзды.'
+          : 'Payment received, but Premium could not be activated. Send /paysupport — we will sort it out or refund the Stars.',
+      })
+    }
+    return
+  }
+
+  const result = (data as CompletePremiumResult[] | null)?.[0]
+
+  // Повторная доставка вебхука: подписка уже активна, второй раз не сообщаем.
+  if (!result || result.already_active) {
+    console.log('[Premium] duplicate webhook for', payment.invoice_payload)
+    return
+  }
+
+  console.log('[Premium] activated', result.subscription_id, 'until', result.expires_at)
+
+  if (chatId) {
+    const until = new Date(result.expires_at).toLocaleDateString(language === 'ru' ? 'ru-RU' : 'en-GB')
+    await telegramApi('sendMessage', {
+      chat_id: chatId,
+      text: language === 'ru'
+        ? `Antigram Premium активен до ${until}. Больше кадров в день, редкие плёнки и расширенная плёнка профиля уже доступны.`
+        : `Antigram Premium is active until ${until}. More frames per day, rare films, and an extended profile strip are available now.`,
+      reply_markup: mainKeyboard(language),
+    })
+  }
+}
+
+/** Сравнение секрета без утечки времени. */
+function timingSafeEqual(a: string, b: string): boolean {
+  const encoder = new TextEncoder()
+  const ab = encoder.encode(a)
+  const bb = encoder.encode(b)
+  let diff = ab.length ^ bb.length
+  for (let i = 0; i < Math.max(ab.length, bb.length); i++) {
+    diff |= (ab[i] ?? 0) ^ (bb[i] ?? 0)
+  }
+  return diff === 0
+}
+
 // ── bot onboarding ──────────────────────────────────────────────────────────────
 
 async function handleBotMessage(message: NonNullable<TelegramUpdate['message']>) {
@@ -241,6 +388,16 @@ async function handleBotMessage(message: NonNullable<TelegramUpdate['message']>)
   if (text.startsWith('/start') || text.startsWith('/help') || text === 'start') {
     await configureBotSurface(chatId, language)
     await sendWelcome(chatId, message.from, language)
+    return
+  }
+
+  // Telegram требует эту команду от ботов, принимающих платежи.
+  if (text.startsWith('/paysupport') || text.startsWith('/refund')) {
+    await telegramApi('sendMessage', {
+      chat_id: chatId,
+      text: BOT_TEXT[language].paysupport,
+      reply_markup: mainKeyboard(language),
+    })
     return
   }
 
@@ -298,6 +455,7 @@ async function configureBotSurface(chatId: number | string, language: BotLanguag
       commands: [
         { command: 'start', description: 'Open Antigram menu' },
         { command: 'help', description: 'Show Antigram help' },
+        { command: 'paysupport', description: 'Payments and refunds' },
         { command: 'language', description: 'Change language' },
       ],
     }),
@@ -437,6 +595,11 @@ async function handlePreCheckout(
   admin: ReturnType<typeof createClient>,
   query: NonNullable<TelegramUpdate['pre_checkout_query']>,
 ) {
+  if (isPremiumPayload(query.invoice_payload)) {
+    await handlePremiumPreCheckout(admin, query)
+    return
+  }
+
   const { data, error } = await admin
     .from('star_payments')
     .select('id, amount, currency, status')

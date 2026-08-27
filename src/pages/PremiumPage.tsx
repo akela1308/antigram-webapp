@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useLanguage } from '../contexts/LanguageContext'
@@ -7,7 +7,9 @@ import {
   PREMIUM_PRICE_STARS,
   PREMIUM_PERIOD_DAYS,
 } from '../lib/premium'
-import { trackPremiumPageViewed, trackPremiumStarted } from '../lib/analytics'
+import { createPremiumInvoice } from '../lib/db'
+import { hapticNotification, openPlatformInvoice } from '../lib/platform'
+import { trackPremiumPageViewed, trackPremiumStarted, trackPremiumActivated } from '../lib/analytics'
 
 const featureKeys = [
   'premium.feature.frames',
@@ -21,14 +23,72 @@ const featureKeys = [
 export function PremiumPage() {
   const navigate = useNavigate()
   const { t } = useLanguage()
-  const { entitlements, isPremium } = useAuth()
+  const { entitlements, isPremium, refreshEntitlements } = useAuth()
   const premiumUntil = entitlements?.premium_until
     ? new Date(entitlements.premium_until).toLocaleDateString()
     : null
 
+  const [pending, setPending] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+
   useEffect(() => {
     trackPremiumPageViewed('premium_page')
   }, [])
+
+  /**
+   * Статус 'paid' приходит на клиент, и доверять ему нельзя: премиум включает
+   * только вебхук по successful_payment. Поэтому после оплаты просто
+   * перечитываем права с небольшими повторами — вебхук может чуть отстать.
+   */
+  const waitForActivation = async (): Promise<boolean> => {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      if (attempt > 0) {
+        await new Promise(resolve => setTimeout(resolve, 650 * attempt))
+      }
+      const next = await refreshEntitlements()
+      if (next?.is_premium) return true
+    }
+    return false
+  }
+
+  const handleBuy = async () => {
+    if (isPremium || !PREMIUM_ENABLED || pending) return
+
+    setPending(true)
+    setMessage(t('premium.processing'))
+    trackPremiumStarted()
+
+    try {
+      const invoice = await createPremiumInvoice()
+      const status = await openPlatformInvoice(invoice.invoiceLink)
+
+      if (status === 'paid') {
+        hapticNotification('success')
+        const activated = await waitForActivation()
+        if (activated) trackPremiumActivated()
+        setMessage(activated ? t('premium.activated') : t('premium.accepted'))
+        return
+      }
+
+      if (status === 'cancelled') {
+        setMessage(t('premium.cancelled'))
+        return
+      }
+
+      if (status === 'opened') {
+        setMessage(t('premium.invoiceOpened'))
+        return
+      }
+
+      setMessage(t('premium.failed'))
+    } catch (error) {
+      console.error('[Premium] purchase failed:', error)
+      hapticNotification('error')
+      setMessage(t('premium.failed'))
+    } finally {
+      setPending(false)
+    }
+  }
 
   return (
     <div
@@ -134,10 +194,8 @@ export function PremiumPage() {
       </section>
 
       <button
-        disabled={isPremium || !PREMIUM_ENABLED}
-        onClick={() => {
-          if (!isPremium && PREMIUM_ENABLED) trackPremiumStarted()
-        }}
+        disabled={isPremium || !PREMIUM_ENABLED || pending}
+        onClick={handleBuy}
         style={{
           width: '100%',
           padding: '15px 0',
@@ -153,10 +211,24 @@ export function PremiumPage() {
       >
         {isPremium
           ? t('premium.active')
+          : pending
+          ? t('premium.processing')
           : PREMIUM_ENABLED
           ? t('premium.buy', { price: PREMIUM_PRICE_STARS })
           : t('premium.comingSoon')}
       </button>
+
+      {message && (
+        <p style={{ color: 'var(--amber)', fontSize: 13, fontWeight: 700, margin: '10px 4px 0', textAlign: 'center' }}>
+          {message}
+        </p>
+      )}
+
+      {!isPremium && PREMIUM_ENABLED && (
+        <p style={{ color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.55, margin: '10px 4px 0', textAlign: 'center' }}>
+          {t('premium.disclaimer')}
+        </p>
+      )}
 
       <p style={{ color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.55, margin: '12px 4px 0', textAlign: 'center' }}>
         {t('premium.note')}

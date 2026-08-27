@@ -9,3 +9,6 @@ deploy_stars.sh
 
 # Supabase CLI temp files
 supabase/.temp/
+
+# Временные архивы после проверок — удалить можно вручную
+_to_delete/

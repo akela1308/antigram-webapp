@@ -1,6 +1,9 @@
 import type { PremiumSubscription } from './types'
 
-export const PREMIUM_ENABLED = false
+// Включено после закаливания платежей: вебхук больше не fail-open при пустом
+// секрете, премиум активируется только по successful_payment, есть /paysupport
+// и путь возврата. План проекта держал этот флаг выключенным именно до этого.
+export const PREMIUM_ENABLED = true
 export const PREMIUM_PRICE_STARS = 149
 export const PREMIUM_PERIOD_DAYS = 30
 export const PREMIUM_REGULAR_DAILY_FRAME_LIMIT = 4
