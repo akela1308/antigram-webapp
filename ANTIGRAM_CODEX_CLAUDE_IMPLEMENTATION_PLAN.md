@@ -6,7 +6,7 @@ This document turns the July 2026 product research and the current architecture 
 
 Primary inputs:
 
-- `/Users/maksimilin/Desktop/ANTIGRAM/Исследования/Antigram в июле 2026.docx`
+- `/Users/maksimilin/Desktop/Projects/ANTIGRAM/Исследования/Antigram в июле 2026.docx`
 - `/Users/maksimilin/Downloads/Antigram глубинное исследование аудитории, рынка и мультиплатформенного запуска.docx`
 - `ANTIGRAM_ARCHITECTURE_DEEP_DIVE.md`
 - `CLAUDE.md`

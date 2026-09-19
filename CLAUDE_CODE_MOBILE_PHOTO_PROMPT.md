@@ -2,7 +2,7 @@
 
 ## Контекст
 
-Expo + React Native приложение. Папка: `/Users/maksimilin/Desktop/ANTIGRAM/mobile/`
+Expo + React Native приложение. Папка: `/Users/maksimilin/Desktop/Projects/ANTIGRAM/mobile/`
 
 В отличие от Telegram webapp, у мобильного приложения есть реальные `.cube` LUT-файлы и `expo-gl` — значит делаем GPU-обработку через WebGL шейдер, как в настоящем профессиональном редакторе.
 

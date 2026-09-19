@@ -3,7 +3,7 @@
 ## Контекст проекта
 
 Telegram Mini App на React + Vite + TypeScript + TailwindCSS.
-Расположение кода: `/Users/maksimilin/Desktop/ANTIGRAM/telegram-webapp/`
+Расположение кода: `/Users/maksimilin/Desktop/Projects/ANTIGRAM/telegram-webapp/`
 Деплой: Vercel (auto-deploy из git main). URL регистрируется в BotFather.
 
 Supabase проект: `https://kwjjwmpcnukfxmwhjwed.supabase.co`
